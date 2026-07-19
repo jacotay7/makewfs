@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 from .config import WFSConfig
+from .source import iter_source_states
+
+
+def _file_digest(path: str) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()[:16]
 
 
 def metadata(
@@ -21,6 +32,7 @@ def metadata(
     seed: int | None,
 ) -> dict[str, Any]:
     """Build serializable metadata for an ideal or detector frame."""
+    states = iter_source_states(config)
     result: dict[str, Any] = {
         "frame_type": "wfs",
         "wfs_sensor": sensor_kind,
@@ -30,7 +42,18 @@ def metadata(
         "wfs_captured_photons_s": float(captured_rate),
         "wfs_input_opd_rms_m": float(np.sqrt(np.mean(np.asarray(opd_m) ** 2))),
         "wfs_seed": seed if seed is not None else "internal",
+        "wfs_source_state_count": len(states),
+        "wfs_source_wavelengths_m": sorted({state.wavelength_m for state in states}),
     }
+    references = {
+        "input_static_opd": config.input.static_opd_path,
+        "telescope_custom_mask": config.telescope.custom_mask_path,
+        "source_sed": config.source.sed_path,
+        "source_transmission": config.source.transmission_path,
+    }
+    for name, path in references.items():
+        if path is not None:
+            result[f"wfs_{name}_sha256"] = _file_digest(path)
     for package in ("makewfs", "getframes"):
         try:
             result[f"{package}_version"] = importlib.metadata.version(package)

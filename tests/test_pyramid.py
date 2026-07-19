@@ -57,3 +57,5 @@ def test_pyramid_frame_records_face_order() -> None:
         "lower_left",
         "lower_right",
     ]
+    assert frame.metadata["wfs_source_state_count"] == 1
+    assert frame.metadata["wfs_source_wavelengths_m"] == [7.0e-7]
