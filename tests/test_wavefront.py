@@ -51,3 +51,11 @@ def test_circular_pupil_area_is_reasonable() -> None:
     pupil = make_pupil(config.telescope, (256, 256), 2.0)
     expected = np.pi * (1.0**2) / (2.0**2)
     assert pupil.mean() == pytest.approx(expected, rel=0.02)
+
+
+def test_pupil_supersampling_improves_boundary_area() -> None:
+    config = _config()
+    expected = np.pi / 4.0
+    coarse = make_pupil(config.telescope, (32, 32), 2.0)
+    fine = make_pupil(config.telescope, (32, 32), 2.0, supersampling=8)
+    assert abs(float(fine.mean()) - expected) <= abs(float(coarse.mean()) - expected)

@@ -42,7 +42,12 @@ class PyramidEngine(SensorEngine):
         self.internal_shape = (pixels, pixels)
         self.output_shape = (pixels + separation, pixels + separation)
         self.nfft = next_fast_length(max(self.output_shape))
-        self.pupil = make_pupil(config.telescope, self.internal_shape, config.input.grid_extent_m)
+        self.pupil = make_pupil(
+            config.telescope,
+            self.internal_shape,
+            config.input.grid_extent_m,
+            supersampling=config.numerics.pupil_supersampling,
+        )
         self.wavefront = WavefrontInput(config, load_static_opd(config))
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
         self.source_rate = source_rate_per_s(config.source, config.telescope)

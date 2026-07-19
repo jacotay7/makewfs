@@ -20,6 +20,10 @@ Unknown keys and conflicting normalization choices are errors. File paths are
 resolved relative to the TOML file. The normalized configuration has a short
 SHA-256 `digest` used in frame provenance.
 
+`numerics.pupil_supersampling` sub-samples analytic circular, annular, and
+spider boundaries before averaging each pupil pixel. Custom masks may be `.npy`,
+`.npz`, or FITS arrays in `[0, 1]`.
+
 ## Source normalization and morphology
 
 For laboratory or already-calibrated flux, use:

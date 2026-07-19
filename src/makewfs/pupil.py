@@ -20,8 +20,14 @@ def _load_mask(path: str, shape: tuple[int, int]) -> NDArray[np.float64]:
         if not archive.files:
             raise ValueError(f"custom pupil archive {source} contains no arrays")
         array = archive[archive.files[0]]
+    elif source.suffix.lower() in {".fits", ".fit"}:
+        try:
+            from astropy.io import fits  # type: ignore[import-untyped]
+        except ImportError as exc:  # pragma: no cover - optional file format
+            raise ImportError("reading FITS pupil masks requires astropy") from exc
+        array = fits.getdata(source)
     else:
-        raise ValueError("custom pupil masks currently support .npy or .npz")
+        raise ValueError("custom pupil masks support .npy, .npz, or FITS")
     result = np.asarray(array, dtype=np.float64)
     if result.shape != shape:
         raise ValueError(f"custom pupil shape {result.shape} does not match {shape}")
@@ -31,12 +37,37 @@ def _load_mask(path: str, shape: tuple[int, int]) -> NDArray[np.float64]:
 
 
 def make_pupil(
-    config: TelescopeConfig, shape: tuple[int, int], extent_m: float
+    config: TelescopeConfig,
+    shape: tuple[int, int],
+    extent_m: float,
+    *,
+    supersampling: int = 1,
 ) -> NDArray[np.float64]:
     """Sample a circular/annular pupil with optional spiders or custom mask."""
+    if supersampling < 1:
+        raise ValueError("supersampling must be >= 1")
     if config.custom_mask_path is not None:
         return _load_mask(config.custom_mask_path, shape)
-    xx, yy = _coordinates(shape, extent_m)
+    if supersampling == 1:
+        xx, yy = _coordinates(shape, extent_m)
+        return _analytic_mask(config, xx, yy)
+    height, width = shape
+    centre_x, centre_y = _coordinates(shape, extent_m)
+    offsets = (np.arange(supersampling, dtype=np.float64) + 0.5) / supersampling - 0.5
+    mask = np.zeros(shape, dtype=np.float64)
+    for offset_y in offsets:
+        for offset_x in offsets:
+            xx = centre_x + offset_x * extent_m / width
+            yy = centre_y + offset_y * extent_m / height
+            mask += _analytic_mask(config, xx, yy)
+    return mask / (supersampling * supersampling)
+
+
+def _analytic_mask(
+    config: TelescopeConfig,
+    xx: NDArray[np.float64],
+    yy: NDArray[np.float64],
+) -> NDArray[np.float64]:
     radius = np.hypot(xx, yy)
     pupil_radius = config.pupil_diameter_m / 2.0
     mask = (radius <= pupil_radius).astype(np.float64)

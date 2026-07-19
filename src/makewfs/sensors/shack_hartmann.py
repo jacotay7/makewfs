@@ -38,7 +38,12 @@ class ShackHartmannEngine(SensorEngine):
         input_samples = max(config.input.shape) / self.n_lenslets
         self.samples_per_lenslet = requested or max(8, math.ceil(input_samples))
         self.internal_shape = (self.n_lenslets * self.samples_per_lenslet,) * 2
-        self.pupil = make_pupil(config.telescope, self.internal_shape, config.input.grid_extent_m)
+        self.pupil = make_pupil(
+            config.telescope,
+            self.internal_shape,
+            config.input.grid_extent_m,
+            supersampling=config.numerics.pupil_supersampling,
+        )
         self.wavefront = WavefrontInput(config, load_static_opd(config))
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
         self.lenslet_mask = self._make_lenslet_mask()
