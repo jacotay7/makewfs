@@ -133,8 +133,9 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Broader independent validation, full gallery artifacts, benchmark regression
-  envelopes, and GPU path.
+- [ ] Broader independent validation, full gallery artifacts, GPU path, and
+  release completion remain staged; relative benchmark regression envelopes are
+  now in CI.
 
 ## 4. End-state user experience
 
@@ -693,8 +694,8 @@ a real GPU backend without an architectural rewrite.
   document stability, and record intentional future extension points.
 - [ ] Verify clean-room installation using released `pyturb` and `getframes`, not
   editable sibling checkouts. Record minimum compatible versions.
-- [ ] Build and inspect sdist/wheel contents, run package metadata checks, tag
-  `1.0.0`, publish docs, and cut a reproducible release.
+- [x] Build and inspect sdist/wheel contents and run package metadata checks.
+- [ ] Tag `1.0.0`, publish docs, and cut a reproducible release.
 
 **Exit:** both sensors and all promised examples satisfy the definition of success
 in section 1, with a stable minimal API and no copied atmosphere/detector physics.
