@@ -195,9 +195,11 @@ class SourceConfig:
     lgs_ranges_m: tuple[float, ...] = ()
     lgs_range_weights: tuple[float, ...] = ()
     lgs_launch_position_m: tuple[float, float] = (0.0, 0.0)
+    sed_path: str | None = None
+    transmission_path: str | None = None
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> SourceConfig:
+    def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> SourceConfig:
         _strict(
             data,
             {
@@ -216,6 +218,8 @@ class SourceConfig:
                 "lgs_ranges_m",
                 "lgs_range_weights",
                 "lgs_launch_position_m",
+                "sed_path",
+                "transmission_path",
             },
             "source",
         )
@@ -301,6 +305,13 @@ class SourceConfig:
             raise ConfigError("source.lgs_launch_position_m: expected [x, y]")
         if kind != "lgs" and (lgs_ranges or lgs_weights or any(value != 0 for value in launch)):
             raise ConfigError("source: LGS geometry fields require source.kind = 'lgs'")
+        base_path = Path.cwd() if base is None else base
+        sed = data.get("sed_path")
+        transmission = data.get("transmission_path")
+        sed_path = None if sed is None else str((base_path / str(sed)).resolve())
+        transmission_path = (
+            None if transmission is None else str((base_path / str(transmission)).resolve())
+        )
         return cls(
             kind,
             normalization,
@@ -317,6 +328,8 @@ class SourceConfig:
             lgs_ranges,
             lgs_weights,
             (launch[0], launch[1]),
+            sed_path,
+            transmission_path,
         )
 
 
@@ -575,11 +588,11 @@ class WFSConfig:
 
         input_config = InputConfig.from_dict(table("input"), base=base_path)
         telescope_config = TelescopeConfig.from_dict(table("telescope"), base=base_path)
-        source_config = SourceConfig.from_dict(table("source"))
+        source_config = SourceConfig.from_dict(table("source"), base=base_path)
         sensor = SensorConfig.from_dict(table("sensor"))
-        if sensor.kind == "shack_hartmann" and "pyramid" in data:
+        if sensor.kind == "shack_hartmann" and data.get("pyramid") is not None:
             raise ConfigError("pyramid: remove this table for a Shack-Hartmann sensor")
-        if sensor.kind == "pyramid" and "shack_hartmann" in data:
+        if sensor.kind == "pyramid" and data.get("shack_hartmann") is not None:
             raise ConfigError("shack_hartmann: remove this table for a pyramid sensor")
         sh_data = table("shack_hartmann") if sensor.kind == "shack_hartmann" else None
         pyramid_data = table("pyramid") if sensor.kind == "pyramid" else None
@@ -635,6 +648,9 @@ class WFSConfig:
 
         data = cast(dict[str, Any], serialise(asdict(self)))
         data.pop("source_path", None)
+        detector = data.get("detector")
+        if isinstance(detector, dict):
+            detector["camera"] = detector.pop("inline", {})
         return data
 
     @property

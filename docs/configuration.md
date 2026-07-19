@@ -49,6 +49,9 @@ wavelengths_m = [650e-9, 700e-9, 750e-9]
 wavelength_weights = [0.2, 0.5, 0.3]
 angular_fwhm_arcsec = 0.25
 angular_quadrature_order = 3
+# Optional two-column wavelength_nm / relative_value files:
+# sed_path = "source_sed.txt"
+# transmission_path = "filter_transmission.txt"
 ```
 
 `field_angle_arcsec = [x, y]` is the source centroid. A finite FWHM uses a

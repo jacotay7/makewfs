@@ -27,6 +27,11 @@ pyramid mask retains its configured fixed pupil separation. The resulting
 photon-rate maps are summed before one scalar-QE `getframes` exposure. A future
 wavelength-resolved detector API is conditional on the gate in `ROADMAP.md`.
 
+For measured relative curves, `sed_path` and `transmission_path` point to
+two-column text files with `wavelength_nm value`. If explicit wavelengths are
+omitted, the curve knots become the quadrature grid; if they are supplied, the
+curves are interpolated there and multiplied into the weights.
+
 ## Sodium LGS approximation
 
 For `kind = "lgs"`, configure `detector_photon_rate_per_s`; magnitude
