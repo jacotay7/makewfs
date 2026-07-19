@@ -1,0 +1,59 @@
+"""Shack-Hartmann optical and detector integration tests."""
+
+import numpy as np
+import pytest
+
+from makewfs import WavefrontSensor
+
+
+def _sensor() -> WavefrontSensor:
+    from pathlib import Path
+
+    return WavefrontSensor.from_toml(
+        Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann_minimal.toml"
+    )
+
+
+def test_reference_is_nonnegative_and_flux_bounded() -> None:
+    sensor = _sensor()
+    reference = sensor.reference()
+    assert reference.shape == (64, 64)
+    assert np.all(reference >= 0)
+    assert reference.sum() <= 2.0e6 * (1.0 + 1e-12)
+    assert reference.sum() > 0.0
+
+
+def test_piston_invariance() -> None:
+    sensor = _sensor()
+    phase = np.zeros((128, 128))
+    assert np.allclose(
+        sensor.photon_rate(phase), sensor.photon_rate(phase + 2.3e-6), rtol=1e-11, atol=1e-12
+    )
+
+
+def test_nonfinite_opd_inside_pupil_is_rejected() -> None:
+    sensor = _sensor()
+    phase = np.zeros((128, 128))
+    phase[40:48, 60:68] = np.nan
+    with pytest.raises(ValueError, match="non-finite"):
+        sensor.photon_rate(phase)
+
+
+def test_seeded_detector_frame_repeats() -> None:
+    sensor = _sensor()
+    phase = np.zeros((128, 128))
+    first = np.asarray(sensor.expose(phase, seed=4))
+    second = np.asarray(sensor.expose(phase, seed=4))
+    assert np.array_equal(first, second)
+
+
+def test_temporal_integration_averages_ideal_maps() -> None:
+    sensor = _sensor()
+    zero = np.zeros((128, 128))
+    tilted = zero.copy()
+    tilted[:, 64:] = 1e-7
+    expected = (sensor.photon_rate(zero) + sensor.photon_rate(tilted)) / 2.0
+    result = sensor.expose_integrated(np.stack([zero, tilted]), seed=5)
+    assert result.truth is not None
+    assert result.metadata["wfs_temporal_samples"] == 2
+    assert np.allclose(result.truth.photon_rate, expected, rtol=1e-5, atol=1e-8)

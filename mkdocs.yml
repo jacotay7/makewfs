@@ -1,0 +1,39 @@
+site_name: makewfs
+site_description: Configuration-driven adaptive-optics wavefront sensor images
+repo_url: https://github.com/jacotay7/makewfs
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: false
+            members_order: source
+            show_root_heading: true
+            separate_signature: true
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.arithmatex:
+      generic: true
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Concepts: concepts.md
+  - Configuration: configuration.md
+  - Shack-Hartmann: shack-hartmann.md
+  - Pyramid: pyramid.md
+  - Detectors and radiometry: detectors.md
+  - Interoperability: interop.md
+  - Validation: validation.md
+  - API reference: api.md
+  - Contributing: contributing.md
