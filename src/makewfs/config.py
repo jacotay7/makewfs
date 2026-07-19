@@ -361,6 +361,9 @@ class ShackHartmannConfig:
     lenslet_focal_length_m: float | None = None
     detector_pixel_pitch_m: float | None = None
     relay_magnification: float = 1.0
+    field_stop_radius_lambda_over_d: float | None = None
+    optical_blur_fwhm_pixels: float = 0.0
+    detector_margin_pixels: int = 0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ShackHartmannConfig:
@@ -375,6 +378,9 @@ class ShackHartmannConfig:
                 "lenslet_focal_length_m",
                 "detector_pixel_pitch_m",
                 "relay_magnification",
+                "field_stop_radius_lambda_over_d",
+                "optical_blur_fwhm_pixels",
+                "detector_margin_pixels",
             },
             "shack_hartmann",
         )
@@ -429,6 +435,23 @@ class ShackHartmannConfig:
                 "shack_hartmann.relay_magnification",
                 minimum=1e-15,
             ),
+            None
+            if data.get("field_stop_radius_lambda_over_d") is None
+            else _finite(
+                data["field_stop_radius_lambda_over_d"],
+                "shack_hartmann.field_stop_radius_lambda_over_d",
+                minimum=0,
+            ),
+            _finite(
+                data.get("optical_blur_fwhm_pixels", 0),
+                "shack_hartmann.optical_blur_fwhm_pixels",
+                minimum=0,
+            ),
+            _positive_int(
+                data.get("detector_margin_pixels", 0),
+                "shack_hartmann.detector_margin_pixels",
+                minimum=0,
+            ),
         )
 
 
@@ -440,6 +463,7 @@ class PyramidConfig:
     pupil_separation_pixels: int
     modulation_radius_lambda_over_d: float = 0.0
     modulation_samples: int = 1
+    detector_margin_pixels: int = 0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> PyramidConfig:
@@ -450,6 +474,7 @@ class PyramidConfig:
                 "pupil_separation_pixels",
                 "modulation_radius_lambda_over_d",
                 "modulation_samples",
+                "detector_margin_pixels",
             },
             "pyramid",
         )
@@ -476,6 +501,11 @@ class PyramidConfig:
             ),
             radius,
             samples,
+            _positive_int(
+                data.get("detector_margin_pixels", 0),
+                "pyramid.detector_margin_pixels",
+                minimum=0,
+            ),
         )
 
 

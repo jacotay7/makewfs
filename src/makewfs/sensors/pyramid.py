@@ -39,8 +39,9 @@ class PyramidEngine(SensorEngine):
             )
         pixels = self.settings.pixels_across_pupil
         separation = self.settings.pupil_separation_pixels
+        margin = self.settings.detector_margin_pixels
         self.internal_shape = (pixels, pixels)
-        self.output_shape = (pixels + separation, pixels + separation)
+        self.output_shape = (pixels + separation + 2 * margin, pixels + separation + 2 * margin)
         self.nfft = next_fast_length(max(self.output_shape))
         self.pupil = make_pupil(
             config.telescope,
@@ -105,6 +106,9 @@ class PyramidEngine(SensorEngine):
         photon_rate = np.zeros(self.output_shape, dtype=np.float64)
         total_field_flux: float | None = None
         captured = 0.0
+        pixels = self.settings.pixels_across_pupil
+        separation = self.settings.pupil_separation_pixels
+        margin = self.settings.detector_margin_pixels
         for state in iter_source_states(self.config):
             fields = self._fields(internal, state)
             padded = pad_center(fields, (self.nfft, self.nfft))
@@ -113,8 +117,15 @@ class PyramidEngine(SensorEngine):
                 focal * self._mask[None, ...], workers=self.config.numerics.fft_workers
             )
             intensity = np.abs(exit_pupil) ** 2
-            cropped = crop_center(intensity, self.output_shape)
+            base_output_shape = (pixels + separation, pixels + separation)
+            cropped = crop_center(intensity, base_output_shape)
             mosaic = np.asarray(np.mean(cropped, axis=0), dtype=np.float64)
+            if margin:
+                padded = np.zeros(self.output_shape, dtype=np.float64)
+                padded[
+                    margin : margin + base_output_shape[0], margin : margin + base_output_shape[1]
+                ] = mosaic
+                mosaic = padded
             if total_field_flux is None:
                 total_field_flux = float(np.sum(np.abs(fields[0]) ** 2))
             cropped_flux = float(np.sum(mosaic))

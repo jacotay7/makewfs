@@ -16,6 +16,8 @@ this averages analytic sub-pixels rather than interpolating a binary mask.
 Instead of normalized spot sampling, a configuration may provide lenslet focal
 length, detector pixel pitch, and relay magnification. The engine derives the
 same normalized sampling from those physical fields and rejects mixed modes.
+The optional field stop, blur, and detector-margin controls are applied to the
+ideal photon-rate mosaic before the camera adapter.
 
 The phase-ramp sign and spot displacement are fixed by analytic tests. This
 repository produces the image; centroiding, slope extraction, and reconstruction

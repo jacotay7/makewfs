@@ -58,6 +58,12 @@ In physical mode, `makewfs` derives pixels per `lambda / D_subaperture` from
 the telescope diameter, lenslet count, sensing wavelength, focal length, pixel
 pitch, and relay magnification.
 
+`field_stop_radius_lambda_over_d` clips each subaperture's focal-plane field
+stop, `optical_blur_fwhm_pixels` applies a flux-spreading optical Gaussian
+before detector sampling, and `detector_margin_pixels` pads the assembled SH
+mosaic with zero-rate margins. These are optical settings; detector binning and
+noise remain in `[detector]`/`getframes`.
+
 Wavelength and source-size quadrature are optional. Weights are normalized, and
 intensities—not complex fields—are summed:
 

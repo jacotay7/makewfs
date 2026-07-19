@@ -88,7 +88,11 @@ class ShackHartmannEngine(SensorEngine):
             self._lgs_mean_range_m = None
         self.source_rate = source_rate_per_s(config.source, config.telescope)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
-        self.output_shape = (self.n_lenslets * self.settings.pixels_per_subaperture,) * 2
+        base_shape = self.n_lenslets * self.settings.pixels_per_subaperture
+        self.output_shape = (
+            base_shape + 2 * self.settings.detector_margin_pixels,
+            base_shape + 2 * self.settings.detector_margin_pixels,
+        )
         self._expected_output_shape = self.output_shape
 
     def _make_lenslet_mask(self) -> NDArray[np.float64]:
@@ -154,6 +158,8 @@ class ShackHartmannEngine(SensorEngine):
         captured = 0.0
         s = self.samples_per_lenslet
         n = self.n_lenslets
+        base_shape = n * self.settings.pixels_per_subaperture
+        margin = self.settings.detector_margin_pixels
         for state in states:
             field = self._field(internal, state)
             if total_field_flux is None:
@@ -167,8 +173,10 @@ class ShackHartmannEngine(SensorEngine):
                 sampling=sampling,
                 oversampling=self.config.numerics.fft_oversampling,
                 workers=self.config.numerics.fft_workers,
+                field_stop_radius_lambda_over_d=self.settings.field_stop_radius_lambda_over_d,
+                optical_blur_fwhm_pixels=self.settings.optical_blur_fwhm_pixels,
             )
-            mosaic = (
+            base_mosaic = (
                 spots.reshape(
                     n,
                     n,
@@ -176,8 +184,10 @@ class ShackHartmannEngine(SensorEngine):
                     self.settings.pixels_per_subaperture,
                 )
                 .transpose(0, 2, 1, 3)
-                .reshape(self._expected_output_shape)
+                .reshape((base_shape, base_shape))
             )
+            mosaic = np.zeros(self.output_shape, dtype=np.float64)
+            mosaic[margin : margin + base_shape, margin : margin + base_shape] = base_mosaic
             cropped_flux = float(np.sum(mosaic))
             if cropped_flux < 0:
                 raise ValueError("pupil propagation produced negative flux")

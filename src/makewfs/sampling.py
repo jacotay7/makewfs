@@ -53,6 +53,8 @@ def spot_intensity(
     sampling: float,
     oversampling: int,
     workers: int,
+    field_stop_radius_lambda_over_d: float | None = None,
+    optical_blur_fwhm_pixels: float = 0.0,
 ) -> NDArray[np.float64]:
     """Propagate lenslet fields and integrate onto ``pixels`` detector pixels.
 
@@ -75,7 +77,20 @@ def spot_intensity(
     intensity = np.abs(transformed) ** 2
     high_resolution_pixels = pixels * oversampling
     cropped = crop_center(intensity, (high_resolution_pixels, high_resolution_pixels))
-    return np.asarray(block_sum(cropped, oversampling), dtype=np.float64)
+    if field_stop_radius_lambda_over_d is not None:
+        y, x = np.indices((high_resolution_pixels, high_resolution_pixels), dtype=np.float64)
+        radius_lambda_over_d = np.hypot(
+            x - (high_resolution_pixels - 1) / 2.0,
+            y - (high_resolution_pixels - 1) / 2.0,
+        ) / (oversampling * sampling)
+        cropped = cropped * (radius_lambda_over_d <= field_stop_radius_lambda_over_d)
+    native = block_sum(cropped, oversampling)
+    if optical_blur_fwhm_pixels > 0.0:
+        from scipy.ndimage import gaussian_filter
+
+        sigma = optical_blur_fwhm_pixels / 2.3548200450309493
+        native = gaussian_filter(native, sigma=(0.0, sigma, sigma), mode="constant")
+    return np.asarray(native, dtype=np.float64)
 
 
 __all__ = ["block_sum", "crop_center", "pad_center", "spot_intensity"]

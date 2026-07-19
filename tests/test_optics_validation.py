@@ -128,3 +128,32 @@ def test_pyramid_piston_invariance_and_push_pull_antisymmetry() -> None:
     minus_response = minus - sensor.photon_rate(zero)
     assert np.linalg.norm(plus_response) > 0.0
     assert float(np.vdot(plus_response, minus_response).real) < 0.0
+
+
+def test_shack_hartmann_field_stop_blur_and_margin_are_optical_settings() -> None:
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    base = WavefrontSensor(config).photon_rate(np.zeros(config.input.shape))
+    settings = replace(
+        config.shack_hartmann,
+        field_stop_radius_lambda_over_d=0.6,
+        optical_blur_fwhm_pixels=1.0,
+        detector_margin_pixels=2,
+    )
+    configured = WavefrontSensor(replace(config, shack_hartmann=settings)).photon_rate(
+        np.zeros(config.input.shape)
+    )
+    assert configured.shape == (68, 68)
+    assert configured.sum() < base.sum()
+    assert np.all(configured >= 0)
+
+
+def test_pyramid_detector_margin_is_zero_filled() -> None:
+    config = load_config(PYRAMID_CONFIG)
+    assert config.pyramid is not None
+    settings = replace(config.pyramid, detector_margin_pixels=3)
+    sensor = WavefrontSensor(replace(config, pyramid=settings))
+    image = sensor.photon_rate(np.zeros(config.input.shape))
+    assert image.shape == (90, 90)
+    assert np.all(image[:3] == 0)
+    assert np.all(image[-3:] == 0)
