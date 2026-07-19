@@ -98,6 +98,20 @@ class ShackHartmannEngine(SensorEngine):
         tiled = np.asarray(np.tile(local, (self.n_lenslets, self.n_lenslets)), dtype=np.float64)
         return np.asarray(self.pupil * tiled, dtype=np.float64)
 
+    def _spot_sampling(self, wavelength_m: float) -> float:
+        configured = self.settings.spot_sampling_pixels_per_lambda_over_d
+        if configured is None:
+            assert self.settings.lenslet_focal_length_m is not None
+            assert self.settings.detector_pixel_pitch_m is not None
+            lenslet_pitch = self.config.telescope.pupil_diameter_m / self.n_lenslets
+            configured = (
+                self.settings.lenslet_focal_length_m
+                * self.config.sensor.wavelength_m
+                * self.settings.relay_magnification
+                / (lenslet_pitch * self.settings.detector_pixel_pitch_m)
+            )
+        return configured * wavelength_m / self.config.sensor.wavelength_m
+
     def _field(
         self,
         internal: NDArray[np.float64],
@@ -140,11 +154,7 @@ class ShackHartmannEngine(SensorEngine):
             if total_field_flux is None:
                 total_field_flux = float(np.sum(np.abs(field) ** 2))
             subapertures = field.reshape(n, s, n, s).transpose(0, 2, 1, 3).reshape(n * n, s, s)
-            sampling = (
-                self.settings.spot_sampling_pixels_per_lambda_over_d
-                * state.wavelength_m
-                / self.config.sensor.wavelength_m
-            )
+            sampling = self._spot_sampling(state.wavelength_m)
             spots = spot_intensity(
                 subapertures,
                 pixels=self.settings.pixels_per_subaperture,

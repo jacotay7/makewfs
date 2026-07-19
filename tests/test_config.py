@@ -89,3 +89,19 @@ def test_sensor_specific_tables_cannot_be_mixed() -> None:
     }
     with pytest.raises(ConfigError, match="pyramid"):
         WFSConfig.from_dict(data)
+
+
+def test_physical_shack_hartmann_sampling_mode() -> None:
+    from makewfs.config import ShackHartmannConfig
+
+    config = ShackHartmannConfig.from_dict(
+        {
+            "lenslets_across_pupil": 8,
+            "pixels_per_subaperture": 8,
+            "minimum_illuminated_fraction": 0.25,
+            "lenslet_focal_length_m": 0.02,
+            "detector_pixel_pitch_m": 15e-6,
+        }
+    )
+    assert config.spot_sampling_pixels_per_lambda_over_d is None
+    assert config.lenslet_focal_length_m == 0.02

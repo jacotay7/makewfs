@@ -88,6 +88,34 @@ def test_float32_and_float64_optics_agree() -> None:
     assert np.allclose(float32, float64, rtol=3e-5, atol=1e-8)
 
 
+def test_physical_lenslet_sampling_matches_normalized_mode() -> None:
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    physical = replace(
+        config,
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            spot_sampling_pixels_per_lambda_over_d=None,
+            lenslet_focal_length_m=0.02,
+            detector_pixel_pitch_m=15e-6,
+        ),
+    )
+    normalized = replace(
+        config,
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            spot_sampling_pixels_per_lambda_over_d=0.02 * 700e-9 / 15e-6,
+        ),
+    )
+    phase = np.zeros(config.input.shape)
+    assert np.allclose(
+        WavefrontSensor(physical).photon_rate(phase),
+        WavefrontSensor(normalized).photon_rate(phase),
+        rtol=1e-12,
+        atol=1e-12,
+    )
+
+
 def test_pyramid_piston_invariance_and_push_pull_antisymmetry() -> None:
     sensor = WavefrontSensor.from_toml(PYRAMID_CONFIG)
     zero = np.zeros(sensor.config.input.shape)

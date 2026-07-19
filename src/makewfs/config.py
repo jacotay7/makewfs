@@ -355,9 +355,12 @@ class ShackHartmannConfig:
 
     lenslets_across_pupil: int
     pixels_per_subaperture: int
-    spot_sampling_pixels_per_lambda_over_d: float
+    spot_sampling_pixels_per_lambda_over_d: float | None
     minimum_illuminated_fraction: float
     lenslet_fill_factor: float = 1.0
+    lenslet_focal_length_m: float | None = None
+    detector_pixel_pitch_m: float | None = None
+    relay_magnification: float = 1.0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ShackHartmannConfig:
@@ -369,9 +372,24 @@ class ShackHartmannConfig:
                 "spot_sampling_pixels_per_lambda_over_d",
                 "minimum_illuminated_fraction",
                 "lenslet_fill_factor",
+                "lenslet_focal_length_m",
+                "detector_pixel_pitch_m",
+                "relay_magnification",
             },
             "shack_hartmann",
         )
+        raw_sampling = data.get("spot_sampling_pixels_per_lambda_over_d")
+        focal = data.get("lenslet_focal_length_m")
+        pixel_pitch = data.get("detector_pixel_pitch_m")
+        if raw_sampling is None and (focal is None or pixel_pitch is None):
+            raise ConfigError(
+                "shack_hartmann: provide spot_sampling_pixels_per_lambda_over_d or "
+                "both lenslet_focal_length_m and detector_pixel_pitch_m"
+            )
+        if raw_sampling is not None and (focal is not None or pixel_pitch is not None):
+            raise ConfigError(
+                "shack_hartmann: normalized and physical sampling modes are mutually exclusive"
+            )
         return cls(
             _positive_int(
                 data.get("lenslets_across_pupil"), "shack_hartmann.lenslets_across_pupil", minimum=1
@@ -381,8 +399,10 @@ class ShackHartmannConfig:
                 "shack_hartmann.pixels_per_subaperture",
                 minimum=2,
             ),
-            _finite(
-                data.get("spot_sampling_pixels_per_lambda_over_d"),
+            None
+            if raw_sampling is None
+            else _finite(
+                raw_sampling,
                 "shack_hartmann.spot_sampling_pixels_per_lambda_over_d",
                 minimum=0.5,
             ),
@@ -397,6 +417,17 @@ class ShackHartmannConfig:
                 "shack_hartmann.lenslet_fill_factor",
                 minimum=0,
                 maximum=1,
+            ),
+            None
+            if focal is None
+            else _finite(focal, "shack_hartmann.lenslet_focal_length_m", minimum=1e-15),
+            None
+            if pixel_pitch is None
+            else _finite(pixel_pitch, "shack_hartmann.detector_pixel_pitch_m", minimum=1e-15),
+            _finite(
+                data.get("relay_magnification", 1),
+                "shack_hartmann.relay_magnification",
+                minimum=1e-15,
             ),
         )
 

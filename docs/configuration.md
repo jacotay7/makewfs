@@ -37,6 +37,23 @@ the alternative is `normalization = "magnitude"` with `magnitude`, `band`, and
 LGS return flux must be supplied directly because laser return prediction is out
 of scope.
 
+Shack–Hartmann sampling can be expressed either directly in normalized units
+or with physical lenslet optics. Do not provide both forms:
+
+```toml
+[shack_hartmann]
+lenslets_across_pupil = 20
+pixels_per_subaperture = 8
+minimum_illuminated_fraction = 0.25
+lenslet_focal_length_m = 0.020
+detector_pixel_pitch_m = 15e-6
+relay_magnification = 1.0
+```
+
+In physical mode, `makewfs` derives pixels per `lambda / D_subaperture` from
+the telescope diameter, lenslet count, sensing wavelength, focal length, pixel
+pitch, and relay magnification.
+
 Wavelength and source-size quadrature are optional. Weights are normalized, and
 intensities—not complex fields—are summed:
 
