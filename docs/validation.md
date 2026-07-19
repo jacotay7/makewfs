@@ -16,10 +16,12 @@ reduced low-order sensitivity under modulation, and explicit face-order
 provenance. These are discretized CPU checks, not a claim of independent-
 reference parity.
 
-The repository includes an optional HCIPy cross-check for a fixed ideal pyramid
-case. It is a validation-only dependency, never a runtime dependency; broader
-convergence studies, SH references, and sodium-LGS geometry cross-checks remain
-in the roadmap.
+The repository includes optional HCIPy cross-checks for a fixed ideal pyramid
+case and a small Shack–Hartmann tilt response. The SH comparison checks spot
+direction, cross-axis suppression, and response scale within a grid-discretized
+tolerance. HCIPy is a validation-only dependency, never a runtime dependency;
+broader convergence studies and sodium-LGS geometry cross-checks remain in the
+roadmap.
 
 Run the optional reference test with:
 
