@@ -20,5 +20,6 @@ modulation_samples = 16
 The shipped `examples/configs/pyramid_minimal.toml` is a complete detector
 configuration. The output shape is
 `pixels_across_pupil + pupil_separation_pixels` in each dimension. Broadband
-propagation, finite-source convolution, LGS range structure, and pyramid
-reconstruction are deliberately later roadmap items.
+and finite-source quadrature are supported through the common source model;
+range-resolved LGS elongation is deliberately Shack–Hartmann-specific for now.
+Pyramid reconstruction remains outside this repository.

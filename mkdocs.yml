@@ -30,11 +30,17 @@ nav:
   - Quickstart: quickstart.md
   - Concepts: concepts.md
   - Configuration: configuration.md
+  - Units and coordinates: units-and-coordinates.md
+  - Guide stars: guide-stars.md
   - Shack-Hartmann: shack-hartmann.md
   - Pyramid: pyramid.md
   - Detectors and radiometry: detectors.md
   - Interoperability: interop.md
   - Validation: validation.md
+  - Examples: examples.md
+  - Performance: performance.md
+  - Troubleshooting: troubleshooting.md
+  - Stability: stability.md
   - API reference: api.md
   - Contributing: contributing.md
   - Architecture decisions:

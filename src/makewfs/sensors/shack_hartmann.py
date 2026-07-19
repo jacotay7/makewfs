@@ -14,6 +14,7 @@ from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
 from ..sampling import spot_intensity
 from ..sensors.base import OpticalResult, SensorEngine
+from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
 
 
@@ -41,6 +42,35 @@ class ShackHartmannEngine(SensorEngine):
         self.wavefront = WavefrontInput(config, load_static_opd(config))
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
         self.lenslet_mask = self._make_lenslet_mask()
+        centers = self.xx.reshape(
+            self.n_lenslets, self.samples_per_lenslet, self.n_lenslets, self.samples_per_lenslet
+        ).mean(axis=(1, 3))
+        centers_y = self.yy.reshape(
+            self.n_lenslets,
+            self.samples_per_lenslet,
+            self.n_lenslets,
+            self.samples_per_lenslet,
+        ).mean(axis=(1, 3))
+        self._subap_x = np.repeat(
+            np.repeat(centers, self.samples_per_lenslet, axis=0),
+            self.samples_per_lenslet,
+            axis=1,
+        )
+        self._subap_y = np.repeat(
+            np.repeat(centers_y, self.samples_per_lenslet, axis=0),
+            self.samples_per_lenslet,
+            axis=1,
+        )
+        self._lgs_mean_range_m: float | None
+        if config.source.lgs_ranges_m:
+            weights = np.asarray(config.source.lgs_range_weights, dtype=np.float64)
+            if not len(weights):
+                weights = np.ones(len(config.source.lgs_ranges_m), dtype=np.float64)
+            self._lgs_mean_range_m = float(
+                np.average(np.asarray(config.source.lgs_ranges_m), weights=weights)
+            )
+        else:
+            self._lgs_mean_range_m = None
         self.source_rate = source_rate_per_s(config.source, config.telescope)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         self.output_shape = (self.n_lenslets * self.settings.pixels_per_subaperture,) * 2
@@ -58,13 +88,22 @@ class ShackHartmannEngine(SensorEngine):
         tiled = np.asarray(np.tile(local, (self.n_lenslets, self.n_lenslets)), dtype=np.float64)
         return np.asarray(self.pupil * tiled, dtype=np.float64)
 
-    def _field(self, opd: NDArray[np.float64]) -> NDArray[Any]:
-        internal = self.wavefront.opd(opd, target_shape=self.internal_shape)
+    def _field(
+        self,
+        internal: NDArray[np.float64],
+        state: SourceState,
+    ) -> NDArray[Any]:
         self.wavefront.validate_finite_inside(internal, self.lenslet_mask)
-        theta_x, theta_y = self.config.source.field_angle_arcsec
-        field_angle_opd = self.xx * math.radians(theta_x / 3600.0) + self.yy * math.radians(
-            theta_y / 3600.0
-        )
+        angle_x = np.full(self.internal_shape, state.angle_x_rad, dtype=np.float64)
+        angle_y = np.full(self.internal_shape, state.angle_y_rad, dtype=np.float64)
+        if state.range_m is not None:
+            if self._lgs_mean_range_m is None:
+                raise ValueError("LGS range state is missing its weighted mean range")
+            launch_x, launch_y = self.config.source.lgs_launch_position_m
+            range_delta = 1.0 / state.range_m - 1.0 / self._lgs_mean_range_m
+            angle_x += (launch_x - self._subap_x) * range_delta
+            angle_y += (launch_y - self._subap_y) * range_delta
+        field_angle_opd = self.xx * angle_x + self.yy * angle_y
         total_opd = internal + field_angle_opd
         illuminated = self.lenslet_mask > 0
         piston = float(np.mean(total_opd[illuminated])) if np.any(illuminated) else 0.0
@@ -74,38 +113,53 @@ class ShackHartmannEngine(SensorEngine):
         relative_opd = total_opd - piston
         if np.ptp(total_opd[illuminated]) == 0.0:
             relative_opd = np.zeros_like(total_opd)
-        phase = 2.0 * np.pi * relative_opd / self.config.sensor.wavelength_m
+        phase = 2.0 * np.pi * relative_opd / state.wavelength_m
         return np.asarray(self.lenslet_mask * np.exp(1j * phase), dtype=self._complex_dtype)
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
-        field = self._field(wavefront)
+        internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
+        self.wavefront.validate_finite_inside(internal, self.lenslet_mask)
+        states = iter_source_states(self.config)
+        photon_rate = np.zeros(self.output_shape, dtype=np.float64)
+        total_field_flux: float | None = None
+        captured = 0.0
         s = self.samples_per_lenslet
         n = self.n_lenslets
-        subapertures = field.reshape(n, s, n, s).transpose(0, 2, 1, 3).reshape(n * n, s, s)
-        spots = spot_intensity(
-            subapertures,
-            pixels=self.settings.pixels_per_subaperture,
-            samples_per_lenslet=s,
-            sampling=self.settings.spot_sampling_pixels_per_lambda_over_d,
-            oversampling=self.config.numerics.fft_oversampling,
-            workers=self.config.numerics.fft_workers,
-        )
-        mosaic = (
-            spots.reshape(
-                n, n, self.settings.pixels_per_subaperture, self.settings.pixels_per_subaperture
+        for state in states:
+            field = self._field(internal, state)
+            if total_field_flux is None:
+                total_field_flux = float(np.sum(np.abs(field) ** 2))
+            subapertures = field.reshape(n, s, n, s).transpose(0, 2, 1, 3).reshape(n * n, s, s)
+            sampling = (
+                self.settings.spot_sampling_pixels_per_lambda_over_d
+                * state.wavelength_m
+                / self.config.sensor.wavelength_m
             )
-            .transpose(0, 2, 1, 3)
-            .reshape(self._expected_output_shape)
-        )
-        total_field_flux = float(np.sum(np.abs(field) ** 2))
-        cropped_flux = float(np.sum(mosaic))
-        if total_field_flux <= 0 or cropped_flux < 0:
+            spots = spot_intensity(
+                subapertures,
+                pixels=self.settings.pixels_per_subaperture,
+                samples_per_lenslet=s,
+                sampling=sampling,
+                oversampling=self.config.numerics.fft_oversampling,
+                workers=self.config.numerics.fft_workers,
+            )
+            mosaic = (
+                spots.reshape(
+                    n,
+                    n,
+                    self.settings.pixels_per_subaperture,
+                    self.settings.pixels_per_subaperture,
+                )
+                .transpose(0, 2, 1, 3)
+                .reshape(self._expected_output_shape)
+            )
+            cropped_flux = float(np.sum(mosaic))
+            if cropped_flux < 0:
+                raise ValueError("pupil propagation produced negative flux")
+            photon_rate += mosaic * (self.source_rate * state.weight / total_field_flux)
+            captured += self.source_rate * state.weight * cropped_flux / total_field_flux
+        if total_field_flux is None or total_field_flux <= 0:
             raise ValueError("pupil has no illuminated pixels")
-        # The unitary FFT preserves the total field energy.  Dividing by the
-        # input energy retains explicit loss when the finite detector window
-        # crops diffraction wings.
-        photon_rate = np.asarray(mosaic * (self.source_rate / total_field_flux), dtype=np.float64)
-        captured = self.source_rate * cropped_flux / total_field_flux
         return OpticalResult(photon_rate, self.source_rate, captured, wavefront)
 
 

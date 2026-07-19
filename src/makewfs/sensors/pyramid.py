@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any
 
 import numpy as np
@@ -14,6 +13,7 @@ from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
 from ..sampling import crop_center, pad_center
 from ..sensors.base import OpticalResult, SensorEngine
+from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
 
 
@@ -33,6 +33,10 @@ class PyramidEngine(SensorEngine):
             raise ValueError("pyramid configuration is missing")
         self.config = config
         self.settings = config.pyramid
+        if config.source.lgs_ranges_m:
+            raise NotImplementedError(
+                "range-resolved LGS elongation is currently implemented for Shack-Hartmann only"
+            )
         pixels = self.settings.pixels_across_pupil
         separation = self.settings.pupil_separation_pixels
         self.internal_shape = (pixels, pixels)
@@ -55,24 +59,20 @@ class PyramidEngine(SensorEngine):
         phase = -2.0 * np.pi * half_separation * (sign_x * fx + sign_y * fy) / self.nfft
         return np.asarray(np.exp(1j * phase), dtype=self._complex_dtype)
 
-    def _base_field(self, opd: NDArray[np.float64]) -> NDArray[Any]:
-        internal = self.wavefront.opd(opd, target_shape=self.internal_shape)
+    def _base_field(self, internal: NDArray[np.float64], state: SourceState) -> NDArray[Any]:
         self.wavefront.validate_finite_inside(internal, self.pupil)
-        theta_x, theta_y = self.config.source.field_angle_arcsec
-        field_angle_opd = self.xx * math.radians(theta_x / 3600.0) + self.yy * math.radians(
-            theta_y / 3600.0
-        )
+        field_angle_opd = self.xx * state.angle_x_rad + self.yy * state.angle_y_rad
         total_opd = internal + field_angle_opd
         illuminated = self.pupil > 0
         piston = float(np.mean(total_opd[illuminated])) if np.any(illuminated) else 0.0
         relative_opd = total_opd - piston
         if np.ptp(total_opd[illuminated]) == 0.0:
             relative_opd = np.zeros_like(total_opd)
-        phase = 2.0 * np.pi * relative_opd / self.config.sensor.wavelength_m
+        phase = 2.0 * np.pi * relative_opd / state.wavelength_m
         return np.asarray(self.pupil * np.exp(1j * phase), dtype=self._complex_dtype)
 
-    def _fields(self, opd: NDArray[np.float64]) -> NDArray[Any]:
-        base = self._base_field(opd)
+    def _fields(self, internal: NDArray[np.float64], state: SourceState) -> NDArray[Any]:
+        base = self._base_field(internal, state)
         radius = self.settings.modulation_radius_lambda_over_d
         samples = self.settings.modulation_samples
         if radius == 0.0:
@@ -95,21 +95,30 @@ class PyramidEngine(SensorEngine):
         return np.asarray(base[None, ...] * tilts, dtype=self._complex_dtype)
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
-        fields = self._fields(wavefront)
-        padded = pad_center(fields, (self.nfft, self.nfft))
-        focal = centered_fft2(padded, workers=self.config.numerics.fft_workers)
-        exit_pupil = centered_ifft2(
-            focal * self._mask[None, ...], workers=self.config.numerics.fft_workers
-        )
-        intensity = np.abs(exit_pupil) ** 2
-        cropped = crop_center(intensity, self.output_shape)
-        mosaic = np.asarray(np.mean(cropped, axis=0), dtype=np.float64)
-        total_field_flux = float(np.sum(np.abs(fields[0]) ** 2))
-        cropped_flux = float(np.sum(mosaic))
-        if total_field_flux <= 0.0 or cropped_flux < 0.0:
+        internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
+        self.wavefront.validate_finite_inside(internal, self.pupil)
+        photon_rate = np.zeros(self.output_shape, dtype=np.float64)
+        total_field_flux: float | None = None
+        captured = 0.0
+        for state in iter_source_states(self.config):
+            fields = self._fields(internal, state)
+            padded = pad_center(fields, (self.nfft, self.nfft))
+            focal = centered_fft2(padded, workers=self.config.numerics.fft_workers)
+            exit_pupil = centered_ifft2(
+                focal * self._mask[None, ...], workers=self.config.numerics.fft_workers
+            )
+            intensity = np.abs(exit_pupil) ** 2
+            cropped = crop_center(intensity, self.output_shape)
+            mosaic = np.asarray(np.mean(cropped, axis=0), dtype=np.float64)
+            if total_field_flux is None:
+                total_field_flux = float(np.sum(np.abs(fields[0]) ** 2))
+            cropped_flux = float(np.sum(mosaic))
+            if cropped_flux < 0.0:
+                raise ValueError("pyramid propagation produced negative flux")
+            photon_rate += mosaic * (self.source_rate * state.weight / total_field_flux)
+            captured += self.source_rate * state.weight * cropped_flux / total_field_flux
+        if total_field_flux is None or total_field_flux <= 0.0:
             raise ValueError("pupil has no illuminated pixels")
-        photon_rate = np.asarray(mosaic * (self.source_rate / total_field_flux), dtype=np.float64)
-        captured = self.source_rate * cropped_flux / total_field_flux
         return OpticalResult(photon_rate, self.source_rate, captured, wavefront)
 
 

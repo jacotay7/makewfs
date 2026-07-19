@@ -54,31 +54,18 @@ def test_direct_rate_and_magnitude_are_mutually_exclusive() -> None:
         )
 
 
-def test_broadband_source_is_explicitly_gated() -> None:
-    from makewfs.config import WFSConfig
+def test_broadband_source_fields_are_validated() -> None:
+    from makewfs.config import SourceConfig
 
-    data = {
-        "schema_version": 1,
-        "input": {"quantity": "opd", "unit": "m", "shape": [8, 8], "grid_extent_m": 1},
-        "telescope": {"pupil_diameter_m": 1},
-        "source": {
+    source = SourceConfig.from_dict(
+        {
             "normalization": "detector_photon_rate",
             "detector_photon_rate_per_s": 1,
             "wavelengths_m": [6e-7, 7e-7],
-        },
-        "sensor": {"kind": "shack_hartmann", "wavelength_m": 7e-7},
-        "shack_hartmann": {
-            "lenslets_across_pupil": 1,
-            "pixels_per_subaperture": 8,
-            "spot_sampling_pixels_per_lambda_over_d": 1,
-            "minimum_illuminated_fraction": 0,
-        },
-        "detector": {
-            "camera": {"name": "generic", "pixel_size_um": 15, "read_noise_e": 0},
-            "exposure_s": 1,
-        },
-    }
-    with pytest.raises(NotImplementedError, match="broadband"):
-        from makewfs import WavefrontSensor
-
-        WavefrontSensor(WFSConfig.from_dict(data))
+            "wavelength_weights": [1, 3],
+            "angular_fwhm_arcsec": 0.4,
+            "angular_quadrature_order": 3,
+        }
+    )
+    assert source.wavelength_weights == (1.0, 3.0)
+    assert source.angular_quadrature_order == 3

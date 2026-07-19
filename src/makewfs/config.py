@@ -189,8 +189,12 @@ class SourceConfig:
     throughput: float = 1.0
     field_angle_arcsec: tuple[float, float] = (0.0, 0.0)
     angular_fwhm_arcsec: float = 0.0
+    angular_quadrature_order: int = 3
     wavelengths_m: tuple[float, ...] = ()
     wavelength_weights: tuple[float, ...] = ()
+    lgs_ranges_m: tuple[float, ...] = ()
+    lgs_range_weights: tuple[float, ...] = ()
+    lgs_launch_position_m: tuple[float, float] = (0.0, 0.0)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> SourceConfig:
@@ -206,8 +210,12 @@ class SourceConfig:
                 "throughput",
                 "field_angle_arcsec",
                 "angular_fwhm_arcsec",
+                "angular_quadrature_order",
                 "wavelengths_m",
                 "wavelength_weights",
+                "lgs_ranges_m",
+                "lgs_range_weights",
+                "lgs_launch_position_m",
             },
             "source",
         )
@@ -248,6 +256,19 @@ class SourceConfig:
         )
         if len(angle) != 2:
             raise ConfigError("source.field_angle_arcsec: expected [x, y]")
+        angular_fwhm = _finite(
+            data.get("angular_fwhm_arcsec", 0),
+            "source.angular_fwhm_arcsec",
+            minimum=0,
+        )
+        angular_order = _positive_int(
+            data.get("angular_quadrature_order", 3),
+            "source.angular_quadrature_order",
+        )
+        if angular_fwhm > 0 and angular_order < 2:
+            raise ConfigError(
+                "source.angular_quadrature_order: finite source extent requires order >= 2"
+            )
         wavelengths = _tuple_floats(data.get("wavelengths_m", []), "source.wavelengths_m")
         if any(value <= 0 for value in wavelengths):
             raise ConfigError("source.wavelengths_m: values must be positive")
@@ -260,6 +281,26 @@ class SourceConfig:
             raise ConfigError(
                 "source.wavelength_weights: must be non-negative and match wavelengths_m"
             )
+        lgs_ranges = _tuple_floats(data.get("lgs_ranges_m", []), "source.lgs_ranges_m")
+        if any(value <= 0 for value in lgs_ranges):
+            raise ConfigError("source.lgs_ranges_m: values must be positive")
+        lgs_weights = _tuple_floats(data.get("lgs_range_weights", []), "source.lgs_range_weights")
+        if lgs_weights and (
+            len(lgs_weights) != len(lgs_ranges)
+            or any(value < 0 for value in lgs_weights)
+            or sum(lgs_weights) <= 0
+        ):
+            raise ConfigError(
+                "source.lgs_range_weights: must be non-negative and match lgs_ranges_m"
+            )
+        launch = _tuple_floats(
+            data.get("lgs_launch_position_m", [0.0, 0.0]),
+            "source.lgs_launch_position_m",
+        )
+        if len(launch) != 2:
+            raise ConfigError("source.lgs_launch_position_m: expected [x, y]")
+        if kind != "lgs" and (lgs_ranges or lgs_weights or any(value != 0 for value in launch)):
+            raise ConfigError("source: LGS geometry fields require source.kind = 'lgs'")
         return cls(
             kind,
             normalization,
@@ -269,9 +310,13 @@ class SourceConfig:
             band,
             _finite(data.get("throughput", 1), "source.throughput", minimum=0, maximum=1),
             (angle[0], angle[1]),
-            _finite(data.get("angular_fwhm_arcsec", 0), "source.angular_fwhm_arcsec", minimum=0),
+            angular_fwhm,
+            angular_order,
             wavelengths,
             weights,
+            lgs_ranges,
+            lgs_weights,
+            (launch[0], launch[1]),
         )
 
 
