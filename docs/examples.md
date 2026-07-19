@@ -11,7 +11,11 @@ The most complete current workflows are:
 - `magnitude_series.py`: one detector configuration across NGS magnitudes;
 - `compare_sensors.py`: identical injected OPD through SH and pyramid optics;
 - `lgs_thin_beacon.py`: explicit thin-beacon LGS return-rate and cone-effect
-  boundary.
+  boundary;
+- `lgs_elongation.py`: centre/side launch and finite sodium-range elongation.
+- `closed_loop_injection.py`: external residual update at the closed-loop API
+  boundary;
+- `detector_choices.py`: identical ideal maps through several getframes presets.
 
 Full-resolution galleries, timing traces, detector-presets comparisons, and a
 closed-loop toy injection plot are scheduled in the roadmap.

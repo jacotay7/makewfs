@@ -11,6 +11,12 @@ with `python -m pip install -e '.[examples,interop]'` from the repository root.
   NGS magnitudes through the `getframes` radiometry path.
 - `lgs_thin_beacon.py` demonstrates the current LGS contract: `pyturb` supplies
   cone-effect OPD and the user supplies a detector-surface return rate. Sodium
-  range elongation is an explicit roadmap item and is not implied by this plot.
+  range elongation is not implied by this thin-beacon plot.
+- `lgs_elongation.py` compares thin, centre-launched, and side-launched sodium
+  range profiles using the current Shack–Hartmann geometry model.
+- `closed_loop_injection.py` shows residual OPD entering a persistent sensor;
+  the toy attenuation is explicitly external to makewfs.
+- `detector_choices.py` holds the ideal optical map fixed while swapping
+  existing CCD, EMCCD, sCMOS, and eAPD getframes presets.
 
 Use `--help` on each script for output and resolution controls.

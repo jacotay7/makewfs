@@ -129,8 +129,12 @@ must not be implemented until its acceptance test demonstrates the need.
   modulation, fixed face-order provenance, and a complete detector example.
 - [x] CLI, closed-loop sequence/integration helpers, worked example scripts,
   and regression tests for seeded detector behavior.
-- [ ] Broadband/finite-source propagation, range-resolved sodium-LGS
-  elongation, independent HCIPy validation, benchmark artifacts, and GPU path.
+- [x] Deterministic wavelength/SED/transmission quadrature, finite NGS angular
+  extent, and a documented Shack–Hartmann sodium-range elongation model.
+- [x] Executable validation metrics, benchmark runners, LGS elongation and
+  detector-choice examples, and closed-loop injection example.
+- [ ] Independent HCIPy validation, physical relay/field-stop models, full
+  gallery artifacts, benchmark regression envelopes, and GPU path.
 
 ## 4. End-state user experience
 

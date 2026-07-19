@@ -30,15 +30,21 @@ def main() -> None:
     ideal = sensor.photon_rate(opd)
     frame = sensor.expose(opd, seed=0)
 
-    figure, axes = plt.subplots(1, 3, figsize=(12, 4))
+    figure, axes = plt.subplots(2, 2, figsize=(10, 8))
+    axes = axes.flat
     axes[0].imshow(opd * 1e9, origin="lower")
     axes[0].set_title("input OPD (nm)")
     axes[1].imshow(ideal, origin="lower")
     axes[1].set_title("ideal rate (photons/s/pixel)")
     axes[2].imshow(np.asarray(frame), origin="lower")
     axes[2].set_title("detector frame (ADU)")
+    axes[3].plot(ideal[ideal.shape[0] // 2])
+    axes[3].set_title("central row (photons/s/pixel)")
+    axes[3].set_xlabel("detector x (pixel)")
+    axes[3].set_ylabel("photons/s")
     for axis in axes:
-        axis.set_axis_off()
+        if axis is not axes[3]:
+            axis.set_axis_off()
     figure.tight_layout()
     figure.savefig(args.output, dpi=140)
     print(f"wrote {args.output}")
