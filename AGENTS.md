@@ -22,7 +22,9 @@ The repository is currently in the CPU Shack-Hartmann and fixed-mask four-face
 pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, and a documented SH sodium-range geometry
-model. Do not present range-resolved turbulent LGS OPD,
+model. It also includes a versioned labelled documentation gallery, benchmark
+reference snapshot, and non-editable-wheel clean-room smoke evidence. Do not
+present range-resolved turbulent LGS OPD,
 wavelength-resolved detector QE, broad independent-reference parity, or GPU
 behavior as implemented until their gates pass.
 
@@ -169,6 +171,7 @@ The representative CI guard is reproducible locally with:
 ```bash
 python benchmarks/run.py --representative --frames 1 --output /tmp/makewfs-benchmark.json
 python benchmarks/check_regression.py /tmp/makewfs-benchmark.json
+MPLBACKEND=Agg python examples/gallery.py
 ```
 
 ## Documentation and examples
