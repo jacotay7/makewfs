@@ -24,5 +24,9 @@ The extended-source configuration at
 `examples/configs/shack_hartmann_extended_source.toml` demonstrates the
 three-column angular-kernel input used for resolved or binary guide sources.
 
-Full-resolution galleries, timing traces, detector-presets comparisons, and a
-closed-loop toy injection plot are scheduled in the roadmap.
+The labelled [documentation gallery](gallery.md) is generated from the same
+shipped configurations and keeps its SVG/manifest outputs under `docs/gallery/`.
+
+The gallery is a compact deterministic documentation artifact; the individual
+scripts remain available for full-resolution timing traces, detector-preset
+comparisons, and closed-loop toy-injection studies.

@@ -22,6 +22,8 @@ with `python -m pip install -e '.[examples,interop]'` from the repository root.
 - `pyramid_modulation.py`: unmodulated versus circularly modulated PWFS response.
 - `realistic_broadband.py`: rotated segmented pupil and incoherent spectral sensing.
 - `precision_throughput.py`: float32/float64 warm-path latency and image agreement.
+- `gallery.py`: deterministic six-panel documentation gallery with labelled
+  units, color bars, configuration digests, and modeling notes.
 - `configs/precision_throughput.toml` is the representative 20x20 lenslet
   configuration used by that precision example.
 - `configs/shack_hartmann_extended_source.toml` plus its kernel file show a

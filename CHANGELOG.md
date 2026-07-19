@@ -23,6 +23,8 @@ All notable changes to `makewfs` are documented here.
   regression envelopes for representative CPU kernels.
 - Added versioned benchmark snapshots and isolated non-editable-wheel
   interoperability verification for `pyturb` 1.0 and `getframes` 2.0.
+- Added a versioned labelled SVG capability gallery with units, color bars,
+  seeds, configuration digests, and modeling notes.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

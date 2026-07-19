@@ -45,7 +45,8 @@ default benchmark run.
 
 The repository also keeps a dated reference snapshot with hardware, Python,
 dependency, precision, source-state, construction, warm-optics, and detector
-columns in [`benchmarks/reference-table.md`](../benchmarks/reference-table.md).
+columns in
+[`benchmarks/reference-table.md`](https://github.com/jacotay7/makewfs/blob/main/benchmarks/reference-table.md).
 Regenerate it on a new machine with:
 
 ```bash

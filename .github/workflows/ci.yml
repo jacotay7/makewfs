@@ -141,6 +141,9 @@ jobs:
           python examples/pyramid_modulation.py --output "$RUNNER_TEMP/makewfs-examples/pyramid-modulation.png"
           python examples/realistic_broadband.py --output "$RUNNER_TEMP/makewfs-examples/realistic-broadband.png"
           python examples/precision_throughput.py --frames 2 --output "$RUNNER_TEMP/makewfs-examples/precision.png"
+          python examples/gallery.py \
+            --output "$RUNNER_TEMP/makewfs-examples/makewfs-gallery.svg" \
+            --manifest "$RUNNER_TEMP/makewfs-examples/makewfs-gallery.json"
       - uses: actions/upload-artifact@v4
         with:
           name: worked-example-smoke

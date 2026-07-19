@@ -38,6 +38,7 @@ nav:
   - Interoperability: interop.md
   - Validation: validation.md
   - Examples: examples.md
+  - Documentation gallery: gallery.md
   - Performance: performance.md
   - Troubleshooting: troubleshooting.md
   - Stability: stability.md

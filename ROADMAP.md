@@ -633,9 +633,10 @@ or modulated pyramid frames.
 - [x] Add an example showing the closed-loop injection point with user-supplied
   `residual_opd -> wfs.expose(residual_opd)` callbacks. Any toy reconstructor or
   controller stays inside the example and is labeled non-production.
-- [ ] Build a documentation gallery from versioned example outputs. Check that
+- [x] Build a documentation gallery from versioned example outputs. Check that
   plots have units, color bars, parameter summaries, accessible labels, and no
-  scientifically ambiguous normalization.
+  scientifically ambiguous normalization. The versioned SVG and manifest are
+  under `docs/gallery/`.
 - [x] Add troubleshooting guides for sampling/aliasing, phase units/signs,
   undersized detectors/cropping, flux/QE, LGS approximation, performance, and
   reproducibility.
