@@ -18,6 +18,8 @@ class OpticalResult:
     launched_rate_per_s: float
     captured_rate_per_s: float
     opd_m: NDArray[np.float64]
+    spectral_photon_rate: NDArray[np.float64] | None = None
+    spectral_wavelengths_m: tuple[float, ...] | None = None
 
 
 class SensorEngine:

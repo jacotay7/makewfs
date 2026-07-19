@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import numpy as np
@@ -30,25 +31,92 @@ class DetectorAdapter:
                 precision=config.precision,
                 default_temperature_c=config.temperature_c,
             )
+        if config.qe_curve_path is not None:
+            camera = camera.with_config(qe_curve=gf.QE.from_file(config.qe_curve_path))
         if camera.resolution != optical_shape:
             camera = camera.with_config(resolution=list(optical_shape))
         self.camera = camera
+        self._supports_binning = "binning" in inspect.signature(camera.expose).parameters
+        if not self._supports_binning and (config.binning != 1 or config.binning_mode != "digital"):
+            raise RuntimeError(
+                "detector binning requires getframes 2.1 or newer; "
+                "use binning=1 with released getframes 2.0"
+            )
         self.config = config
         self.optical_shape = optical_shape
 
-    def expose(
-        self, photon_rate: NDArray[Any], *, metadata: dict[str, Any], seed: int | None
+    def _expose_camera(
+        self,
+        photon_rate: NDArray[Any],
+        *,
+        quantum_efficiency: float | None = None,
+        seed: int | None,
     ) -> Any:
-        """Run the existing detector signal chain."""
-        frame = self.camera.expose(
+        kwargs: dict[str, Any] = {
+            "seed": seed,
+            "include_truth": self.config.include_truth,
+        }
+        if quantum_efficiency is not None:
+            kwargs["quantum_efficiency"] = quantum_efficiency
+        if self._supports_binning:
+            kwargs["binning"] = self.config.binning
+            kwargs["binning_mode"] = self.config.binning_mode
+        return self.camera.expose(
             np.asarray(photon_rate),
             self.config.exposure_s,
             self.config.temperature_c,
-            binning=self.config.binning,
-            binning_mode=self.config.binning_mode,
-            seed=seed,
-            include_truth=self.config.include_truth,
+            **kwargs,
         )
+
+    def expose(
+        self,
+        photon_rate: NDArray[Any],
+        *,
+        metadata: dict[str, Any],
+        seed: int | None,
+        spectral_photon_rate: NDArray[Any] | None = None,
+        spectral_wavelengths_m: tuple[float, ...] | None = None,
+    ) -> Any:
+        """Run the existing detector signal chain."""
+        if (
+            spectral_photon_rate is not None
+            and spectral_wavelengths_m is not None
+            and self.camera.config.qe_curve is not None
+        ):
+            cube = np.asarray(spectral_photon_rate)
+            wavelengths_nm = np.asarray(spectral_wavelengths_m) * 1e9
+            if hasattr(self.camera, "expose_spectral"):
+                frame = self.camera.expose_spectral(
+                    cube,
+                    wavelengths_nm,
+                    self.config.exposure_s,
+                    self.config.temperature_c,
+                    binning=self.config.binning,
+                    binning_mode=self.config.binning_mode,
+                    seed=seed,
+                    include_truth=self.config.include_truth,
+                )
+            else:
+                # Compatibility fallback for released getframes 2.0: preserve
+                # the QE-weighted signal while the sibling spectral cube API is
+                # released. Full spectral cube truth requires getframes 2.1+.
+                qe = np.asarray(self.camera.config.qe_curve(wavelengths_nm))
+                electron_rate = np.tensordot(qe, cube, axes=(0, 0))
+                frame = self._expose_camera(
+                    electron_rate,
+                    quantum_efficiency=1.0,
+                    seed=seed,
+                )
+                frame.metadata["spectral"] = True
+                frame.metadata["spectral_wavelengths_nm"] = [
+                    float(value) for value in wavelengths_nm
+                ]
+                frame.metadata["spectral_truth"] = "integrated-only getframes 2.0 fallback"
+        else:
+            frame = self._expose_camera(
+                np.asarray(photon_rate),
+                seed=seed,
+            )
         frame.metadata.update(metadata)
         frame.metadata["detector_binning"] = self.config.binning
         frame.metadata["detector_binning_mode"] = self.config.binning_mode

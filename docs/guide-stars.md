@@ -26,9 +26,12 @@ with Gaussian FWHM mode.
 
 `wavelengths_m` and optional `wavelength_weights` form a normalized photon
 quadrature. The Shack–Hartmann spot sampling scales with wavelength; the ideal
-pyramid mask retains its configured fixed pupil separation. The resulting
-photon-rate maps are summed before one scalar-QE `getframes` exposure. A future
-wavelength-resolved detector API is conditional on the gate in `ROADMAP.md`.
+pyramid mask retains its configured fixed pupil separation. Without
+`detector.qe_curve_path`, the resulting photon-rate maps are summed before one
+scalar-QE `getframes` exposure. With that curve, the optional spectral-QE path
+passes the cube to `getframes` 2.1's development API (or applies an explicitly
+documented integrated fallback on 2.0); the release gate remains in
+`ROADMAP.md`.
 
 For measured relative curves, `sed_path` and `transmission_path` point to
 two-column text files with `wavelength_nm value`. If explicit wavelengths are

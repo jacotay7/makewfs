@@ -41,8 +41,10 @@ python -m pytest -m interop
 ```
 
 The clean-room smoke check has also been run from non-editable wheels for
-`getframes 2.0.0`, `pyturb 1.0.0`, and `makewfs 0.1.0.dev0` in an isolated
+`getframes 2.1.0.dev0`, `pyturb 1.0.0`, and `makewfs 0.1.0.dev0` in an isolated
 Python 3.13 environment. It imports the installed packages, builds a small SH
 configuration, renders an ideal rate map, and exposes one seeded detector frame.
-The package constraints therefore currently record `getframes>=2.0` and
-`pyturb>=1.0` as the minimum compatible sibling versions.
+The scalar package constraint remains `getframes>=2.0` and `pyturb>=1.0`. Full
+spectral cube truth uses the upcoming `getframes>=2.1.0` API; released 2.0
+cameras use a documented QE-weighted integrated-signal fallback until that
+minor release is available.

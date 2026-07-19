@@ -103,6 +103,9 @@ class PyramidEngine(SensorEngine):
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
         self.wavefront.validate_finite_inside(internal, self.pupil)
         photon_rate = np.zeros(self.output_shape, dtype=np.float64)
+        wavelengths = tuple(dict.fromkeys(state.wavelength_m for state in self.source_states))
+        wavelength_index = {wavelength: index for index, wavelength in enumerate(wavelengths)}
+        spectral_photon_rate = np.zeros((len(wavelengths), *self.output_shape), dtype=np.float64)
         total_field_flux: float | None = None
         captured = 0.0
         pixels = self.settings.pixels_across_pupil
@@ -130,11 +133,20 @@ class PyramidEngine(SensorEngine):
             cropped_flux = float(np.sum(mosaic))
             if cropped_flux < 0.0:
                 raise ValueError("pyramid propagation produced negative flux")
-            photon_rate += mosaic * (self.source_rate * state.weight / total_field_flux)
+            contribution = mosaic * (self.source_rate * state.weight / total_field_flux)
+            photon_rate += contribution
+            spectral_photon_rate[wavelength_index[state.wavelength_m]] += contribution
             captured += self.source_rate * state.weight * cropped_flux / total_field_flux
         if total_field_flux is None or total_field_flux <= 0.0:
             raise ValueError("pupil has no illuminated pixels")
-        return OpticalResult(photon_rate, self.source_rate, captured, wavefront)
+        return OpticalResult(
+            photon_rate,
+            self.source_rate,
+            captured,
+            wavefront,
+            spectral_photon_rate,
+            wavelengths,
+        )
 
 
 __all__ = ["PyramidEngine"]

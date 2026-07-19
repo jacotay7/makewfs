@@ -583,9 +583,10 @@ class DetectorConfig:
     binning_mode: str
     precision: str
     include_truth: bool
+    qe_curve_path: str | None = None
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> DetectorConfig:
+    def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> DetectorConfig:
         allowed = {
             "preset",
             "camera",
@@ -595,6 +596,7 @@ class DetectorConfig:
             "binning_mode",
             "precision",
             "include_truth",
+            "qe_curve_path",
         }
         _strict(data, allowed, "detector")
         preset = None if data.get("preset") is None else str(data["preset"])
@@ -615,6 +617,12 @@ class DetectorConfig:
         include_truth = data.get("include_truth", True)
         if not isinstance(include_truth, bool):
             raise ConfigError("detector.include_truth: expected a boolean")
+        qe_curve = data.get("qe_curve_path")
+        qe_curve_path = (
+            None
+            if qe_curve is None
+            else str(((Path.cwd() if base is None else base) / str(qe_curve)).resolve())
+        )
         return cls(
             preset,
             inline,
@@ -626,6 +634,7 @@ class DetectorConfig:
             mode,
             precision,
             include_truth,
+            qe_curve_path,
         )
 
 
@@ -736,7 +745,7 @@ class WFSConfig:
             telescope_config,
             source_config,
             sensor,
-            DetectorConfig.from_dict(table("detector")),
+            DetectorConfig.from_dict(table("detector"), base=base_path),
             NumericsConfig.from_dict(table("numerics")),
             None if sh_data is None else ShackHartmannConfig.from_dict(sh_data, base=base_path),
             None if pyramid_data is None else PyramidConfig.from_dict(pyramid_data),

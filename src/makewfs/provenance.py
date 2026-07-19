@@ -35,6 +35,7 @@ def referenced_file_digests(config: WFSConfig) -> dict[str, str]:
         ),
         "source_sed": config.source.sed_path,
         "source_transmission": config.source.transmission_path,
+        "detector_qe_curve": config.detector.qe_curve_path,
     }
     return {
         f"wfs_{name}_sha256": _file_digest(path)

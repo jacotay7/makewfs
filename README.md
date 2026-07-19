@@ -11,8 +11,10 @@ noise; neither model will be reimplemented here.
 
 > **Status:** early development. The CPU Shack–Hartmann and four-face pyramid
 > paths, configuration API, and detector handoff are implemented. Broadband
-> source morphology and Shack–Hartmann LGS elongation are implemented; full
-> range-resolved turbulence and detector-spectral QE remain roadmap work.
+> source morphology and Shack–Hartmann LGS elongation are implemented. An
+> optional wavelength-resolved detector-QE prototype is available with the
+> unreleased `getframes` cube API; full range-resolved turbulence and a released
+> spectral-QE contract remain roadmap work.
 
 - [Complete implementation roadmap](ROADMAP.md)
 - [Instructions for implementation agents](AGENTS.md)

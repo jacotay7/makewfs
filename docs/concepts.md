@@ -14,10 +14,12 @@ input contains only the phase/OPD map.
 ## Image domains
 
 The optical engines are deterministic and return an incident photon-rate map in
-photons/s/native detector pixel. `getframes.Camera.expose()` then performs the
-photon-to-electron-to-ADU chain and attaches detector truth. Optical intensities
-are summed over incoherent wavelength, source, modulation, and sodium-range
-samples; complex fields are never added across incoherent states.
+photons/s/native detector pixel. `getframes.Camera.expose()` performs the
+scalar photon-to-electron-to-ADU chain, while the optional
+`Camera.expose_spectral()` path applies wavelength-dependent QE exactly once
+and preserves the incident cube in detector truth. Optical intensities are
+summed over incoherent wavelength, source, modulation, and sodium-range samples;
+complex fields are never added across incoherent states.
 
 ## Piston and sampling
 

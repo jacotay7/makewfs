@@ -109,6 +109,7 @@ kernel file hash and all normalized states are included in frame provenance.
 | `detector.binning_mode` | `"digital"` or `"on_chip"` (default `"digital"`). |
 | `detector.precision` | `"float32"` or `"float64"` (default `"float64"`). |
 | `detector.include_truth` | Boolean (default `true`) controlling detector truth arrays. |
+| `detector.qe_curve_path` | Optional configuration-relative two-column `wavelength_nm qe` curve passed to `getframes`; enables wavelength-resolved QE for broadband optical cubes. |
 | `numerics.dtype` | Optical real precision, `"float32"` or `"float64"` (default `"float64"`). |
 | `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). |
 | `numerics.fft_workers` | Positive `scipy.fft` worker count (default `1`). |
@@ -219,10 +220,11 @@ angular_quadrature_order = 3
 ```
 
 `field_angle_arcsec = [x, y]` is the source centroid. A finite FWHM uses a
-deterministic Gaussian quadrature around that centroid. The detector still
-receives one summed photon-rate map, so wavelength-dependent detector QE is
-represented by the configured scalar camera QE until the conditional getframes
-gate in the roadmap is met.
+deterministic Gaussian quadrature around that centroid. By default the detector
+receives one summed photon-rate map and uses its scalar QE. For broadband
+scenes, `detector.qe_curve_path` enables the optional wavelength-resolved path;
+full spectral truth requires the unreleased `getframes` cube API, while released
+2.0 cameras use the documented integrated-signal fallback.
 
 For a sodium LGS, configure a detector-surface return rate and optional range
 profile. The range model is currently Shack–Hartmann-specific:

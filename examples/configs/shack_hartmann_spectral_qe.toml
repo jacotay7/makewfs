@@ -1,0 +1,40 @@
+schema_version = 1
+
+[input]
+quantity = "opd"
+unit = "m"
+shape = [128, 128]
+grid_extent_m = 8.0
+
+[telescope]
+pupil_diameter_m = 8.0
+central_obscuration_ratio = 0.14
+
+[source]
+kind = "ngs"
+normalization = "detector_photon_rate"
+detector_photon_rate_per_s = 2.0e6
+wavelengths_m = [5.85e-7, 5.90e-7, 5.95e-7]
+wavelength_weights = [0.25, 0.5, 0.25]
+
+[sensor]
+kind = "shack_hartmann"
+wavelength_m = 5.90e-7
+
+[shack_hartmann]
+lenslets_across_pupil = 8
+pixels_per_subaperture = 8
+spot_sampling_pixels_per_lambda_over_d = 2.0
+minimum_illuminated_fraction = 0.25
+
+[detector]
+preset = "generic_cmos"
+qe_curve_path = "qe_curve.txt"
+exposure_s = 0.001
+binning = 1
+precision = "float32"
+
+[numerics]
+dtype = "float32"
+fft_oversampling = 2
+fft_workers = 1

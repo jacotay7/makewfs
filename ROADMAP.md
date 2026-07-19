@@ -315,9 +315,11 @@ The CLI does not generate an atmosphere.
 - Radiometry scales it to photons/s/native detector pixel. Cropping or field stops
   are allowed to lose flux, but loss is explicit in metadata and never hidden by
   renormalizing the cropped image.
-- `getframes.Camera.expose` is the sole conversion from photon rate to noisy ADU.
-  Exposure, temperature, binning, precision, preset/overrides, and detector seed
-  come from config or an explicit per-call seed.
+- `getframes.Camera.expose` is the scalar conversion from photon rate to noisy
+  ADU. The optional `Camera.expose_spectral` cube boundary is equivalent for
+  wavelength-resolved QE and preserves incident spectral truth. Exposure,
+  temperature, binning, precision, preset/overrides, and detector seed come from
+  config or an explicit per-call seed.
 - Optics are deterministic. All random detector effects remain in `getframes`.
   All optional Monte Carlo source sampling uses an independent, named RNG stream
   and has a deterministic quadrature default.
@@ -471,7 +473,7 @@ and validation of the near-field geometry.
   typed-package marker, dynamic version, and MIT license matching the sibling
   projects. Test Python 3.10 through the current stable version supported by the
   runtime dependencies rather than baking in an unnecessary upper bound.
-- [x] Add runtime dependencies (`numpy`, `scipy`, `getframes>=2`) and separated
+- [x] Add runtime dependencies (`numpy`, `scipy`, `getframes>=2.0`) and separated
   `dev`, `docs`, `examples`, `interop`, and future `gpu` extras. `pyturb` belongs
   to `interop/examples`, not core.
 - [x] Configure Ruff lint and format, strict mypy, pytest strict markers, branch
@@ -563,8 +565,10 @@ Shack–Hartmann frame through `getframes`.
 - [x] Document the mean-altitude OPD approximation and show the division of labor:
   `pyturb.Atmosphere(..., lgs_altitude=mean_range)` supplies cone-effect OPD;
   `makewfs` supplies detector-plane sodium elongation.
-- [ ] Resolve the wavelength-resolved detector-QE gate in section 13 before
-  claiming fully quantitative broadband detector frames.
+- [ ] Resolve the wavelength-resolved detector-QE gate in section 13: the
+  broadband SH spectrum varies materially across pixels and a local
+  `getframes 2.1.0.dev0` cube prototype exists; release/pin that sibling API
+  before claiming the full gate.
 - [x] Cross-validate selected monochromatic SH cases against an independent
   Fourier-optics calculation; the small-grid direct DFT reference is frozen in
   the core test suite, while optional package references remain validation-only.
@@ -696,7 +700,8 @@ a real GPU backend without an architectural rewrite.
   document stability, and record intentional future extension points.
 - [x] Verify clean-room installation using non-editable versioned `pyturb` and
   `getframes` wheels, not editable sibling checkouts; record minimum compatible
-  versions (`pyturb>=1.0`, `getframes>=2.0`).
+  scalar versions (`pyturb>=1.0`, `getframes>=2.0`). The optional spectral-QE
+  path is exercised separately against the unreleased 2.1.0 development wheel.
 - [x] Build and inspect sdist/wheel contents and run package metadata checks.
 - [ ] Tag `1.0.0`, publish docs, and cut a reproducible release.
 
@@ -867,19 +872,21 @@ repository only if the preceding phase proves the need.
 
 ### getframes: wavelength-resolved rate-map exposure
 
-- [ ] **Gate:** demonstrate a broadband WFS whose spatial spectrum changes across
+- [x] **Gate:** demonstrate a broadband WFS whose spatial spectrum changes across
   detector pixels, so a single scalar effective QE gives a materially wrong
   result.
-- [ ] If gated in, add a public `getframes` API accepting either a wavelength +
+- [x] If gated in, add a public `getframes` API accepting either a wavelength +
   photon-rate cube or a pre-QE electron-rate map with correct `FrameTruth`
   semantics. Apply QE/PRNU/noise exactly once and test equivalence to scalar
   monochromatic exposure.
 - [ ] Release and pin the first `getframes` version with that contract before
   using it from `makewfs`.
 
-The current internal spectral scene path precomputes electron rate and calls
-`Camera.expose(..., quantum_efficiency=1.0)`, but `makewfs` must not depend on
-private helpers or mislabel electron rate as photon rate.
+The current compatibility path precomputes a QE-weighted electron rate and calls
+`Camera.expose(..., quantum_efficiency=1.0)` only when the released camera lacks
+the public cube API. The preferred path calls `Camera.expose_spectral` and keeps
+the incident photon cube in `FrameTruth`; `makewfs` must not depend on private
+helpers or mislabel electron rate as photon rate.
 
 ### pyturb: same-realization multi-range LGS OPD
 

@@ -25,6 +25,10 @@ All notable changes to `makewfs` are documented here.
   interoperability verification for `pyturb` 1.0 and `getframes` 2.0.
 - Added a versioned labelled SVG capability gallery with units, color bars,
   seeds, configuration digests, and modeling notes.
+- Added wavelength-resolved detector QE through the public `getframes` spectral
+  cube contract, with truth preservation and a shipped comparison example.
+- The spectral-QE path uses the upcoming `getframes>=2.1.0` capability when
+  available and retains a documented integrated-signal fallback for 2.0.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

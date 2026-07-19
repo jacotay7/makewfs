@@ -71,7 +71,13 @@ class WavefrontSensor:
             file_digests=self.engine.file_digests,
         )
         detector_start = perf_counter()
-        frame = self.detector.expose(result.photon_rate, metadata=frame_metadata, seed=seed)
+        frame = self.detector.expose(
+            result.photon_rate,
+            metadata=frame_metadata,
+            seed=seed,
+            spectral_photon_rate=result.spectral_photon_rate,
+            spectral_wavelengths_m=result.spectral_wavelengths_m,
+        )
         detector_elapsed = perf_counter() - detector_start
         frame.metadata["wfs_optical_render_s"] = optical_elapsed
         frame.metadata["wfs_detector_expose_s"] = detector_elapsed

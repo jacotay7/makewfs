@@ -23,10 +23,12 @@ pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, and a documented SH sodium-range geometry
 model. It also includes a versioned labelled documentation gallery, benchmark
-reference snapshot, and non-editable-wheel clean-room smoke evidence. Do not
-present range-resolved turbulent LGS OPD,
-wavelength-resolved detector QE, broad independent-reference parity, or GPU
-behavior as implemented until their gates pass.
+reference snapshot, non-editable-wheel clean-room smoke evidence, and an
+optional wavelength-resolved detector-QE prototype that uses the unreleased
+`getframes` cube API (with an integrated fallback for released 2.0 cameras).
+Do not present range-resolved turbulent LGS OPD, the spectral-QE path as a
+released/stable contract, broad independent-reference parity, or GPU behavior
+as implemented until their gates pass.
 
 ## Product boundary
 
@@ -42,7 +44,7 @@ pupil OPD/phase + static config
  photon rate [photons/s/native detector pixel]
               |
               v
-     getframes.Camera.expose
+     getframes.Camera.expose[_spectral]
               |
               v
         Frame data [ADU]
@@ -130,7 +132,8 @@ Follow the target layout in `ROADMAP.md`:
 - `wavefront.py`, `pupil.py`, and `sampling.py` hold shared numerical rules.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
 - `radiometry.py` produces source photon budgets using public `getframes` tools.
-- `detector.py` is a narrow adapter to `getframes.Camera.expose`.
+- `detector.py` is a narrow adapter to `getframes.Camera.expose` and the
+  optional public `expose_spectral` cube API.
 - `api.py` owns the user facade and caching lifecycle.
 - `validation/` produces theory/reference evidence; `benchmarks/` measures speed;
   neither is imported by the runtime package.

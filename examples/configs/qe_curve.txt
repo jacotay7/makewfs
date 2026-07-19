@@ -1,0 +1,4 @@
+# wavelength_nm  quantum_efficiency
+580 0.10
+590 0.50
+600 0.90

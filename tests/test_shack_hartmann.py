@@ -1,6 +1,7 @@
 """Shack-Hartmann optical and detector integration tests."""
 
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -79,6 +80,37 @@ def test_detector_binning_changes_frame_shape_but_preserves_optical_truth() -> N
     assert frame.truth is not None
     assert frame.truth.photon_rate.shape == (64, 64)
     assert frame.metadata["detector_binning"] == 2
+
+
+def test_wavelength_resolved_qe_applies_per_pixel_spectral_weights(tmp_path: Path) -> None:
+    config = WavefrontSensor.from_toml(
+        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml"
+    ).config
+    qe_path = tmp_path / "qe.txt"
+    qe_path.write_text("580 0.1\n590 0.5\n600 0.9\n", encoding="utf-8")
+    sensor = WavefrontSensor(
+        replace(config, detector=replace(config.detector, qe_curve_path=str(qe_path)))
+    )
+    frame = sensor.expose(np.zeros(config.input.shape), seed=17)
+    assert frame.truth is not None
+    spectral_photon_rate = getattr(frame.truth, "spectral_photon_rate", None)
+    wavelengths_nm = getattr(frame.truth, "wavelengths_nm", None)
+    if spectral_photon_rate is None or wavelengths_nm is None:
+        pytest.skip("full spectral truth requires getframes 2.1+")
+    assert frame.metadata["spectral"] is True
+    np.testing.assert_allclose(
+        frame.truth.photon_rate,
+        np.sum(spectral_photon_rate, axis=0),
+    )
+    qe = np.interp(
+        wavelengths_nm,
+        [580.0, 590.0, 600.0],
+        [0.1, 0.5, 0.9],
+    )
+    expected_electrons = (
+        np.sum(spectral_photon_rate * qe[:, None, None], axis=0) * config.detector.exposure_s
+    )
+    np.testing.assert_allclose(frame.truth.mean_photoelectrons, expected_electrons, rtol=1e-6)
 
 
 def test_temporal_integration_averages_ideal_maps() -> None:
