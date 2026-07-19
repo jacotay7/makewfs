@@ -18,3 +18,5 @@ def test_source_curve_digest_is_recorded(tmp_path: Path) -> None:
     sensor = WavefrontSensor(replace(config, source=source))
     frame = sensor.expose(np.zeros(config.input.shape), seed=1)
     assert len(frame.metadata["wfs_source_sed_sha256"]) == 16
+    assert frame.metadata["wfs_source_kind"] == "ngs"
+    assert np.isclose(frame.metadata["wfs_source_states"][0]["wavelength_m"], 6.0e-7)

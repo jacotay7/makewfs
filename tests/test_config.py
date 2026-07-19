@@ -277,6 +277,8 @@ def test_detector_and_root_tables_reject_conflicts() -> None:
         )
     with pytest.raises(ConfigError, match="binning_mode"):
         DetectorConfig.from_dict({"preset": "generic_cmos", "exposure_s": 1, "binning_mode": "bad"})
+    with pytest.raises(ConfigError, match="camera: expected a table"):
+        DetectorConfig.from_dict({"camera": [], "exposure_s": 1})
     missing_sensor_table = _minimal_tables()
     missing_sensor_table.pop("shack_hartmann")
     with pytest.raises(ConfigError, match="required"):

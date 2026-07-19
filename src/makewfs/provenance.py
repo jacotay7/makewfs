@@ -59,8 +59,19 @@ def metadata(
         "wfs_captured_photons_s": float(captured_rate),
         "wfs_input_opd_rms_m": float(np.sqrt(np.mean(np.asarray(opd_m) ** 2))),
         "wfs_seed": seed if seed is not None else "internal",
+        "wfs_source_kind": config.source.kind,
         "wfs_source_state_count": len(states),
         "wfs_source_wavelengths_m": sorted({state.wavelength_m for state in states}),
+        "wfs_source_states": [
+            {
+                "wavelength_m": state.wavelength_m,
+                "weight": state.weight,
+                "angle_x_rad": state.angle_x_rad,
+                "angle_y_rad": state.angle_y_rad,
+                "range_m": state.range_m,
+            }
+            for state in states
+        ],
     }
     result.update(referenced_file_digests(config) if file_digests is None else file_digests)
     for package in ("makewfs", "getframes"):

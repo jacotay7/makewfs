@@ -536,7 +536,10 @@ class DetectorConfig:
         }
         _strict(data, allowed, "detector")
         preset = None if data.get("preset") is None else str(data["preset"])
-        inline = dict(data.get("camera", {}))
+        raw_inline = data.get("camera", {})
+        if not isinstance(raw_inline, Mapping):
+            raise ConfigError("detector.camera: expected a table")
+        inline = dict(raw_inline)
         if preset is None and not inline:
             raise ConfigError("detector: provide preset or inline camera config")
         if preset is not None and inline:
