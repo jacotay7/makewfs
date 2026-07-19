@@ -17,6 +17,8 @@ All notable changes to `makewfs` are documented here.
   lenslet-grid rotation/offset path with aligned-grid parity tests.
 - Added an optional HCIPy ideal-pyramid cross-check and a dedicated validation
   CI job; HCIPy remains outside runtime dependencies.
+- Added configuration-relative measured SH optical blur kernels with unit-sum
+  validation, cached convolution, and provenance hashes.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.
