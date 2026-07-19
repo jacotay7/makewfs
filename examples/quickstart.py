@@ -18,6 +18,9 @@ def main() -> None:
     parser.add_argument("--output", default="quickstart.png")
     args = parser.parse_args()
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise SystemExit("install makewfs[examples] to run this example") from exc
@@ -42,8 +45,9 @@ def main() -> None:
     axes[3].set_title("central row (photons/s/pixel)")
     axes[3].set_xlabel("detector x (pixel)")
     axes[3].set_ylabel("photons/s")
+    central_axis = axes[3]
     for axis in axes:
-        if axis is not axes[3]:
+        if axis is not central_axis:
             axis.set_axis_off()
     figure.tight_layout()
     figure.savefig(args.output, dpi=140)

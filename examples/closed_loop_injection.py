@@ -18,6 +18,9 @@ def main() -> None:
     if args.steps < 2:
         raise SystemExit("--steps must be >= 2")
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise SystemExit("install makewfs[examples] to run this example") from exc

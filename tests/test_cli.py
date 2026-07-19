@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from makewfs.cli import main
 
@@ -40,3 +41,21 @@ def test_render_command_writes_detector_array(tmp_path: Path) -> None:
         == 0
     )
     assert np.load(output_path).shape == (64, 64)
+
+
+def test_npz_input_and_output_paths(tmp_path: Path) -> None:
+    wavefront_path = tmp_path / "phase.npz"
+    ideal_path = tmp_path / "ideal.npz"
+    render_path = tmp_path / "frame.npz"
+    np.savez(wavefront_path, phase=np.zeros((128, 128)))
+    assert main(["ideal", str(CONFIG), str(wavefront_path), "--output", str(ideal_path)]) == 0
+    assert np.load(ideal_path)["data"].shape == (64, 64)
+    assert main(["render", str(CONFIG), str(wavefront_path), "--output", str(render_path)]) == 0
+    assert np.load(render_path)["data"].shape == (64, 64)
+
+
+def test_cli_reports_unsupported_file_format(tmp_path: Path) -> None:
+    wavefront_path = tmp_path / "phase.npy"
+    np.save(wavefront_path, np.zeros((128, 128)))
+    with pytest.raises(SystemExit):
+        main(["ideal", str(CONFIG), str(wavefront_path), "--output", str(tmp_path / "out.dat")])

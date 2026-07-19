@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from makewfs import WavefrontSensor
 
@@ -59,3 +60,25 @@ def test_pyramid_frame_records_face_order() -> None:
     ]
     assert frame.metadata["wfs_source_state_count"] == 1
     assert frame.metadata["wfs_source_wavelengths_m"] == [7.0e-7]
+
+
+def test_pyramid_allows_overlapping_pupil_images() -> None:
+    config = WavefrontSensor.from_toml(CONFIG).config
+    assert config.pyramid is not None
+    overlap = replace(config.pyramid, pupil_separation_pixels=4)
+    sensor = WavefrontSensor(replace(config, pyramid=overlap))
+    image = sensor.photon_rate(np.zeros(config.input.shape))
+    assert image.shape == (68, 68)
+    assert np.isclose(image.sum(), config.source.detector_photon_rate_per_s, rtol=0.1)
+
+
+def test_pyramid_rejects_range_resolved_lgs() -> None:
+    config = WavefrontSensor.from_toml(CONFIG).config
+    source = replace(
+        config.source,
+        kind="lgs",
+        lgs_ranges_m=(89e3, 91e3),
+        lgs_range_weights=(0.5, 0.5),
+    )
+    with pytest.raises(NotImplementedError, match="Shack-Hartmann"):
+        WavefrontSensor(replace(config, source=source))

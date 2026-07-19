@@ -5,7 +5,7 @@ import pytest
 
 from makewfs.config import WFSConfig
 from makewfs.pupil import make_pupil
-from makewfs.wavefront import WavefrontInput, resample_opd
+from makewfs.wavefront import WavefrontInput, iter_phase_samples, load_static_opd, resample_opd
 
 
 def _config(quantity: str = "opd") -> WFSConfig:
@@ -37,6 +37,62 @@ def test_phase_to_opd_conversion() -> None:
     wavefront = WavefrontInput(config)
     phase = np.full(config.input.shape, np.pi)
     assert np.allclose(wavefront.opd(phase), 250e-9)
+
+
+def test_wavefront_shape_type_finiteness_and_static_map(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    config = _config()
+    with pytest.raises(ValueError, match="shape"):
+        WavefrontInput(config).opd(np.zeros((4, 4)))
+    with pytest.raises(TypeError, match="numeric"):
+        WavefrontInput(config).opd(np.full(config.input.shape, "bad", dtype=object))
+    with pytest.raises(ValueError, match="non-finite"):
+        WavefrontInput(config).opd(np.full(config.input.shape, np.nan))
+    static_path = tmp_path / "static.npy"
+    np.save(static_path, np.ones(config.input.shape) * 2e-9)
+    static_config = WFSConfig.from_dict(
+        {
+            **config.to_dict(),
+            "input": {**config.to_dict()["input"], "static_opd_path": str(static_path)},
+        }
+    )
+    static = load_static_opd(static_config)
+    assert static is not None
+    assert np.allclose(
+        WavefrontInput(static_config, static).opd(np.zeros(config.input.shape)), 2e-9
+    )
+
+
+def test_static_map_archive_and_invalid_shape(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    config = _config()
+    archive = tmp_path / "static.npz"
+    np.savez(archive, data=np.zeros(config.input.shape))
+    archive_config = WFSConfig.from_dict(
+        {
+            **config.to_dict(),
+            "input": {**config.to_dict()["input"], "static_opd_path": str(archive)},
+        }
+    )
+    assert load_static_opd(archive_config) is not None
+    bad = tmp_path / "bad.npy"
+    np.save(bad, np.zeros((3, 3)))
+    bad_config = WFSConfig.from_dict(
+        {**config.to_dict(), "input": {**config.to_dict()["input"], "static_opd_path": str(bad)}}
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        load_static_opd(bad_config)
+
+
+def test_phase_sample_iterator_supports_snapshot_stack_and_iterable() -> None:
+    config = _config()
+    snapshot = np.zeros(config.input.shape)
+    assert len(list(iter_phase_samples(snapshot, config.input.shape))) == 1
+    stack = np.zeros((3, *config.input.shape))
+    assert len(list(iter_phase_samples(stack, config.input.shape))) == 3
+    assert len(list(iter_phase_samples([snapshot, snapshot], config.input.shape))) == 2
+    with pytest.raises(ValueError, match="end in shape"):
+        list(iter_phase_samples(np.zeros((2, 4, 4)), config.input.shape))
+    with pytest.raises(ValueError, match="sample must have shape"):
+        list(iter_phase_samples([np.zeros((4, 4))], config.input.shape))
 
 
 def test_opd_resampling_preserves_plane() -> None:

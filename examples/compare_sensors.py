@@ -15,6 +15,9 @@ def main() -> None:
     parser.add_argument("--output", default="compare_sensors.png")
     args = parser.parse_args()
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise SystemExit("install makewfs[examples] to run this example") from exc

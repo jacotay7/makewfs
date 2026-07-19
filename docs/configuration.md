@@ -18,7 +18,99 @@ The root requires `schema_version = 1` and has these tables:
 
 Unknown keys and conflicting normalization choices are errors. File paths are
 resolved relative to the TOML file. The normalized configuration has a short
-SHA-256 `digest` used in frame provenance.
+SHA-256 `digest` used in frame provenance. All lengths are metres unless the
+key explicitly says `arcsec`, `deg`, or `pixels`.
+
+## Complete key reference
+
+The loader rejects omitted required keys, unknown keys, non-finite values, and
+values outside the ranges below. Defaults are shown in parentheses.
+
+At the root, `schema_version = 1` is required. An optional `[metadata]` table
+accepts arbitrary designer notes and is preserved in the normalized
+configuration; it does not affect optical propagation except through the
+configuration digest.
+
+### `input`
+
+| Key | Meaning and constraints |
+| --- | --- |
+| `quantity` | `"opd"` or `"phase"` (default `"opd"`). |
+| `unit` | Must be `"m"` for OPD or `"rad"` for phase; units are never inferred. |
+| `shape` | Required `[height, width]`, positive integers. Every dynamic input has this shape. |
+| `grid_extent_m` | Required physical width/height of the input grid, positive. |
+| `reference_wavelength_m` | Required positive wavelength when `quantity = "phase"`; otherwise unused. |
+| `static_opd_path` | Optional `.npy`, `.npz`, or FITS OPD map with exactly `shape`; resolved relative to the TOML file. |
+
+### `telescope`
+
+| Key | Meaning and constraints |
+| --- | --- |
+| `pupil_diameter_m` | Required positive entrance-pupil diameter. |
+| `central_obscuration_ratio` | Inner radius divided by outer radius, `[0, 1)`, default `0`. |
+| `spiders` | Array of `{angle_deg, width_fraction}` tables (default `[]`); angle is measured from +x and width is a fraction of a half-turn, `[0, 1]`. |
+| `pupil_rotation_deg` | Rotation applied to spider angles, default `0`. |
+| `custom_mask_path` | Optional `.npy`, `.npz`, or FITS amplitude mask; values must be finite in `[0, 1]` and match the internal sensor grid. |
+
+### `source`
+
+| Key | Meaning and constraints |
+| --- | --- |
+| `kind` | `"ngs"` or `"lgs"` (default `"ngs"`). |
+| `normalization` | `"detector_photon_rate"` or `"magnitude"` (default `"detector_photon_rate"`). |
+| `detector_photon_rate_per_s` | Non-negative total photons/s at the detector surface before QE; required for direct-rate mode. |
+| `magnitude` | Finite magnitude; required for magnitude mode. LGS must not use magnitude mode. |
+| `magnitude_system` | `"vega"` or `"ab"` (default `"vega"`); used with `band`. |
+| `band` | Required band name for magnitude mode, passed to `getframes` radiometry. |
+| `throughput` | Scalar optical throughput in `[0, 1]` (default `1`), used by magnitude radiometry. |
+| `field_angle_arcsec` | Source centroid `[x, y]` in arcsec (default `[0, 0]`). |
+| `angular_fwhm_arcsec` | Non-negative Gaussian source FWHM (default `0`); nonzero values require quadrature order at least 2. |
+| `angular_quadrature_order` | Positive deterministic source quadrature order (default `3`). |
+| `wavelengths_m` | Optional positive wavelength nodes. Empty means the sensor wavelength. |
+| `wavelength_weights` | Optional non-negative weights matching `wavelengths_m`; normalized internally. |
+| `lgs_ranges_m` | Optional positive sodium range nodes; only valid for LGS. Empty means a thin layer at the configured mean. |
+| `lgs_range_weights` | Optional non-negative weights matching `lgs_ranges_m`; normalized internally. |
+| `lgs_launch_position_m` | LGS launch `[x, y]` in the entrance-pupil plane (default `[0, 0]`); only valid for LGS. |
+| `sed_path` | Optional two-column `wavelength_nm value` source spectrum, non-negative and increasing. |
+| `transmission_path` | Optional two-column `wavelength_nm value` transmission curve in `[0, 1]`. |
+
+SED and transmission curves use trapezoid quadrature on their common wavelength
+nodes. The resulting normalized wavelength, source-angle, and (for SH) range
+states are recorded in provenance.
+
+### `sensor`, `detector`, and `numerics`
+
+| Table/key | Meaning and constraints |
+| --- | --- |
+| `sensor.kind` | Required `"shack_hartmann"` or `"pyramid"`. |
+| `sensor.wavelength_m` | Required positive reference sensing wavelength. |
+| `detector.preset` | Existing `getframes` camera preset; mutually exclusive with `detector.camera`. |
+| `detector.camera` | Inline `getframes.CameraConfig` dictionary; mutually exclusive with `preset`. |
+| `detector.exposure_s` | Required non-negative exposure time. |
+| `detector.temperature_c` | Optional detector temperature in °C. |
+| `detector.binning` | Positive integer passed to `getframes`. |
+| `detector.binning_mode` | `"digital"` or `"on_chip"` (default `"digital"`). |
+| `detector.precision` | `"float32"` or `"float64"` (default `"float64"`). |
+| `detector.include_truth` | Boolean (default `true`) controlling detector truth arrays. |
+| `numerics.dtype` | Optical real precision, `"float32"` or `"float64"` (default `"float64"`). |
+| `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). |
+| `numerics.fft_workers` | Positive `scipy.fft` worker count (default `1`). |
+| `numerics.pupil_samples_per_lenslet` | Optional integer ≥4 for SH internal pupil sampling; otherwise derived from input shape. |
+| `numerics.pupil_supersampling` | Positive analytic pupil boundary sub-sampling factor (default `1`). |
+
+`[shack_hartmann]` requires positive `lenslets_across_pupil`, at least two
+`pixels_per_subaperture`, and `minimum_illuminated_fraction` in `[0, 1]`.
+Either `spot_sampling_pixels_per_lambda_over_d` (at least `0.5`) or both
+`lenslet_focal_length_m` and `detector_pixel_pitch_m` must be supplied, but
+never both. The optional `lenslet_fill_factor` is in `[0, 1]`,
+`relay_magnification` is positive, `field_stop_radius_lambda_over_d` is
+non-negative when supplied, `optical_blur_fwhm_pixels` is non-negative, and
+`detector_margin_pixels` is a non-negative integer.
+
+`[pyramid]` requires `pixels_across_pupil` ≥ 8 and positive
+`pupil_separation_pixels`. `modulation_radius_lambda_over_d` is non-negative;
+zero radius requires exactly one sample, while nonzero modulation requires at
+least four `modulation_samples`. `detector_margin_pixels` is non-negative.
 
 `numerics.pupil_supersampling` sub-samples analytic circular, annular, and
 spider boundaries before averaging each pupil pixel. Custom masks may be `.npy`,

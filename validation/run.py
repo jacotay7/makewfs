@@ -75,6 +75,9 @@ def main() -> int:
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.plot is not None:
         try:
+            import matplotlib
+
+            matplotlib.use("Agg")
             import matplotlib.pyplot as plt
         except ImportError as exc:
             raise SystemExit("--plot requires matplotlib") from exc

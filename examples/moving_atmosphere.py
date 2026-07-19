@@ -19,6 +19,9 @@ def main() -> None:
     if args.steps < 6:
         raise SystemExit("--steps must be at least 6 for the two-row diagnostic plot")
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import pyturb
     except ImportError as exc:

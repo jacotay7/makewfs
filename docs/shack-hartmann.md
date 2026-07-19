@@ -27,6 +27,6 @@ belong downstream.
 
 The CPU path supports deterministic wavelength quadrature, finite NGS angular
 extent, static path OPD, and a configurable sodium-range elongation model for
-Shack–Hartmann. Physical relay parameters, field stops, and measured optical
-blur remain staged in the roadmap. LGS return flux is always supplied by the
+Shack–Hartmann. Measured optical calibration products and lenslet-grid rotation
+remain staged in the roadmap. LGS return flux is always supplied by the
 user; `makewfs` does not model laser propagation or sodium physics.

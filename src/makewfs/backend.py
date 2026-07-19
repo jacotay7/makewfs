@@ -24,7 +24,11 @@ def real_dtype(name: str) -> np.dtype[Any]:
 
 def complex_dtype(name: str) -> np.dtype[Any]:
     """Return the complex dtype paired with a real dtype."""
-    return np.dtype(np.complex64 if name == "float32" else np.complex128)
+    if name == "float32":
+        return np.dtype(np.complex64)
+    if name == "float64":
+        return np.dtype(np.complex128)
+    raise ValueError(f"unsupported dtype {name!r}")
 
 
 def centered_fft2(array: NDArray[Any], *, workers: int = 1) -> NDArray[Any]:

@@ -655,12 +655,16 @@ class WFSConfig:
             raise ConfigError("pyramid: remove this table for a Shack-Hartmann sensor")
         if sensor.kind == "pyramid" and data.get("shack_hartmann") is not None:
             raise ConfigError("shack_hartmann: remove this table for a pyramid sensor")
-        sh_data = table("shack_hartmann") if sensor.kind == "shack_hartmann" else None
-        pyramid_data = table("pyramid") if sensor.kind == "pyramid" else None
-        if sensor.kind == "shack_hartmann" and sh_data is None:
-            raise ConfigError("shack_hartmann: required for Shack-Hartmann sensor")
-        if sensor.kind == "pyramid" and pyramid_data is None:
-            raise ConfigError("pyramid: required for pyramid sensor")
+        if sensor.kind == "shack_hartmann":
+            if "shack_hartmann" not in data or data.get("shack_hartmann") is None:
+                raise ConfigError("shack_hartmann: required for Shack-Hartmann sensor")
+            sh_data = table("shack_hartmann")
+            pyramid_data = None
+        else:
+            if "pyramid" not in data or data.get("pyramid") is None:
+                raise ConfigError("pyramid: required for pyramid sensor")
+            sh_data = None
+            pyramid_data = table("pyramid")
         return cls(
             1,
             input_config,

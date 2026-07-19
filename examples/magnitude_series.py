@@ -17,6 +17,9 @@ def main() -> None:
     parser.add_argument("--magnitudes", nargs="+", type=float, default=[8.0, 12.0, 16.0])
     args = parser.parse_args()
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise SystemExit("install makewfs[examples] to run this example") from exc

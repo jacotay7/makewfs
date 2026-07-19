@@ -133,8 +133,9 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Independent HCIPy validation, physical relay/field-stop models, full
-  gallery artifacts, benchmark regression envelopes, and GPU path.
+- [ ] Independent HCIPy validation, measured optical calibration products and
+  lenslet-grid rotation, full gallery artifacts, benchmark regression envelopes,
+  and GPU path.
 
 ## 4. End-state user experience
 
@@ -478,7 +479,7 @@ and validation of the near-field geometry.
   match `getframes` unless an ADR records a change.
 - [x] Add `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.gitignore`,
   `.pre-commit-config.yaml`, and package/version smoke tests.
-- [ ] Add CI for lint/format/type-check, strict docs build, Linux/macOS/Windows
+- [x] Add CI for lint/format/type-check, strict docs build, Linux/macOS/Windows
   tests on supported Python versions, wheel/sdist build and install, and coverage
   upload. Establish an initial 90% branch-coverage target for `src/makewfs`.
 - [x] Implement immutable config models, strict TOML loading, useful path-aware
@@ -499,39 +500,39 @@ CI, and the numerical/API contracts needed by both sensors are frozen.
 
 ### Phase 1 — Shack–Hartmann end-to-end vertical slice (0.1)
 
-- [ ] Implement wavefront validation and OPD/phase conversion with all unit,
+- [x] Implement wavefront validation and OPD/phase conversion with all unit,
   shape, non-finite, piston-invariance, and coordinate-sign tests.
 - [ ] Implement physical-coordinate OPD resampling onto the internal computation
   grid when input dimensions do not match the lenslet partition. Validate planes,
   low-order Zernikes, boundary behavior, precision, and absence of wrapped-phase
   interpolation artifacts.
-- [ ] Implement sampled circular/annular pupils with obscuration and spiders;
+- [x] Implement sampled circular/annular pupils with obscuration and spiders;
   verify sampled area convergence as resolution/supersampling increases.
-- [ ] Partition the pupil into a square lenslet grid, preserve partial lenslet
+- [x] Partition the pupil into a square lenslet grid, preserve partial lenslet
   illumination, and produce explicit lenslet-validity/illumination maps.
-- [ ] Implement flux-normalized Fraunhofer propagation of all subapertures using
+- [x] Implement flux-normalized Fraunhofer propagation of all subapertures using
   batched FFT axes—no Python loop over lenslets on the steady-state hot path.
-- [ ] Integrate oversampled spot intensity into native detector pixels with a
+- [x] Integrate oversampled spot intensity into native detector pixels with a
   charge/flux-conserving operation rather than image interpolation.
-- [ ] Assemble the spot mosaic with fixed axis/sign/layout conventions and report
+- [x] Assemble the spot mosaic with fixed axis/sign/layout conventions and report
   per-subaperture captured flux.
-- [ ] Implement direct detector-surface photon-rate normalization and confirm the
+- [x] Implement direct detector-surface photon-rate normalization and confirm the
   ideal image sum matches the requested rate when uncropped.
-- [ ] Implement the narrow `getframes` adapter: preset/inline camera, ROI
+- [x] Implement the narrow `getframes` adapter: preset/inline camera, ROI
   resolution validation, exposure, temperature, binning, precision, truth,
   provenance, and seeded frame generation.
-- [ ] Implement `WavefrontSensor`, `WavefrontSensor.from_toml`, `photon_rate`,
+- [x] Implement `WavefrontSensor`, `WavefrontSensor.from_toml`, `photon_rate`,
   `reference`, `expose`, `expose_many`, and one-shot `simulate`; freeze only these
   after user testing.
-- [ ] Add analytic validation: zero-OPD symmetry, piston invariance, total and
+- [x] Add analytic validation: zero-OPD symmetry, piston invariance, total and
   per-lenslet flux, square-aperture diffraction profile, and spot displacement
   under a known phase ramp.
 - [ ] Add independent brute-force small-grid comparisons for random phase maps so
   vectorization cannot conceal an indexing/transposition error.
-- [ ] Add seeded end-to-end tests showing expected `getframes` QE, Poisson/read
+- [x] Add seeded end-to-end tests showing expected `getframes` QE, Poisson/read
   statistics, binning shape, saturation, and reproducibility without duplicating
   getframes' own unit suite.
-- [ ] Write the quickstart, configuration reference, units/conventions guide,
+- [x] Write the quickstart, configuration reference, units/conventions guide,
   Shack–Hartmann physics guide, detector handoff guide, and API docs.
 - [ ] Add a deterministic quickstart example that saves phase, ideal rate, noisy
   ADU, and a spot-row profile as plots; smoke-run it in CI at reduced resolution.
@@ -543,23 +544,23 @@ Shack–Hartmann frame through `getframes`.
 
 ### Phase 2 — Shack–Hartmann fidelity, radiometry, and LGS (0.2)
 
-- [ ] Add magnitude normalization by calling `getframes` bandpass/telescope
+- [x] Add magnitude normalization by calling `getframes` bandpass/telescope
   radiometry; test Pogson scaling, collecting area, obscuration, throughput, and
   direct-rate equivalence.
-- [ ] Add custom transmission/SED inputs and deterministic wavelength quadrature.
+- [x] Add custom transmission/SED inputs and deterministic wavelength quadrature.
   Test monochromatic convergence, broadband flux, and diffraction scaling.
 - [ ] Complete pupil support: custom masks, pupil rotation, segment gaps, static
   WFS-path OPD, lenslet-grid rotation/offset, and sampled partial subapertures.
 - [ ] Add finite NGS angular size and user-supplied source kernels as incoherent
   sums/convolutions with flux conservation and centroid tests.
-- [ ] Add physical lenslet/relay configuration and cross-check the derived spot
+- [x] Add physical lenslet/relay configuration and cross-check the derived spot
   sampling and tilt displacement against the normalized configuration.
-- [ ] Add field stops, detector margins, optical blur, and explicit launched vs
+- [x] Add field stops, detector margins, optical blur, and explicit launched vs
   captured flux accounting. Cropping must never silently renormalize.
-- [ ] Add LGS sodium range/density profiles, launch position, and geometric
+- [x] Add LGS sodium range/density profiles, launch position, and geometric
   subaperture-dependent elongation. Validate direction, length, centroid, flux,
   central-launch symmetry, and the thin-layer limit analytically.
-- [ ] Document the mean-altitude OPD approximation and show the division of labor:
+- [x] Document the mean-altitude OPD approximation and show the division of labor:
   `pyturb.Atmosphere(..., lgs_altitude=mean_range)` supplies cone-effect OPD;
   `makewfs` supplies detector-plane sodium elongation.
 - [ ] Resolve the wavelength-resolved detector-QE gate in section 13 before
@@ -577,18 +578,18 @@ choices needed for AO design studies, with LGS limitations stated honestly.
 
 ### Phase 3 — pyramid WFS end-to-end (0.3)
 
-- [ ] Implement the ideal four-face focal-plane phase mask using a centred,
+- [x] Implement the ideal four-face focal-plane phase mask using a centred,
   unit-tested coordinate system and explicit quadrant/face naming.
-- [ ] Propagate pupil field → focal plane → pyramid mask → re-imaged pupil plane
+- [x] Propagate pupil field → focal plane → pyramid mask → re-imaged pupil plane
   with correct FFT normalization, padding, focal extent, and output sampling.
-- [ ] Support separated and intentionally overlapping pupil images without
+- [x] Support separated and intentionally overlapping pupil images without
   assuming each detector pixel belongs to only one geometric pupil.
-- [ ] Implement unmodulated mode and deterministic circular modulation as an
+- [x] Implement unmodulated mode and deterministic circular modulation as an
   incoherent weighted sum of tip/tilt samples. Batch or memory-bound chunks run
   through the FFT; there is no Python loop over output pixels.
-- [ ] Implement detector mosaic/cropping and source normalization through the same
+- [x] Implement detector mosaic/cropping and source normalization through the same
   common radiometry and `getframes` adapter as SH.
-- [ ] Validate zero-phase four-pupil symmetry, piston invariance, flux
+- [x] Validate zero-phase four-pupil symmetry, piston invariance, flux
   conservation, phase-ramp sign, pupil ordering, and convergence with focal-grid
   and modulation sampling.
 - [ ] Validate small-signal push/pull responses for tip, tilt, focus, and selected
@@ -596,14 +597,14 @@ choices needed for AO design studies, with LGS limitations stated honestly.
   range while reducing low-order sensitivity.
 - [ ] Cross-validate fixed ideal-pyramid cases and response maps against HCIPy
   within documented discretization tolerances. HCIPy remains validation-only.
-- [ ] Add broadband propagation. If a physical pyramid mask is enabled, implement
+- [x] Add broadband propagation. If a physical pyramid mask is enabled, implement
   refractive-index/apex-angle chromatic separation and validate it separately
   from ideal fixed-separation mode.
-- [ ] Add optional finite source extent and static path OPD through the common
+- [x] Add optional finite source extent and static path OPD through the common
   incoherent-source machinery.
-- [ ] Write the pyramid physics/sampling/modulation guide, configuration reference,
+- [x] Write the pyramid physics/sampling/modulation guide, configuration reference,
   validation discussion, performance guide, and API docs.
-- [ ] Add unmodulated/modulated PWFS and fair SH-versus-PWFS worked examples.
+- [x] Add unmodulated/modulated PWFS and fair SH-versus-PWFS worked examples.
 - [ ] Establish pyramid benchmarks at representative 40-, 60-, and 80-pixel pupil
   samplings with 1, 8, and 32 modulation samples, warm/cold and both precisions.
 
@@ -612,30 +613,30 @@ or modulated pyramid frames.
 
 ### Phase 4 — workflows, examples, and closed-loop ergonomics (0.4)
 
-- [ ] Implement `.npy`/`.npz`/FITS phase readers and ideal/frame writers in the
+- [x] Implement `.npy`/`.npz`/FITS phase readers and ideal/frame writers in the
   CLI without making file I/O part of the hot `expose` path.
-- [ ] Make configuration-relative paths resolve relative to the TOML file, not the
+- [x] Make configuration-relative paths resolve relative to the TOML file, not the
   process working directory. Record file hashes for masks/curves/static OPD.
-- [ ] Add iterator-based phase sequences and deterministic seed derivation; verify
+- [x] Add iterator-based phase sequences and deterministic seed derivation; verify
   one-frame-at-a-time operation has bounded memory and cached optics.
-- [ ] Add `expose_integrated` for one detector exposure containing uniformly
+- [x] Add `expose_integrated` for one detector exposure containing uniformly
   weighted temporal phase samples. Verify it averages ideal intensities (never
   complex fields or phase), invokes `getframes` once, conserves mean photon rate,
   and remains distinct from the multiple-read `expose_many` path.
 - [ ] Add lightweight timing/provenance hooks useful to a closed-loop driver,
   without adding controller/DM/reconstructor abstractions.
-- [ ] Add `pyturb` and `getframes` compatibility tests pinned to their supported
+- [x] Add `pyturb` and `getframes` compatibility tests pinned to their supported
   public contracts. Test minimum supported and current local versions in CI where
   practical.
 - [ ] Create every worked example in section 10 as a script plus TOML config. Each
   saves plots non-interactively, has a fast CI smoke mode, and records its seed.
-- [ ] Add an example showing the closed-loop injection point with user-supplied
+- [x] Add an example showing the closed-loop injection point with user-supplied
   `residual_opd -> wfs.expose(residual_opd)` callbacks. Any toy reconstructor or
   controller stays inside the example and is labeled non-production.
 - [ ] Build a documentation gallery from versioned example outputs. Check that
   plots have units, color bars, parameter summaries, accessible labels, and no
   scientifically ambiguous normalization.
-- [ ] Add troubleshooting guides for sampling/aliasing, phase units/signs,
+- [x] Add troubleshooting guides for sampling/aliasing, phase units/signs,
   undersized detectors/cropping, flux/QE, LGS approximation, performance, and
   reproducibility.
 

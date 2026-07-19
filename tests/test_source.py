@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from makewfs import WavefrontSensor, load_config
 from makewfs.source import iter_source_states
@@ -109,3 +110,43 @@ def test_centre_launched_lgs_elongation_grows_toward_edge_subapertures() -> None
     centre = x_variance(mosaic[4, 4])
     edge = x_variance(mosaic[4, 0])
     assert edge > centre * 1.01
+
+
+def test_side_launched_lgs_elongation_tracks_launch_baseline() -> None:
+    config = load_config(SH_CONFIG)
+    source = replace(
+        config.source,
+        kind="lgs",
+        lgs_ranges_m=(89e3, 91e3),
+        lgs_range_weights=(0.5, 0.5),
+        lgs_launch_position_m=(0.8, 0.0),
+    )
+    telescope = replace(config.telescope, central_obscuration_ratio=0.0)
+    image = WavefrontSensor(replace(config, telescope=telescope, source=source)).photon_rate(
+        np.zeros(config.input.shape)
+    )
+    mosaic = image.reshape(8, 8, 8, 8)
+    _yy, xx = np.indices((8, 8), dtype=np.float64)
+
+    def x_variance(spot: np.ndarray) -> float:
+        weights = spot / spot.sum()
+        mean = float(np.sum(weights * xx))
+        return float(np.sum(weights * (xx - mean) ** 2))
+
+    # A positive launch coordinate is closer to the right-hand subapertures,
+    # so the left-hand rays have the larger range-dependent angular baseline.
+    assert x_variance(mosaic[4, 0]) > x_variance(mosaic[4, 7])
+
+
+def test_source_curve_failures_are_actionable(tmp_path: Path) -> None:
+    config = load_config(SH_CONFIG)
+    malformed = tmp_path / "malformed.txt"
+    np.savetxt(malformed, [[700.0]])
+    source = replace(config.source, sed_path=str(malformed))
+    with pytest.raises(ValueError, match="two columns"):
+        iter_source_states(replace(config, source=source))
+    transmission = tmp_path / "transmission.txt"
+    np.savetxt(transmission, [[600.0, 2.0], [700.0, 2.0]])
+    source = replace(config.source, transmission_path=str(transmission))
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        iter_source_states(replace(config, source=source))

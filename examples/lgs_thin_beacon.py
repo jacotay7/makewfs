@@ -20,6 +20,9 @@ def main() -> None:
     parser.add_argument("--output", default="lgs_thin_beacon.png")
     args = parser.parse_args()
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import pyturb
     except ImportError as exc:
