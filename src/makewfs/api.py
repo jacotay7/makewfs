@@ -63,6 +63,7 @@ class WavefrontSensor:
             captured_rate=result.captured_rate_per_s,
             opd_m=result.opd_m,
             seed=seed,
+            source_states=self.engine.source_states,
         )
         return self.detector.expose(result.photon_rate, metadata=frame_metadata, seed=seed)
 
@@ -100,6 +101,7 @@ class WavefrontSensor:
             captured_rate=captured / len(rates),
             opd_m=average_opd,
             seed=seed,
+            source_states=self.engine.source_states,
         )
         frame_metadata["wfs_temporal_samples"] = len(rates)
         return self.detector.expose(average_rate, metadata=frame_metadata, seed=seed)

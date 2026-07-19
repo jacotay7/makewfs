@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .config import WFSConfig
-from .source import iter_source_states
+from .source import SourceState, iter_source_states
 
 
 def _file_digest(path: str) -> str:
@@ -30,9 +30,10 @@ def metadata(
     captured_rate: float,
     opd_m: NDArray[Any],
     seed: int | None,
+    source_states: tuple[SourceState, ...] | None = None,
 ) -> dict[str, Any]:
     """Build serializable metadata for an ideal or detector frame."""
-    states = iter_source_states(config)
+    states = iter_source_states(config) if source_states is None else source_states
     result: dict[str, Any] = {
         "frame_type": "wfs",
         "wfs_sensor": sensor_kind,

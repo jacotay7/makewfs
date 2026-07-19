@@ -31,3 +31,11 @@ frame = wfs.expose(residual_opd_m)
 
 The controller and reconstructor in this sketch are deliberately external to
 `makewfs`.
+
+The optional `interop` test marker exercises one real `pyturb.Atmosphere.frames`
+OPD sample when pyturb is installed:
+
+```bash
+python -m pip install -e '.[interop]'
+python -m pytest -m interop
+```

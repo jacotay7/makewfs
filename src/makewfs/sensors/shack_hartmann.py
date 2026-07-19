@@ -87,6 +87,7 @@ class ShackHartmannEngine(SensorEngine):
         else:
             self._lgs_mean_range_m = None
         self.source_rate = source_rate_per_s(config.source, config.telescope)
+        self.source_states = iter_source_states(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         base_shape = self.n_lenslets * self.settings.pixels_per_subaperture
         self.output_shape = (
@@ -152,7 +153,7 @@ class ShackHartmannEngine(SensorEngine):
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
         self.wavefront.validate_finite_inside(internal, self.lenslet_mask)
-        states = iter_source_states(self.config)
+        states = self.source_states
         photon_rate = np.zeros(self.output_shape, dtype=np.float64)
         total_field_flux: float | None = None
         captured = 0.0

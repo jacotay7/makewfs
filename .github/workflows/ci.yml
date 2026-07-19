@@ -28,13 +28,19 @@ jobs:
       - run: mypy
 
   test:
-    name: Tests (Python ${{ matrix.python-version }})
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - {os: ubuntu-latest, python-version: "3.10"}
+          - {os: ubuntu-latest, python-version: "3.11"}
+          - {os: ubuntu-latest, python-version: "3.12"}
+          - {os: ubuntu-latest, python-version: "3.13"}
+          - {os: macos-latest, python-version: "3.12"}
+          - {os: windows-latest, python-version: "3.12"}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,9 +52,9 @@ jobs:
           pip install -e ".[dev]"
       - run: python -m pytest -q --cov=makewfs --cov-branch --cov-report=term-missing
       - name: Validation smoke report
-        run: python validation/run.py --output /tmp/makewfs-validation.json
+        run: python validation/run.py --output "${{ runner.temp }}/makewfs-validation.json"
       - name: Benchmark smoke report
-        run: python benchmarks/run.py --frames 1 --output /tmp/makewfs-benchmark.json
+        run: python benchmarks/run.py --frames 1 --output "${{ runner.temp }}/makewfs-benchmark.json"
 
   package:
     name: Build and install wheel
@@ -74,3 +80,14 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[docs]"
       - run: mkdocs build --strict
+
+  interop:
+    name: Optional sibling interoperability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,interop]"
+      - run: python -m pytest -q -m interop

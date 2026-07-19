@@ -52,6 +52,7 @@ class PyramidEngine(SensorEngine):
         self.wavefront = WavefrontInput(config, load_static_opd(config))
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
         self.source_rate = source_rate_per_s(config.source, config.telescope)
+        self.source_states = iter_source_states(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         self._mask = self._make_pyramid_mask()
 
@@ -109,7 +110,7 @@ class PyramidEngine(SensorEngine):
         pixels = self.settings.pixels_across_pupil
         separation = self.settings.pupil_separation_pixels
         margin = self.settings.detector_margin_pixels
-        for state in iter_source_states(self.config):
+        for state in self.source_states:
             fields = self._fields(internal, state)
             padded = pad_center(fields, (self.nfft, self.nfft))
             focal = centered_fft2(padded, workers=self.config.numerics.fft_workers)

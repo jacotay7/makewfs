@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from ..source import SourceState
+
 
 @dataclass(frozen=True)
 class OpticalResult:
@@ -23,6 +25,7 @@ class SensorEngine:
 
     kind: str
     output_shape: tuple[int, int]
+    source_states: tuple[SourceState, ...]
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         """Render one validated OPD input."""

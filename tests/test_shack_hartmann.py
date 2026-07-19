@@ -1,5 +1,7 @@
 """Shack-Hartmann optical and detector integration tests."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -59,6 +61,18 @@ def test_seeded_detector_frame_repeats() -> None:
     assert np.array_equal(first, second)
 
 
+def test_detector_binning_changes_frame_shape_but_preserves_optical_truth() -> None:
+    sensor = _sensor()
+    configured = WavefrontSensor(
+        replace(sensor.config, detector=replace(sensor.config.detector, binning=2))
+    )
+    frame = configured.expose(np.zeros(configured.config.input.shape), seed=4)
+    assert np.asarray(frame).shape == (32, 32)
+    assert frame.truth is not None
+    assert frame.truth.photon_rate.shape == (64, 64)
+    assert frame.metadata["detector_binning"] == 2
+
+
 def test_temporal_integration_averages_ideal_maps() -> None:
     sensor = _sensor()
     zero = np.zeros((128, 128))
@@ -69,3 +83,13 @@ def test_temporal_integration_averages_ideal_maps() -> None:
     assert result.truth is not None
     assert result.metadata["wfs_temporal_samples"] == 2
     assert np.allclose(result.truth.photon_rate, expected, rtol=1e-5, atol=1e-8)
+
+
+def test_expose_many_is_streaming_and_seeded() -> None:
+    sensor = _sensor()
+    phases = [np.zeros(sensor.config.input.shape) for _ in range(2)]
+    frames = list(sensor.expose_many(phases, seeds=[11, 12]))
+    assert len(frames) == 2
+    assert not np.array_equal(np.asarray(frames[0]), np.asarray(frames[1]))
+    repeated = list(sensor.expose_many(phases, seeds=[11, 12]))
+    assert np.array_equal(np.asarray(frames[0]), np.asarray(repeated[0]))

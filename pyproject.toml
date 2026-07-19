@@ -90,6 +90,7 @@ testpaths = ["tests"]
 markers = [
     "slow: slower statistical or gallery tests",
     "validation: theory/reference validation tests",
+    "interop: tests requiring optional pyturb/getframes sibling APIs",
 ]
 
 [tool.coverage.run]
