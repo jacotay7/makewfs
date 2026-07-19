@@ -28,6 +28,11 @@ def referenced_file_digests(config: WFSConfig) -> dict[str, str]:
         "input_static_opd": config.input.static_opd_path,
         "telescope_custom_mask": config.telescope.custom_mask_path,
         "source_angular_kernel": config.source.angular_kernel_path,
+        "shack_hartmann_optical_blur_kernel": (
+            None
+            if config.shack_hartmann is None
+            else config.shack_hartmann.optical_blur_kernel_path
+        ),
         "source_sed": config.source.sed_path,
         "source_transmission": config.source.transmission_path,
     }

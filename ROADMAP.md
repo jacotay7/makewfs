@@ -133,8 +133,8 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Broader independent validation, measured optical calibration products,
-  full gallery artifacts, benchmark regression envelopes, and GPU path.
+- [ ] Broader independent validation, full gallery artifacts, benchmark regression
+  envelopes, and GPU path.
 
 ## 4. End-state user experience
 

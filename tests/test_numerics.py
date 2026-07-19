@@ -10,7 +10,7 @@ from makewfs.backend import centered_fft2, centered_ifft2, complex_dtype, real_d
 from makewfs.config import SourceConfig, SpiderConfig, TelescopeConfig
 from makewfs.pupil import make_pupil
 from makewfs.radiometry import source_rate_per_s
-from makewfs.sampling import block_sum, crop_center, pad_center, spot_intensity
+from makewfs.sampling import block_sum, crop_center, load_blur_kernel, pad_center, spot_intensity
 
 
 def test_centered_fft_roundtrip_and_dtype() -> None:
@@ -112,6 +112,48 @@ def test_custom_pupil_archives_and_validation(tmp_path: Path) -> None:
         make_pupil(TelescopeConfig(1.0, custom_mask_path=str(invalid)), (4, 4), 1.0)
     with pytest.raises(ValueError, match="supersampling"):
         make_pupil(TelescopeConfig(1.0), (4, 4), 1.0, supersampling=0)
+
+
+def test_measured_blur_kernel_is_normalized_and_validated(tmp_path: Path) -> None:
+    path = tmp_path / "blur.npy"
+    kernel = np.zeros((3, 3))
+    kernel[1, 1] = 2.0
+    kernel[1, 2] = 1.0
+    np.save(path, kernel)
+    loaded = load_blur_kernel(str(path))
+    assert np.isclose(loaded.sum(), 1.0)
+    assert loaded[1, 2] > loaded[0, 0]
+    even = tmp_path / "even.npy"
+    np.save(even, np.ones((2, 2)))
+    with pytest.raises(ValueError, match="odd-sized"):
+        load_blur_kernel(str(even))
+    bad_suffix = tmp_path / "blur.dat"
+    bad_suffix.write_text("0", encoding="utf-8")
+    with pytest.raises(ValueError, match="support"):
+        load_blur_kernel(str(bad_suffix))
+    empty = tmp_path / "empty.npz"
+    np.savez(empty)
+    with pytest.raises(ValueError, match="contains no arrays"):
+        load_blur_kernel(str(empty))
+    negative = tmp_path / "negative.npy"
+    np.save(negative, -np.ones((3, 3)))
+    with pytest.raises(ValueError, match="non-negative"):
+        load_blur_kernel(str(negative))
+
+
+def test_spot_blur_modes_are_mutually_exclusive() -> None:
+    field = np.ones((1, 4, 4), dtype=np.complex128)
+    with pytest.raises(ValueError, match="either"):
+        spot_intensity(
+            field,
+            pixels=4,
+            samples_per_lenslet=4,
+            sampling=1.0,
+            oversampling=1,
+            workers=1,
+            optical_blur_fwhm_pixels=1.0,
+            optical_blur_kernel=np.ones((3, 3)) / 9.0,
+        )
 
 
 def test_magnitude_rate_follows_pogson_scaling() -> None:

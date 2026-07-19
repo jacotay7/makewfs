@@ -16,8 +16,8 @@ this averages analytic sub-pixels rather than interpolating a binary mask.
 Instead of normalized spot sampling, a configuration may provide lenslet focal
 length, detector pixel pitch, and relay magnification. The engine derives the
 same normalized sampling from those physical fields and rejects mixed modes.
-The optional field stop, blur, and detector-margin controls are applied to the
-ideal photon-rate mosaic before the camera adapter.
+The optional field stop, Gaussian or measured-kernel blur, and detector-margin
+controls are applied to the ideal photon-rate mosaic before the camera adapter.
 
 `lenslet_grid_rotation_deg` and `lenslet_grid_offset_fraction` describe a
 rotated or decentered lenslet array relative to the entrance pupil. They use
@@ -32,8 +32,7 @@ belong downstream.
 
 The CPU path supports deterministic wavelength quadrature, finite NGS angular
 extent and user kernels, rotated analytic pupils with square segment gaps,
-static path OPD, and a configurable sodium-range elongation model for
-Shack–Hartmann. Measured optical calibration products and lenslet-grid
-rotation/offset remain staged in the roadmap. LGS return flux is always
-supplied by the user; `makewfs` does not model laser propagation or sodium
-physics.
+static path OPD, measured blur kernels, and a configurable sodium-range
+elongation model for Shack–Hartmann. Lenslet-grid rotation/offset is supported
+through the explicit resampling path. LGS return flux is always supplied by the
+user; `makewfs` does not model laser propagation or sodium physics.

@@ -396,12 +396,13 @@ class ShackHartmannConfig:
     relay_magnification: float = 1.0
     field_stop_radius_lambda_over_d: float | None = None
     optical_blur_fwhm_pixels: float = 0.0
+    optical_blur_kernel_path: str | None = None
     detector_margin_pixels: int = 0
     lenslet_grid_rotation_deg: float = 0.0
     lenslet_grid_offset_fraction: tuple[float, float] = (0.0, 0.0)
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> ShackHartmannConfig:
+    def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> ShackHartmannConfig:
         _strict(
             data,
             {
@@ -415,6 +416,7 @@ class ShackHartmannConfig:
                 "relay_magnification",
                 "field_stop_radius_lambda_over_d",
                 "optical_blur_fwhm_pixels",
+                "optical_blur_kernel_path",
                 "detector_margin_pixels",
                 "lenslet_grid_rotation_deg",
                 "lenslet_grid_offset_fraction",
@@ -433,6 +435,21 @@ class ShackHartmannConfig:
             raise ConfigError(
                 "shack_hartmann: normalized and physical sampling modes are mutually exclusive"
             )
+        blur_fwhm = _finite(
+            data.get("optical_blur_fwhm_pixels", 0),
+            "shack_hartmann.optical_blur_fwhm_pixels",
+            minimum=0,
+        )
+        blur_kernel = data.get("optical_blur_kernel_path")
+        if blur_kernel is not None and blur_fwhm > 0:
+            raise ConfigError(
+                "shack_hartmann: optical_blur_fwhm_pixels and optical_blur_kernel_path "
+                "are mutually exclusive"
+            )
+        base_path = Path.cwd() if base is None else base
+        blur_kernel_path = (
+            None if blur_kernel is None else str((base_path / str(blur_kernel)).resolve())
+        )
         grid_offset = _tuple_floats(
             data.get("lenslet_grid_offset_fraction", [0.0, 0.0]),
             "shack_hartmann.lenslet_grid_offset_fraction",
@@ -485,11 +502,8 @@ class ShackHartmannConfig:
                 "shack_hartmann.field_stop_radius_lambda_over_d",
                 minimum=0,
             ),
-            _finite(
-                data.get("optical_blur_fwhm_pixels", 0),
-                "shack_hartmann.optical_blur_fwhm_pixels",
-                minimum=0,
-            ),
+            blur_fwhm,
+            blur_kernel_path,
             _positive_int(
                 data.get("detector_margin_pixels", 0),
                 "shack_hartmann.detector_margin_pixels",
@@ -724,7 +738,7 @@ class WFSConfig:
             sensor,
             DetectorConfig.from_dict(table("detector")),
             NumericsConfig.from_dict(table("numerics")),
-            None if sh_data is None else ShackHartmannConfig.from_dict(sh_data),
+            None if sh_data is None else ShackHartmannConfig.from_dict(sh_data, base=base_path),
             None if pyramid_data is None else PyramidConfig.from_dict(pyramid_data),
             dict(table("metadata")),
         )

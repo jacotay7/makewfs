@@ -2,12 +2,44 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 from .backend import centered_fft2, next_fast_length
+
+
+def load_blur_kernel(path: str) -> NDArray[np.float64]:
+    """Load and normalize a finite, odd-sized measured optical blur kernel."""
+    source = Path(path)
+    if source.suffix.lower() == ".npy":
+        array = np.load(source)
+    elif source.suffix.lower() == ".npz":
+        archive = np.load(source)
+        if not archive.files:
+            raise ValueError(f"optical blur archive {source} contains no arrays")
+        array = archive[archive.files[0]]
+    elif source.suffix.lower() in {".fits", ".fit"}:
+        try:
+            from astropy.io import fits  # type: ignore[import-untyped]
+        except ImportError as exc:  # pragma: no cover - optional file format
+            raise ImportError("reading FITS blur kernels requires astropy") from exc
+        array = fits.getdata(source)
+    else:
+        raise ValueError("optical blur kernels support .npy, .npz, or FITS")
+    kernel = np.asarray(array, dtype=np.float64)
+    if (
+        kernel.ndim != 2
+        or kernel.shape[0] % 2 == 0
+        or kernel.shape[1] % 2 == 0
+        or not np.all(np.isfinite(kernel))
+        or np.any(kernel < 0)
+        or np.sum(kernel) <= 0
+    ):
+        raise ValueError("optical blur kernel must be finite, non-negative, 2-D, and odd-sized")
+    return np.asarray(kernel / np.sum(kernel), dtype=np.float64)
 
 
 def pad_center(array: NDArray[Any], shape: tuple[int, int]) -> NDArray[Any]:
@@ -55,6 +87,7 @@ def spot_intensity(
     workers: int,
     field_stop_radius_lambda_over_d: float | None = None,
     optical_blur_fwhm_pixels: float = 0.0,
+    optical_blur_kernel: NDArray[np.float64] | None = None,
 ) -> NDArray[Any]:
     """Propagate lenslet fields and integrate onto ``pixels`` detector pixels.
 
@@ -85,7 +118,18 @@ def spot_intensity(
         ) / (oversampling * sampling)
         cropped = cropped * (radius_lambda_over_d <= field_stop_radius_lambda_over_d)
     native = block_sum(cropped, oversampling)
-    if optical_blur_fwhm_pixels > 0.0:
+    if optical_blur_kernel is not None and optical_blur_fwhm_pixels > 0.0:
+        raise ValueError("provide either optical_blur_fwhm_pixels or optical_blur_kernel")
+    if optical_blur_kernel is not None:
+        from scipy.ndimage import convolve
+
+        native = convolve(
+            native,
+            optical_blur_kernel[None, ...],
+            mode="constant",
+            cval=0.0,
+        )
+    elif optical_blur_fwhm_pixels > 0.0:
         from scipy.ndimage import gaussian_filter
 
         sigma = optical_blur_fwhm_pixels / 2.3548200450309493
@@ -96,4 +140,4 @@ def spot_intensity(
     return np.asarray(native)
 
 
-__all__ = ["block_sum", "crop_center", "pad_center", "spot_intensity"]
+__all__ = ["block_sum", "crop_center", "load_blur_kernel", "pad_center", "spot_intensity"]

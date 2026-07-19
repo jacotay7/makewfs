@@ -297,6 +297,32 @@ def test_sensor_specific_validation_and_defaults() -> None:
         )
 
 
+def test_measured_blur_kernel_path_is_relative_and_exclusive(tmp_path: Path) -> None:
+    config = ShackHartmannConfig.from_dict(
+        {
+            "lenslets_across_pupil": 2,
+            "pixels_per_subaperture": 4,
+            "spot_sampling_pixels_per_lambda_over_d": 2.0,
+            "minimum_illuminated_fraction": 0.25,
+            "optical_blur_kernel_path": "blur.npy",
+        },
+        base=tmp_path,
+    )
+    assert config.optical_blur_kernel_path == str((tmp_path / "blur.npy").resolve())
+    with pytest.raises(ConfigError, match="mutually exclusive"):
+        ShackHartmannConfig.from_dict(
+            {
+                "lenslets_across_pupil": 2,
+                "pixels_per_subaperture": 4,
+                "spot_sampling_pixels_per_lambda_over_d": 2.0,
+                "minimum_illuminated_fraction": 0.25,
+                "optical_blur_fwhm_pixels": 1.0,
+                "optical_blur_kernel_path": "blur.npy",
+            },
+            base=tmp_path,
+        )
+
+
 def test_detector_and_root_tables_reject_conflicts() -> None:
     with pytest.raises(ConfigError, match="preset or inline"):
         DetectorConfig.from_dict(

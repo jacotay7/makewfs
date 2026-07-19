@@ -13,7 +13,7 @@ from ..config import WFSConfig
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
-from ..sampling import spot_intensity
+from ..sampling import load_blur_kernel, spot_intensity
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
@@ -114,6 +114,11 @@ class ShackHartmannEngine(SensorEngine):
         self.source_states = iter_source_states(config)
         self.file_digests = referenced_file_digests(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
+        self._optical_blur_kernel = (
+            None
+            if self.settings.optical_blur_kernel_path is None
+            else load_blur_kernel(self.settings.optical_blur_kernel_path)
+        )
         base_shape = self.n_lenslets * self.settings.pixels_per_subaperture
         self.output_shape = (
             base_shape + 2 * self.settings.detector_margin_pixels,
@@ -217,6 +222,7 @@ class ShackHartmannEngine(SensorEngine):
                 workers=self.config.numerics.fft_workers,
                 field_stop_radius_lambda_over_d=self.settings.field_stop_radius_lambda_over_d,
                 optical_blur_fwhm_pixels=self.settings.optical_blur_fwhm_pixels,
+                optical_blur_kernel=self._optical_blur_kernel,
             )
             base_mosaic = (
                 spots.reshape(

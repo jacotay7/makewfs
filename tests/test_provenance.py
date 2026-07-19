@@ -33,3 +33,18 @@ def test_angular_kernel_digest_is_recorded(tmp_path: Path) -> None:
         np.zeros(config.input.shape), seed=2
     )
     assert len(frame.metadata["wfs_source_angular_kernel_sha256"]) == 16
+
+
+def test_optical_blur_kernel_digest_is_recorded(tmp_path: Path) -> None:
+    path = tmp_path / "blur.npy"
+    kernel = np.zeros((3, 3))
+    kernel[1, 1] = 1.0
+    np.save(path, kernel)
+    config = load_config(
+        Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann_minimal.toml"
+    )
+    settings = replace(config.shack_hartmann, optical_blur_kernel_path=str(path))
+    frame = WavefrontSensor(replace(config, shack_hartmann=settings)).expose(
+        np.zeros(config.input.shape), seed=4
+    )
+    assert len(frame.metadata["wfs_shack_hartmann_optical_blur_kernel_sha256"]) == 16

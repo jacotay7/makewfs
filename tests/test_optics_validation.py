@@ -230,6 +230,27 @@ def test_shack_hartmann_field_stop_blur_and_margin_are_optical_settings() -> Non
     assert np.all(configured >= 0)
 
 
+def test_measured_shack_blur_kernel_is_applied(tmp_path: Path) -> None:
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    kernel = np.zeros((3, 3), dtype=float)
+    kernel[1, 1] = 0.5
+    kernel[1, 0] = 0.25
+    kernel[1, 2] = 0.25
+    path = tmp_path / "blur.npy"
+    np.save(path, kernel)
+    base = WavefrontSensor(config).photon_rate(np.zeros(config.input.shape))
+    measured = WavefrontSensor(
+        replace(
+            config,
+            shack_hartmann=replace(config.shack_hartmann, optical_blur_kernel_path=str(path)),
+        )
+    ).photon_rate(np.zeros(config.input.shape))
+    assert np.all(measured >= 0)
+    assert measured.shape == base.shape
+    assert not np.array_equal(measured, base)
+
+
 def test_rotated_offset_lenslet_grid_uses_physical_resampling_path() -> None:
     config = load_config(SH_CONFIG)
     assert config.shack_hartmann is not None

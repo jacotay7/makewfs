@@ -115,6 +115,25 @@ kernel file hash and all normalized states are included in frame provenance.
 | `numerics.pupil_samples_per_lenslet` | Optional integer ≥4 for SH internal pupil sampling; otherwise derived from input shape. |
 | `numerics.pupil_supersampling` | Positive analytic pupil boundary sub-sampling factor (default `1`). |
 
+`[shack_hartmann]` keys are:
+
+| Key | Meaning and constraints |
+| --- | --- |
+| `lenslets_across_pupil` | Positive square lenslet count. |
+| `pixels_per_subaperture` | Native detector pixels per lenslet, at least 2. |
+| `spot_sampling_pixels_per_lambda_over_d` | Normalized sampling, at least 0.5; mutually exclusive with physical relay fields. |
+| `minimum_illuminated_fraction` | Validity threshold in `[0, 1]`. |
+| `lenslet_fill_factor` | Square clear fill fraction in `[0, 1]` (default 1). |
+| `lenslet_focal_length_m` | Optional positive physical lenslet focal length. |
+| `detector_pixel_pitch_m` | Optional positive detector pitch for physical sampling. |
+| `relay_magnification` | Positive relay magnification (default 1). |
+| `field_stop_radius_lambda_over_d` | Optional non-negative focal-plane field-stop radius. |
+| `optical_blur_fwhm_pixels` | Gaussian blur FWHM in native pixels (default 0). |
+| `optical_blur_kernel_path` | Optional measured odd-sized blur kernel path; mutually exclusive with Gaussian blur. |
+| `detector_margin_pixels` | Non-negative zero-rate mosaic margin. |
+| `lenslet_grid_rotation_deg` | Lenslet-frame rotation in degrees (default 0). |
+| `lenslet_grid_offset_fraction` | `[x, y]` offset in lenslet-pitch fractions (default `[0, 0]`). |
+
 `[shack_hartmann]` requires positive `lenslets_across_pupil`, at least two
 `pixels_per_subaperture`, and `minimum_illuminated_fraction` in `[0, 1]`.
 Either `spot_sampling_pixels_per_lambda_over_d` (at least `0.5`) or both
@@ -122,7 +141,10 @@ Either `spot_sampling_pixels_per_lambda_over_d` (at least `0.5`) or both
 never both. The optional `lenslet_fill_factor` is in `[0, 1]`,
 `relay_magnification` is positive, `field_stop_radius_lambda_over_d` is
 non-negative when supplied, `optical_blur_fwhm_pixels` is non-negative, and
-`detector_margin_pixels` is a non-negative integer. The optional
+`optical_blur_kernel_path` may reference a measured odd-sized, non-negative
+`.npy`, `.npz`, or FITS PSF kernel; it is normalized to unit sum and is
+mutually exclusive with `optical_blur_fwhm_pixels`. `detector_margin_pixels`
+is a non-negative integer. The optional
 `lenslet_grid_rotation_deg` rotates the lenslet coordinate frame, and
 `lenslet_grid_offset_fraction = [x, y]` shifts its origin by fractions of one
 subaperture pitch. These two controls use an explicit physical-coordinate
