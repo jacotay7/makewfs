@@ -43,6 +43,17 @@ range-resolved SH source, and 40/60/80-pixel pyramid cases with 1/8/32
 modulation samples while keeping the minimal SH and pyramid smoke cases in the
 default benchmark run.
 
+The repository also keeps a dated reference snapshot with hardware, Python,
+dependency, precision, source-state, construction, warm-optics, and detector
+columns in [`benchmarks/reference-table.md`](../benchmarks/reference-table.md).
+Regenerate it on a new machine with:
+
+```bash
+python benchmarks/run.py --representative --frames 3 --measure-memory \
+  --output benchmarks/reference-results.json
+python benchmarks/render_table.py benchmarks/reference-results.json --output benchmarks/reference-table.md
+```
+
 For call-level hotspot inspection, write a compact cumulative `cProfile` report:
 
 ```bash

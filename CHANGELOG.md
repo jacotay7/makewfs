@@ -21,6 +21,8 @@ All notable changes to `makewfs` are documented here.
   validation, cached convolution, and provenance hashes.
 - Added a public API/configuration stability audit and same-run benchmark
   regression envelopes for representative CPU kernels.
+- Added versioned benchmark snapshots and isolated non-editable-wheel
+  interoperability verification for `pyturb` 1.0 and `getframes` 2.0.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

@@ -39,3 +39,10 @@ OPD sample when pyturb is installed:
 python -m pip install -e '.[interop]'
 python -m pytest -m interop
 ```
+
+The clean-room smoke check has also been run from non-editable wheels for
+`getframes 2.0.0`, `pyturb 1.0.0`, and `makewfs 0.1.0.dev0` in an isolated
+Python 3.13 environment. It imports the installed packages, builds a small SH
+configuration, renders an ideal rate map, and exposes one seeded detector frame.
+The package constraints therefore currently record `getframes>=2.0` and
+`pyturb>=1.0` as the minimum compatible sibling versions.

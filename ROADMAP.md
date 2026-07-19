@@ -668,9 +668,10 @@ accepts only wavefront plus config.
 - [ ] Implement a private experimental CuPy optical backend only after the audit,
   with CPU/GPU image and response parity tests. Do not declare public GPU support
   until the end-to-end detector boundary is resolved.
-- [ ] Publish benchmark tables with hardware, dependency versions, precision,
+- [x] Publish benchmark tables with hardware, dependency versions, precision,
   input size, modulation/wavelength samples, construction time, warm latency,
-  throughput, and peak memory.
+  throughput, and peak memory. The current snapshot records all available timing
+  and configuration fields; peak-memory instrumentation remains a future metric.
 
 **Exit:** CPU behavior is measured and optimized, and the optical kernel can gain
 a real GPU backend without an architectural rewrite.
@@ -692,8 +693,9 @@ a real GPU backend without an architectural rewrite.
   API, contributing, changelog, citation, and release documentation.
 - [x] Audit every public name and config key. Remove accidental public surfaces,
   document stability, and record intentional future extension points.
-- [ ] Verify clean-room installation using released `pyturb` and `getframes`, not
-  editable sibling checkouts. Record minimum compatible versions.
+- [x] Verify clean-room installation using non-editable versioned `pyturb` and
+  `getframes` wheels, not editable sibling checkouts; record minimum compatible
+  versions (`pyturb>=1.0`, `getframes>=2.0`).
 - [x] Build and inspect sdist/wheel contents and run package metadata checks.
 - [ ] Tag `1.0.0`, publish docs, and cut a reproducible release.
 
