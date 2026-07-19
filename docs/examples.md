@@ -16,6 +16,9 @@ The most complete current workflows are:
 - `closed_loop_injection.py`: external residual update at the closed-loop API
   boundary;
 - `detector_choices.py`: identical ideal maps through several getframes presets.
+- `sh_design_trade.py`, `pyramid_modulation.py`, `realistic_broadband.py`, and
+  `precision_throughput.py` cover the optical design, modulation, broadband
+  pupil, and CPU precision trade studies.
 
 The extended-source configuration at
 `examples/configs/shack_hartmann_extended_source.toml` demonstrates the

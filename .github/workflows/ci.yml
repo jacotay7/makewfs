@@ -129,7 +129,15 @@ jobs:
           python examples/quickstart.py --config examples/configs/shack_hartmann_extended_source.toml --output "$RUNNER_TEMP/makewfs-examples/extended-source.png"
           python examples/compare_sensors.py --output "$RUNNER_TEMP/makewfs-examples/compare.png"
           python examples/lgs_elongation.py --output "$RUNNER_TEMP/makewfs-examples/lgs.png"
+          python examples/lgs_thin_beacon.py --output "$RUNNER_TEMP/makewfs-examples/lgs-thin.png"
+          python examples/magnitude_series.py --magnitudes 10 14 --output "$RUNNER_TEMP/makewfs-examples/magnitudes.png"
+          python examples/detector_choices.py --output "$RUNNER_TEMP/makewfs-examples/detectors.png"
+          python examples/closed_loop_injection.py --steps 6 --output "$RUNNER_TEMP/makewfs-examples/closed-loop.png"
           python examples/moving_atmosphere.py --steps 6 --output "$RUNNER_TEMP/makewfs-examples/moving.png"
+          python examples/sh_design_trade.py --output "$RUNNER_TEMP/makewfs-examples/sh-design.png"
+          python examples/pyramid_modulation.py --output "$RUNNER_TEMP/makewfs-examples/pyramid-modulation.png"
+          python examples/realistic_broadband.py --output "$RUNNER_TEMP/makewfs-examples/realistic-broadband.png"
+          python examples/precision_throughput.py --frames 2 --output "$RUNNER_TEMP/makewfs-examples/precision.png"
       - uses: actions/upload-artifact@v4
         with:
           name: worked-example-smoke

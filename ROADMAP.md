@@ -567,7 +567,7 @@ Shack–Hartmann frame through `getframes`.
 - [ ] Cross-validate selected monochromatic SH cases against an independent
   Fourier-optics package or frozen trusted calculation; keep that package in a
   validation extra only.
-- [ ] Add the NGS magnitude-series, realistic pupil, polychromatic, and LGS worked
+- [x] Add the NGS magnitude-series, realistic pupil, polychromatic, and LGS worked
   examples listed in section 10.
 - [x] Extend benchmarks across wavelength and sodium-range sample counts; document
   accuracy/performance choices and stable convergence defaults.
@@ -627,7 +627,7 @@ or modulated pyramid frames.
 - [x] Add `pyturb` and `getframes` compatibility tests pinned to their supported
   public contracts. Test minimum supported and current local versions in CI where
   practical.
-- [ ] Create every worked example in section 10 as a script plus TOML config. Each
+- [x] Create every worked example in section 10 as a script plus TOML config. Each
   saves plots non-interactively, has a fast CI smoke mode, and records its seed.
 - [x] Add an example showing the closed-loop injection point with user-supplied
   `residual_opd -> wfs.expose(residual_opd)` callbacks. Any toy reconstructor or
@@ -647,7 +647,7 @@ accepts only wavefront plus config.
 
 - [x] Profile warm SH and PWFS paths before optimizing; store profiles/benchmark
   metadata and identify FFT, assembly, quadrature, and detector costs separately.
-- [ ] Ensure static pupil/lenslet masks, phase ramps, pyramid masks, quadrature,
+- [x] Ensure static pupil/lenslet masks, phase ramps, pyramid masks, quadrature,
   index maps, and detector objects are built once and cached immutably.
 - [ ] Remove avoidable Python loops and temporaries from hot paths; use batched
   FFTs, in-place-safe operations, and configurable chunks where the full batch
@@ -681,11 +681,11 @@ a real GPU backend without an architectural rewrite.
 - [x] Run validation in CI and upload the gallery/JSON as artifacts. Physics
   tolerances cite a derivation, paper, or independent implementation and explain
   sampling limitations.
-- [ ] Achieve the agreed branch-coverage threshold with meaningful assertions;
+- [x] Achieve the agreed branch-coverage threshold with meaningful assertions;
   do not cover numerical code with smoke-only tests.
-- [ ] Run the complete quality gate on every supported platform and Python,
+- [x] Run the complete quality gate on every supported platform and Python,
   including wheel installation and all shipped configuration/example smoke tests.
-- [ ] Complete README, quickstart, concepts, configuration reference, both sensor
+- [x] Complete README, quickstart, concepts, configuration reference, both sensor
   guides, radiometry/detector/interop guides, examples, validation, performance,
   API, contributing, changelog, citation, and release documentation.
 - [ ] Audit every public name and config key. Remove accidental public surfaces,

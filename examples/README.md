@@ -18,6 +18,10 @@ with `python -m pip install -e '.[examples,interop]'` from the repository root.
   the toy attenuation is explicitly external to makewfs.
 - `detector_choices.py` holds the ideal optical map fixed while swapping
   existing CCD, EMCCD, sCMOS, and eAPD getframes presets.
+- `sh_design_trade.py`: field-stop and blur sampling choices.
+- `pyramid_modulation.py`: unmodulated versus circularly modulated PWFS response.
+- `realistic_broadband.py`: rotated segmented pupil and incoherent spectral sensing.
+- `precision_throughput.py`: float32/float64 warm-path latency and image agreement.
 - `configs/shack_hartmann_extended_source.toml` plus its kernel file show a
   measured/arbitrary finite-source morphology without changing the API.
 
