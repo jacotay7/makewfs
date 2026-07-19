@@ -22,6 +22,13 @@ ideal_rate = wfs.photon_rate(opd_m)  # photons/s/native detector pixel
 frame = wfs.expose(opd_m, seed=0)    # getframes.Frame; data are ADU
 ```
 
+The same minimal API accepts the shipped four-face pyramid configuration:
+
+```python
+pyramid = makewfs.WavefrontSensor.from_toml("examples/configs/pyramid_minimal.toml")
+pyramid_frame = pyramid.expose(opd_m, seed=0)
+```
+
 The sensor object caches pupil masks and FFT geometry. In a closed-loop driver,
 keep it alive and call `expose()` once per residual OPD. For a single exposure
 that contains several temporal phase samples, call `expose_integrated()`; it

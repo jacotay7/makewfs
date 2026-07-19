@@ -1,13 +1,24 @@
 # Pyramid wavefront sensor
 
-The planned pyramid engine will propagate the pupil field to a focal-plane
-four-face phase mask and back to a re-imaged pupil detector plane. It will support
-unmodulated operation and deterministic circular modulation, with intensity
-accumulated over modulation samples.
+The four-face pyramid path propagates a monochromatic pupil through a
+piecewise-linear focal-plane phase mask and returns the four re-imaged pupils
+as one photon-rate mosaic. Circular modulation is represented by several source
+tilts whose intensities are averaged before the detector exposure.
 
-The implementation is staged after the validated Shack-Hartmann vertical slice.
-Its face ordering, pupil separation, focal sampling, overlap behavior, and
-modulation convergence will be fixed by analytic tests and cross-checked against
-the independent HCIPy implementation. See the
-[roadmap](https://github.com/jacotay7/makewfs/blob/main/ROADMAP.md) for the
-acceptance criteria.
+```toml
+[sensor]
+kind = "pyramid"
+wavelength_m = 700e-9
+
+[pyramid]
+pixels_across_pupil = 64
+pupil_separation_pixels = 20
+modulation_radius_lambda_over_d = 2.0
+modulation_samples = 16
+```
+
+The shipped `examples/configs/pyramid_minimal.toml` is a complete detector
+configuration. The output shape is
+`pixels_across_pupil + pupil_separation_pixels` in each dimension. Broadband
+propagation, finite-source convolution, LGS range structure, and pyramid
+reconstruction are deliberately later roadmap items.

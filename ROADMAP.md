@@ -119,6 +119,19 @@ No sibling change is required for the first monochromatic Shack–Hartmann or
 pyramid vertical slice. Conditional upstream work is listed in section 13; it
 must not be implemented until its acceptance test demonstrates the need.
 
+### Current implementation checkpoint (2026-07-19)
+
+- [x] Repository foundation, strict TOML configuration, CPU backend boundary,
+  ADRs, CI/docs scaffolding, and a validated minimal API.
+- [x] Batched CPU Shack–Hartmann propagation with OPD/phase input conversion,
+  analytic pupils, direct/magnitude source normalization, and getframes output.
+- [x] Monochromatic four-face pyramid propagation with deterministic circular
+  modulation, fixed face-order provenance, and a complete detector example.
+- [x] CLI, closed-loop sequence/integration helpers, worked example scripts,
+  and regression tests for seeded detector behavior.
+- [ ] Broadband/finite-source propagation, range-resolved sodium-LGS
+  elongation, independent HCIPy validation, benchmark artifacts, and GPU path.
+
 ## 4. End-state user experience
 
 ### Configuration first
@@ -449,32 +462,32 @@ and validation of the near-field geometry.
 
 ### Phase 0 — repository foundation and locked contracts (0.0.x)
 
-- [ ] Add `pyproject.toml` using Hatchling, a `src/` layout, Python >=3.10,
+- [x] Add `pyproject.toml` using Hatchling, a `src/` layout, Python >=3.10,
   typed-package marker, dynamic version, and MIT license matching the sibling
   projects. Test Python 3.10 through the current stable version supported by the
   runtime dependencies rather than baking in an unnecessary upper bound.
-- [ ] Add runtime dependencies (`numpy`, `scipy`, `getframes>=2`) and separated
+- [x] Add runtime dependencies (`numpy`, `scipy`, `getframes>=2`) and separated
   `dev`, `docs`, `examples`, `interop`, and future `gpu` extras. `pyturb` belongs
   to `interop/examples`, not core.
-- [ ] Configure Ruff lint and format, strict mypy, pytest strict markers, branch
+- [x] Configure Ruff lint and format, strict mypy, pytest strict markers, branch
   coverage, and pre-commit. Use 100-character lines and NumPy-style docstrings to
   match `getframes` unless an ADR records a change.
-- [ ] Add `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.gitignore`,
+- [x] Add `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.gitignore`,
   `.pre-commit-config.yaml`, and package/version smoke tests.
 - [ ] Add CI for lint/format/type-check, strict docs build, Linux/macOS/Windows
   tests on supported Python versions, wheel/sdist build and install, and coverage
   upload. Establish an initial 90% branch-coverage target for `src/makewfs`.
-- [ ] Implement immutable config models, strict TOML loading, useful path-aware
+- [x] Implement immutable config models, strict TOML loading, useful path-aware
   validation errors, schema versioning, config round-trip/digest, and a
   `validate-config` CLI.
-- [ ] Commit example minimal SH and pyramid TOML files and test that every shipped
+- [x] Commit example minimal SH and pyramid TOML files and test that every shipped
   config loads.
-- [ ] Write and accept short ADRs for units/coordinates, flux normalization, FFT
+- [x] Write and accept short ADRs for units/coordinates, flux normalization, FFT
   normalization, public API, and backend boundary. Link each ADR from the docs.
-- [ ] Implement the CPU backend boundary with centered FFT helpers and explicit
+- [x] Implement the CPU backend boundary with centered FFT helpers and explicit
   `float32/complex64` and `float64/complex128` pairs. Do not expose a fake GPU
   option; unsupported devices fail clearly.
-- [ ] Create the MkDocs structure and API reference generation, with strict
+- [x] Create the MkDocs structure and API reference generation, with strict
   broken-link and warning handling.
 
 **Exit:** a wheel installs, config validation works, all repository gates run in

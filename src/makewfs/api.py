@@ -12,7 +12,8 @@ from numpy.typing import ArrayLike, NDArray
 from .config import WFSConfig, load_config
 from .detector import DetectorAdapter
 from .provenance import metadata
-from .sensors.base import OpticalResult
+from .sensors.base import OpticalResult, SensorEngine
+from .sensors.pyramid import PyramidEngine
 from .sensors.shack_hartmann import ShackHartmannEngine
 from .wavefront import iter_phase_samples
 
@@ -31,11 +32,18 @@ class WavefrontSensor:
             raise NotImplementedError(
                 "broadband source propagation is planned but not implemented in this release"
             )
+        if config.source.angular_fwhm_arcsec > 0.0:
+            raise NotImplementedError(
+                "finite guide-source morphology is planned but not implemented in this release"
+            )
+        self.engine: SensorEngine
         if config.sensor.kind == "shack_hartmann":
             self.engine = ShackHartmannEngine(config)
+        elif config.sensor.kind == "pyramid":
+            self.engine = PyramidEngine(config)
         else:
-            raise NotImplementedError("pyramid support is implemented in the next sensor slice")
-        self.detector = DetectorAdapter(config.detector, self.engine._expected_output_shape)
+            raise NotImplementedError(f"unsupported sensor kind {config.sensor.kind!r}")
+        self.detector = DetectorAdapter(config.detector, self.engine.output_shape)
 
     @classmethod
     def from_toml(cls, path: str | Path) -> WavefrontSensor:

@@ -34,7 +34,7 @@ def test_piston_invariance() -> None:
 def test_nonfinite_opd_inside_pupil_is_rejected() -> None:
     sensor = _sensor()
     phase = np.zeros((128, 128))
-    phase[40:48, 60:68] = np.nan
+    phase[64, 64] = np.nan
     with pytest.raises(ValueError, match="non-finite"):
         sensor.photon_rate(phase)
 

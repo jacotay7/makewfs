@@ -7,6 +7,12 @@
 `expose_integrated()` for multiple atmosphere samples within one detector
 integration. `makewfs` does not import or simulate the atmosphere internally.
 
+The runnable `examples/moving_atmosphere.py` script demonstrates this boundary,
+including the explicit `pyturb.to_numpy` device-to-host conversion before the
+CPU optical path. `examples/lgs_thin_beacon.py` uses the same pattern with
+`lgs_altitude`; range-resolved sodium elongation is not silently inferred from
+that single OPD map.
+
 ## getframes
 
 `wfs.expose()` returns the existing array-like `getframes.Frame`. Use

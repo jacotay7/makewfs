@@ -18,5 +18,10 @@ for repository conventions.
 
 ## Current status
 
-The initial CPU Shack-Hartmann path is available. Pyramid support, broader
-source models, validation gallery, and GPU work are staged in the roadmap.
+The initial CPU Shack-Hartmann and monochromatic four-face pyramid paths are
+available. Broadband source models, sodium-LGS elongation, an independent
+validation gallery, and GPU work remain staged in the roadmap.
+
+See the [worked examples](https://github.com/jacotay7/makewfs/tree/main/examples)
+for atmosphere handoff, magnitude series, SH-versus-pyramid comparison, and
+the explicitly thin-beacon LGS contract.

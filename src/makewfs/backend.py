@@ -37,7 +37,8 @@ def centered_fft2(array: NDArray[Any], *, workers: int = 1) -> NDArray[Any]:
         fft.fft2(fft.ifftshift(array, axes=(-2, -1)), axes=(-2, -1), workers=workers), axes=(-2, -1)
     )
     height, width = array.shape[-2:]
-    return np.asarray(transformed / np.sqrt(height * width))
+    scale = np.sqrt(np.asarray(height * width, dtype=transformed.real.dtype))
+    return np.asarray(transformed / scale, dtype=transformed.dtype)
 
 
 def centered_ifft2(array: NDArray[Any], *, workers: int = 1) -> NDArray[Any]:
@@ -49,7 +50,8 @@ def centered_ifft2(array: NDArray[Any], *, workers: int = 1) -> NDArray[Any]:
         axes=(-2, -1),
     )
     height, width = array.shape[-2:]
-    return np.asarray(transformed * np.sqrt(height * width))
+    scale = np.sqrt(np.asarray(height * width, dtype=transformed.real.dtype))
+    return np.asarray(transformed * scale, dtype=transformed.dtype)
 
 
 def next_fast_length(value: int) -> int:

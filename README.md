@@ -9,8 +9,9 @@ The package owns the wavefront-sensor optics. It deliberately reuses
 [`getframes`](https://github.com/jacotay7/getframes) for detector response and
 noise; neither model will be reimplemented here.
 
-> **Status:** early development. The initial CPU Shack–Hartmann path and
-> configuration API are implemented; pyramid support is next.
+> **Status:** early development. The CPU Shack–Hartmann and four-face pyramid
+> paths, configuration API, and detector handoff are implemented. Broadband
+> source morphology and LGS elongation remain roadmap work.
 
 - [Complete implementation roadmap](ROADMAP.md)
 - [Instructions for implementation agents](AGENTS.md)
@@ -26,6 +27,8 @@ frame = wfs.expose(opd_m, seed=0)  # getframes.Frame, data in ADU
 
 The repository includes a runnable starter configuration at
 [`examples/configs/shack_hartmann_minimal.toml`](examples/configs/shack_hartmann_minimal.toml).
+The corresponding pyramid starter is at
+[`examples/configs/pyramid_minimal.toml`](examples/configs/pyramid_minimal.toml).
 For an ideal photon-rate map, use `wfs.photon_rate(opd_m)`; for one detector
 exposure containing several temporal OPD samples, use
 `wfs.expose_integrated(samples)`.

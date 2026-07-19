@@ -22,6 +22,7 @@ class SensorEngine:
     """Structural interface implemented by each deterministic optical engine."""
 
     kind: str
+    output_shape: tuple[int, int]
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         """Render one validated OPD input."""

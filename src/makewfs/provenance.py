@@ -36,6 +36,13 @@ def metadata(
             result[f"{package}_version"] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
             result[f"{package}_version"] = "uninstalled"
+    if sensor_kind == "pyramid":
+        result["wfs_pyramid_face_order"] = [
+            "upper_left",
+            "upper_right",
+            "lower_left",
+            "lower_right",
+        ]
     return result
 
 

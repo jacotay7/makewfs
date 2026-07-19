@@ -10,6 +10,10 @@ test. The first Shack-Hartmann slice currently checks:
 - temporal integration as an average of ideal intensities before one detector
   read.
 
+The pyramid slice additionally checks equal unmodulated pupil quadrants,
+modulation flux conservation, and explicit face-order provenance. These are
+discretized CPU checks, not a claim of independent-reference parity.
+
 The roadmap adds analytic tilt displacement, lenslet diffraction, broadband
 convergence, sodium-LGS geometry, and pyramid modulation response. HCIPy is a
 validation-only dependency, never a runtime dependency.

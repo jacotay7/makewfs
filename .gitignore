@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# makewfs generated artifacts
+*.coverage
+.coverage
+*.npy
+*.npz
+*.fits
+*.fit
+*.png

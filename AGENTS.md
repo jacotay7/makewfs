@@ -18,8 +18,9 @@ Before changing anything:
    `/home/donkeykong/pyturb` for atmosphere and
    `/home/donkeykong/getframes` for detector/radiometry.
 
-The repository is currently in the early CPU Shack-Hartmann stage. Do not present
-planned pyramid or broadband behavior as implemented until its tests pass.
+The repository is currently in the early CPU Shack-Hartmann and monochromatic
+four-face pyramid stage. Do not present broadband, finite-source, or LGS
+morphology behavior as implemented until its tests pass.
 
 ## Product boundary
 

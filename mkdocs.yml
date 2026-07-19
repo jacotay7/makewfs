@@ -37,3 +37,9 @@ nav:
   - Validation: validation.md
   - API reference: api.md
   - Contributing: contributing.md
+  - Architecture decisions:
+      - Index: adr/index.md
+      - Units and coordinates: adr/0001-units-coordinates.md
+      - Flux normalization: adr/0002-flux-normalization.md
+      - Public API: adr/0003-public-api.md
+      - Backend boundary: adr/0004-backend-boundary.md

@@ -43,7 +43,8 @@ class ShackHartmannEngine(SensorEngine):
         self.lenslet_mask = self._make_lenslet_mask()
         self.source_rate = source_rate_per_s(config.source, config.telescope)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
-        self._expected_output_shape = (self.n_lenslets * self.settings.pixels_per_subaperture,) * 2
+        self.output_shape = (self.n_lenslets * self.settings.pixels_per_subaperture,) * 2
+        self._expected_output_shape = self.output_shape
 
     def _make_lenslet_mask(self) -> NDArray[np.float64]:
         """Apply optional square lenslet fill factor to the entrance pupil."""

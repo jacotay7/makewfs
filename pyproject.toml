@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "makewfs"
-version = "0.1.0.dev0"
+dynamic = ["version"]
 description = "Configuration-driven adaptive-optics wavefront sensor image simulation."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,6 +51,9 @@ Repository = "https://github.com/jacotay7/makewfs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/makewfs"]
+
+[tool.hatch.version]
+path = "src/makewfs/__about__.py"
 
 [tool.hatch.build.targets.sdist]
 include = ["src/makewfs", "tests", "docs", "examples", "README.md", "ROADMAP.md", "AGENTS.md", "LICENSE", "CHANGELOG.md"]

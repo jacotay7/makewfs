@@ -79,6 +79,8 @@ class WavefrontInput:
             converted = converted * self.config.input.reference_wavelength_m / (2.0 * np.pi)
         if self.static_opd is not None:
             converted = converted + self.static_opd
+        if not np.all(np.isfinite(converted)):
+            raise ValueError("wavefront contains non-finite OPD")
         if target_shape is not None and tuple(target_shape) != converted.shape:
             converted = resample_opd(converted, target_shape, self.config.input.grid_extent_m)
         return converted

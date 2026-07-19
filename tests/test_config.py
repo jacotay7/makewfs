@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from makewfs import ConfigError, load_config
+from makewfs import ConfigError, __version__, load_config
 
 CONFIG = Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann_minimal.toml"
 
@@ -14,6 +14,13 @@ def test_load_config_and_digest() -> None:
     assert config.sensor.kind == "shack_hartmann"
     assert config.input.shape == (128, 128)
     assert len(config.digest) == 16
+    assert __version__ == "0.1.0.dev0"
+
+
+def test_all_shipped_configurations_load() -> None:
+    for path in sorted(CONFIG.parent.glob("*.toml")):
+        config = load_config(path)
+        assert config.source_path == str(path.resolve())
 
 
 def test_config_rejects_unknown_top_level_key() -> None:
