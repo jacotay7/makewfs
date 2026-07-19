@@ -9,6 +9,9 @@ grid_extent_m = 8.0
 [telescope]
 pupil_diameter_m = 8.0
 central_obscuration_ratio = 0.14
+pupil_rotation_deg = 7.0
+segments_across_pupil = 8
+segment_gap_fraction = 0.02
 
 [source]
 kind = "ngs"

@@ -64,6 +64,22 @@ def test_custom_pupil_and_spider_masks(tmp_path: Path) -> None:
     )
 
 
+def test_rotated_segmented_analytic_pupil_has_explicit_gaps() -> None:
+    plain = TelescopeConfig(1.0)
+    segmented = TelescopeConfig(
+        1.0,
+        pupil_rotation_deg=23.0,
+        segments_across_pupil=4,
+        segment_gap_fraction=0.08,
+    )
+    plain_mask = make_pupil(plain, (128, 128), 1.0, supersampling=4)
+    segmented_mask = make_pupil(segmented, (128, 128), 1.0, supersampling=4)
+    assert np.all(segmented_mask >= 0)
+    assert np.all(segmented_mask <= 1)
+    assert segmented_mask.sum() < plain_mask.sum()
+    assert not np.array_equal(segmented_mask, make_pupil(plain, (128, 128), 1.0))
+
+
 def test_custom_pupil_archives_and_validation(tmp_path: Path) -> None:
     from makewfs.pupil import make_pupil
 

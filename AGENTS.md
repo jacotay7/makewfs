@@ -21,9 +21,10 @@ Before changing anything:
 The repository is currently in the CPU Shack-Hartmann and fixed-mask four-face
 pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
-and a documented SH sodium-range geometry model. Do not present range-resolved turbulent LGS OPD,
-wavelength-resolved detector QE, independent HCIPy parity, or GPU behavior as
-implemented until their gates pass.
+analytic segmented/rotated pupils, and a documented SH sodium-range geometry
+model. Do not present range-resolved turbulent LGS OPD,
+wavelength-resolved detector QE, broad independent-reference parity, or GPU
+behavior as implemented until their gates pass.
 
 ## Product boundary
 

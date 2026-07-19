@@ -110,6 +110,30 @@ def test_opd_resampling_preserves_y_plane_and_constant() -> None:
     assert np.allclose(constant, 3.2)
 
 
+def test_opd_resampling_preserves_low_order_defocus() -> None:
+    yy, xx = np.mgrid[:7, :7]
+    x = (xx - 3.0) / 7.0
+    y = (yy - 3.0) / 7.0
+    source = x**2 + y**2
+    result = resample_opd(source, (14, 14), 1.0)
+    target_y, target_x = np.mgrid[:14, :14]
+    expected = ((target_x - 6.5) / 14.0) ** 2 + ((target_y - 6.5) / 14.0) ** 2
+    assert np.allclose(result[2:-2, 2:-2], expected[2:-2, 2:-2], atol=0.03)
+    assert resample_opd(source.astype(np.float32), (14, 14), 1.0).dtype == np.float32
+
+
+def test_phase_is_converted_before_resampling_without_wrapping() -> None:
+    config = _config("phase")
+    wavefront = WavefrontInput(config)
+    phase = np.linspace(-12.0 * np.pi, 12.0 * np.pi, config.input.shape[1])[None, :]
+    phase = np.broadcast_to(phase, config.input.shape)
+    result = wavefront.opd(phase, target_shape=(16, 16))
+    source_index = np.clip((np.arange(16, dtype=float) + 0.5) * 8.0 / 16.0 - 0.5, 0, 7)
+    expected = (-12.0 * np.pi + source_index / 7.0 * 24.0 * np.pi)[None, :]
+    expected = np.broadcast_to(expected, (16, 16)) * 500e-9 / (2.0 * np.pi)
+    assert np.allclose(result, expected, atol=2e-8)
+
+
 def test_circular_pupil_area_is_reasonable() -> None:
     config = _config()
     pupil = make_pupil(config.telescope, (256, 256), 2.0)

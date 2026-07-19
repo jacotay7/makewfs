@@ -51,6 +51,8 @@ configuration digest.
 | `spiders` | Array of `{angle_deg, width_fraction}` tables (default `[]`); angle is measured from +x and width is a fraction of a half-turn, `[0, 1]`. |
 | `pupil_rotation_deg` | Rotation applied to spider angles, default `0`. |
 | `custom_mask_path` | Optional `.npy`, `.npz`, or FITS amplitude mask; values must be finite in `[0, 1]` and match the internal sensor grid. |
+| `segments_across_pupil` | Optional square segment count (integer ≥2), used with analytic segment gaps. |
+| `segment_gap_fraction` | Gap width as a fraction of segment pitch, `[0, 0.99]` (default `0`); nonzero values require `segments_across_pupil`. |
 
 ### `source`
 
@@ -120,16 +122,22 @@ Either `spot_sampling_pixels_per_lambda_over_d` (at least `0.5`) or both
 never both. The optional `lenslet_fill_factor` is in `[0, 1]`,
 `relay_magnification` is positive, `field_stop_radius_lambda_over_d` is
 non-negative when supplied, `optical_blur_fwhm_pixels` is non-negative, and
-`detector_margin_pixels` is a non-negative integer.
+`detector_margin_pixels` is a non-negative integer. The optional
+`lenslet_grid_rotation_deg` rotates the lenslet coordinate frame, and
+`lenslet_grid_offset_fraction = [x, y]` shifts its origin by fractions of one
+subaperture pitch. These two controls use an explicit physical-coordinate
+resampling path; the default zero values retain the fast axis-aligned path.
 
 `[pyramid]` requires `pixels_across_pupil` ≥ 8 and positive
 `pupil_separation_pixels`. `modulation_radius_lambda_over_d` is non-negative;
 zero radius requires exactly one sample, while nonzero modulation requires at
 least four `modulation_samples`. `detector_margin_pixels` is non-negative.
 
-`numerics.pupil_supersampling` sub-samples analytic circular, annular, and
-spider boundaries before averaging each pupil pixel. Custom masks may be `.npy`,
-`.npz`, or FITS arrays in `[0, 1]`.
+`numerics.pupil_supersampling` sub-samples analytic circular, annular, spider,
+and segment-gap boundaries before averaging each pupil pixel. Analytic features
+are rotated by `pupil_rotation_deg`; custom masks should be supplied already
+rotated because they are measured amplitude products. Custom masks may be
+`.npy`, `.npz`, or FITS arrays in `[0, 1]`.
 
 ## Source normalization and morphology
 

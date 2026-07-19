@@ -47,6 +47,24 @@ class ShackHartmannEngine(SensorEngine):
         )
         self.wavefront = WavefrontInput(config, load_static_opd(config))
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
+        rotation = math.radians(self.settings.lenslet_grid_rotation_deg)
+        offset_x, offset_y = self.settings.lenslet_grid_offset_fraction
+        self._grid_transform_enabled = abs(rotation) > 1e-15 or bool(offset_x or offset_y)
+        self._sample_indices: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
+        if self._grid_transform_enabled:
+            pitch = config.telescope.pupil_diameter_m / self.n_lenslets
+            cosine = math.cos(rotation)
+            sine = math.sin(rotation)
+            self._field_x = cosine * self.xx - sine * self.yy + offset_x * pitch
+            self._field_y = sine * self.xx + cosine * self.yy + offset_y * pitch
+            sample_x = (self._field_x / config.input.grid_extent_m + 0.5) * self.internal_shape[1]
+            sample_y = (self._field_y / config.input.grid_extent_m + 0.5) * self.internal_shape[0]
+            self._sample_indices = (sample_y - 0.5, sample_x - 0.5)
+            self._pupil_on_lenslet_grid = self._sample_to_lenslet_grid(self.pupil)
+        else:
+            self._field_x = self.xx
+            self._field_y = self.yy
+            self._pupil_on_lenslet_grid = self.pupil
         self.lenslet_mask = self._make_lenslet_mask()
         self.lenslet_illumination = np.asarray(
             self.lenslet_mask.reshape(
@@ -58,15 +76,20 @@ class ShackHartmannEngine(SensorEngine):
             dtype=np.float64,
         )
         self.lenslet_valid = self.lenslet_illumination >= self.settings.minimum_illuminated_fraction
-        centers = self.xx.reshape(
+        local_centers_x = self.xx.reshape(
             self.n_lenslets, self.samples_per_lenslet, self.n_lenslets, self.samples_per_lenslet
         ).mean(axis=(1, 3))
-        centers_y = self.yy.reshape(
+        local_centers_y = self.yy.reshape(
             self.n_lenslets,
             self.samples_per_lenslet,
             self.n_lenslets,
             self.samples_per_lenslet,
         ).mean(axis=(1, 3))
+        pitch = config.telescope.pupil_diameter_m / self.n_lenslets
+        cosine = math.cos(rotation)
+        sine = math.sin(rotation)
+        centers = cosine * local_centers_x - sine * local_centers_y + offset_x * pitch
+        centers_y = sine * local_centers_x + cosine * local_centers_y + offset_y * pitch
         self._subap_x = np.repeat(
             np.repeat(centers, self.samples_per_lenslet, axis=0),
             self.samples_per_lenslet,
@@ -102,13 +125,28 @@ class ShackHartmannEngine(SensorEngine):
         """Apply optional square lenslet fill factor to the entrance pupil."""
         fill = self.settings.lenslet_fill_factor
         if fill >= 1.0:
-            return self.pupil
+            return self._pupil_on_lenslet_grid
         s = self.samples_per_lenslet
         coords = (np.arange(s, dtype=np.float64) + 0.5) / s - 0.5
         yy, xx = np.meshgrid(coords, coords)
         local = ((np.abs(xx) <= fill / 2) & (np.abs(yy) <= fill / 2)).astype(np.float64)
         tiled = np.asarray(np.tile(local, (self.n_lenslets, self.n_lenslets)), dtype=np.float64)
-        return np.asarray(self.pupil * tiled, dtype=np.float64)
+        return np.asarray(self._pupil_on_lenslet_grid * tiled, dtype=np.float64)
+
+    def _sample_to_lenslet_grid(self, array: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Sample a physical-grid array on the configured lenslet grid."""
+        if self._sample_indices is None:
+            return array
+        from scipy.ndimage import map_coordinates
+
+        sampled = map_coordinates(
+            array,
+            self._sample_indices,
+            order=1,
+            mode="constant",
+            cval=0.0,
+        )
+        return np.asarray(sampled, dtype=np.float64)
 
     def _spot_sampling(self, wavelength_m: float) -> float:
         configured = self.settings.spot_sampling_pixels_per_lambda_over_d
@@ -129,6 +167,7 @@ class ShackHartmannEngine(SensorEngine):
         internal: NDArray[np.float64],
         state: SourceState,
     ) -> NDArray[Any]:
+        internal = self._sample_to_lenslet_grid(internal)
         self.wavefront.validate_finite_inside(internal, self.lenslet_mask)
         angle_x = np.full(self.internal_shape, state.angle_x_rad, dtype=np.float64)
         angle_y = np.full(self.internal_shape, state.angle_y_rad, dtype=np.float64)
@@ -139,7 +178,7 @@ class ShackHartmannEngine(SensorEngine):
             range_delta = 1.0 / state.range_m - 1.0 / self._lgs_mean_range_m
             angle_x += (launch_x - self._subap_x) * range_delta
             angle_y += (launch_y - self._subap_y) * range_delta
-        field_angle_opd = self.xx * angle_x + self.yy * angle_y
+        field_angle_opd = self._field_x * angle_x + self._field_y * angle_y
         total_opd = internal + field_angle_opd
         illuminated = self.lenslet_mask > 0
         piston = float(np.mean(total_opd[illuminated])) if np.any(illuminated) else 0.0
@@ -154,7 +193,7 @@ class ShackHartmannEngine(SensorEngine):
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
-        self.wavefront.validate_finite_inside(internal, self.lenslet_mask)
+        self.wavefront.validate_finite_inside(internal, self.pupil)
         states = self.source_states
         photon_rate = np.zeros(self.output_shape, dtype=np.float64)
         total_field_flux: float | None = None

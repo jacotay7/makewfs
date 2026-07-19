@@ -139,6 +139,8 @@ class TelescopeConfig:
     spiders: tuple[SpiderConfig, ...] = ()
     pupil_rotation_deg: float = 0.0
     custom_mask_path: str | None = None
+    segments_across_pupil: int | None = None
+    segment_gap_fraction: float = 0.0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, base: Path) -> TelescopeConfig:
@@ -150,6 +152,8 @@ class TelescopeConfig:
                 "spiders",
                 "pupil_rotation_deg",
                 "custom_mask_path",
+                "segments_across_pupil",
+                "segment_gap_fraction",
             },
             "telescope",
         )
@@ -162,6 +166,22 @@ class TelescopeConfig:
         )
         custom = data.get("custom_mask_path")
         custom_path = None if custom is None else str((base / str(custom)).resolve())
+        segments = data.get("segments_across_pupil")
+        segment_count = (
+            None
+            if segments is None
+            else _positive_int(segments, "telescope.segments_across_pupil", minimum=2)
+        )
+        gap_fraction = _finite(
+            data.get("segment_gap_fraction", 0),
+            "telescope.segment_gap_fraction",
+            minimum=0,
+            maximum=0.99,
+        )
+        if gap_fraction > 0 and segment_count is None:
+            raise ConfigError(
+                "telescope.segments_across_pupil: required when segment_gap_fraction is nonzero"
+            )
         return cls(
             _finite(data.get("pupil_diameter_m"), "telescope.pupil_diameter_m", minimum=1e-15),
             _finite(
@@ -173,6 +193,8 @@ class TelescopeConfig:
             spiders,
             _finite(data.get("pupil_rotation_deg", 0), "telescope.pupil_rotation_deg"),
             custom_path,
+            segment_count,
+            gap_fraction,
         )
 
 
@@ -375,6 +397,8 @@ class ShackHartmannConfig:
     field_stop_radius_lambda_over_d: float | None = None
     optical_blur_fwhm_pixels: float = 0.0
     detector_margin_pixels: int = 0
+    lenslet_grid_rotation_deg: float = 0.0
+    lenslet_grid_offset_fraction: tuple[float, float] = (0.0, 0.0)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ShackHartmannConfig:
@@ -392,6 +416,8 @@ class ShackHartmannConfig:
                 "field_stop_radius_lambda_over_d",
                 "optical_blur_fwhm_pixels",
                 "detector_margin_pixels",
+                "lenslet_grid_rotation_deg",
+                "lenslet_grid_offset_fraction",
             },
             "shack_hartmann",
         )
@@ -407,6 +433,12 @@ class ShackHartmannConfig:
             raise ConfigError(
                 "shack_hartmann: normalized and physical sampling modes are mutually exclusive"
             )
+        grid_offset = _tuple_floats(
+            data.get("lenslet_grid_offset_fraction", [0.0, 0.0]),
+            "shack_hartmann.lenslet_grid_offset_fraction",
+        )
+        if len(grid_offset) != 2:
+            raise ConfigError("shack_hartmann.lenslet_grid_offset_fraction: expected [x, y]")
         return cls(
             _positive_int(
                 data.get("lenslets_across_pupil"), "shack_hartmann.lenslets_across_pupil", minimum=1
@@ -463,6 +495,11 @@ class ShackHartmannConfig:
                 "shack_hartmann.detector_margin_pixels",
                 minimum=0,
             ),
+            _finite(
+                data.get("lenslet_grid_rotation_deg", 0),
+                "shack_hartmann.lenslet_grid_rotation_deg",
+            ),
+            (grid_offset[0], grid_offset[1]),
         )
 
 

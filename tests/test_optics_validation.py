@@ -146,6 +146,35 @@ def test_pyramid_piston_invariance_and_push_pull_antisymmetry() -> None:
     assert float(np.vdot(plus_response, minus_response).real) < 0.0
 
 
+def test_pyramid_focus_response_and_modulation_sensitivity_trade() -> None:
+    config = load_config(PYRAMID_CONFIG)
+    sensor = WavefrontSensor(config)
+    yy, xx = np.mgrid[: config.input.shape[0], : config.input.shape[1]]
+    x = (xx - (config.input.shape[1] - 1) / 2) / config.input.shape[1]
+    y = (yy - (config.input.shape[0] - 1) / 2) / config.input.shape[0]
+    focus = 1.0e-7 * (x**2 + y**2)
+    reference = sensor.photon_rate(np.zeros(config.input.shape))
+    plus = sensor.photon_rate(focus) - reference
+    minus = sensor.photon_rate(-focus) - reference
+    assert float(np.vdot(plus, minus).real) < 0.0
+
+    assert config.pyramid is not None
+    modulated_config = replace(
+        config,
+        pyramid=replace(
+            config.pyramid,
+            modulation_radius_lambda_over_d=2.0,
+            modulation_samples=8,
+        ),
+    )
+    modulated = WavefrontSensor(modulated_config)
+    tilt = 1.0e-8 * x
+    unmodulated_response = np.linalg.norm(sensor.photon_rate(tilt) - reference)
+    modulated_reference = modulated.photon_rate(np.zeros(config.input.shape))
+    modulated_response = np.linalg.norm(modulated.photon_rate(tilt) - modulated_reference)
+    assert modulated_response < unmodulated_response
+
+
 def test_shack_hartmann_field_stop_blur_and_margin_are_optical_settings() -> None:
     config = load_config(SH_CONFIG)
     assert config.shack_hartmann is not None
@@ -162,6 +191,36 @@ def test_shack_hartmann_field_stop_blur_and_margin_are_optical_settings() -> Non
     assert configured.shape == (68, 68)
     assert configured.sum() < base.sum()
     assert np.all(configured >= 0)
+
+
+def test_rotated_offset_lenslet_grid_uses_physical_resampling_path() -> None:
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    settings = replace(
+        config.shack_hartmann,
+        lenslet_grid_rotation_deg=11.0,
+        lenslet_grid_offset_fraction=(0.18, -0.13),
+    )
+    sensor = WavefrontSensor(replace(config, shack_hartmann=settings))
+    zero = sensor.photon_rate(np.zeros(config.input.shape))
+    piston = sensor.photon_rate(np.full(config.input.shape, 2.0e-6))
+    assert zero.shape == (64, 64)
+    assert np.all(zero >= 0)
+    assert np.allclose(zero, piston, rtol=1e-10, atol=1e-10)
+
+
+def test_explicit_zero_lenslet_transform_matches_default() -> None:
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    explicit = replace(
+        config.shack_hartmann,
+        lenslet_grid_rotation_deg=0.0,
+        lenslet_grid_offset_fraction=(0.0, 0.0),
+    )
+    phase = np.zeros(config.input.shape)
+    default = WavefrontSensor(config).photon_rate(phase)
+    unchanged = WavefrontSensor(replace(config, shack_hartmann=explicit)).photon_rate(phase)
+    assert np.array_equal(default, unchanged)
 
 
 def test_pyramid_detector_margin_is_zero_filled() -> None:

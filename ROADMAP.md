@@ -133,9 +133,8 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Independent HCIPy validation, measured optical calibration products and
-  lenslet-grid rotation, full gallery artifacts, benchmark regression envelopes,
-  and GPU path.
+- [ ] Broader independent validation, measured optical calibration products,
+  full gallery artifacts, benchmark regression envelopes, and GPU path.
 
 ## 4. End-state user experience
 
@@ -502,7 +501,7 @@ CI, and the numerical/API contracts needed by both sensors are frozen.
 
 - [x] Implement wavefront validation and OPD/phase conversion with all unit,
   shape, non-finite, piston-invariance, and coordinate-sign tests.
-- [ ] Implement physical-coordinate OPD resampling onto the internal computation
+- [x] Implement physical-coordinate OPD resampling onto the internal computation
   grid when input dimensions do not match the lenslet partition. Validate planes,
   low-order Zernikes, boundary behavior, precision, and absence of wrapped-phase
   interpolation artifacts.
@@ -549,7 +548,7 @@ Shack–Hartmann frame through `getframes`.
   direct-rate equivalence.
 - [x] Add custom transmission/SED inputs and deterministic wavelength quadrature.
   Test monochromatic convergence, broadband flux, and diffraction scaling.
-- [ ] Complete pupil support: custom masks, pupil rotation, segment gaps, static
+- [x] Complete pupil support: custom masks, pupil rotation, segment gaps, static
   WFS-path OPD, lenslet-grid rotation/offset, and sampled partial subapertures.
 - [x] Add finite NGS angular size and user-supplied source kernels as incoherent
   sums/convolutions with flux conservation and centroid tests.
@@ -592,10 +591,10 @@ choices needed for AO design studies, with LGS limitations stated honestly.
 - [x] Validate zero-phase four-pupil symmetry, piston invariance, flux
   conservation, phase-ramp sign, pupil ordering, and convergence with focal-grid
   and modulation sampling.
-- [ ] Validate small-signal push/pull responses for tip, tilt, focus, and selected
+- [x] Validate small-signal push/pull responses for tip, tilt, focus, and selected
   Zernikes: response is antisymmetric near zero; modulation increases linear
   range while reducing low-order sensitivity.
-- [ ] Cross-validate fixed ideal-pyramid cases and response maps against HCIPy
+- [x] Cross-validate fixed ideal-pyramid cases and response maps against HCIPy
   within documented discretization tolerances. HCIPy remains validation-only.
 - [x] Add broadband propagation. If a physical pyramid mask is enabled, implement
   refractive-index/apex-angle chromatic separation and validate it separately

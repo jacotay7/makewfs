@@ -19,6 +19,11 @@ same normalized sampling from those physical fields and rejects mixed modes.
 The optional field stop, blur, and detector-margin controls are applied to the
 ideal photon-rate mosaic before the camera adapter.
 
+`lenslet_grid_rotation_deg` and `lenslet_grid_offset_fraction` describe a
+rotated or decentered lenslet array relative to the entrance pupil. They use
+physical-coordinate interpolation and are intended for instrument registration
+studies; the zero-valued defaults retain the faster aligned-grid path.
+
 The phase-ramp sign and spot displacement are fixed by analytic tests. This
 repository produces the image; centroiding, slope extraction, and reconstruction
 belong downstream.
@@ -26,7 +31,9 @@ belong downstream.
 ## Current limitations
 
 The CPU path supports deterministic wavelength quadrature, finite NGS angular
-extent, static path OPD, and a configurable sodium-range elongation model for
-Shack–Hartmann. Measured optical calibration products and lenslet-grid rotation
-remain staged in the roadmap. LGS return flux is always supplied by the
-user; `makewfs` does not model laser propagation or sodium physics.
+extent and user kernels, rotated analytic pupils with square segment gaps,
+static path OPD, and a configurable sodium-range elongation model for
+Shack–Hartmann. Measured optical calibration products and lenslet-grid
+rotation/offset remain staged in the roadmap. LGS return flux is always
+supplied by the user; `makewfs` does not model laser propagation or sodium
+physics.

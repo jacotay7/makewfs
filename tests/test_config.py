@@ -135,6 +135,21 @@ def test_physical_shack_hartmann_sampling_mode() -> None:
     assert config.lenslet_focal_length_m == 0.02
 
 
+def test_lenslet_grid_rotation_and_offset_fields() -> None:
+    config = ShackHartmannConfig.from_dict(
+        {
+            "lenslets_across_pupil": 8,
+            "pixels_per_subaperture": 8,
+            "spot_sampling_pixels_per_lambda_over_d": 2.0,
+            "minimum_illuminated_fraction": 0.25,
+            "lenslet_grid_rotation_deg": 12.0,
+            "lenslet_grid_offset_fraction": [0.2, -0.1],
+        }
+    )
+    assert config.lenslet_grid_rotation_deg == 12.0
+    assert config.lenslet_grid_offset_fraction == (0.2, -0.1)
+
+
 @pytest.mark.parametrize(
     ("factory", "data", "message", "call_mode"),
     [
@@ -297,3 +312,19 @@ def test_detector_and_root_tables_reject_conflicts() -> None:
         WFSConfig.from_dict(missing_sensor_table)
     with pytest.raises(ConfigError, match="expected a table"):
         WFSConfig.from_dict(_minimal_tables() | {"input": []})
+
+
+def test_segment_gap_requires_segment_count() -> None:
+    with pytest.raises(ConfigError, match="segments_across_pupil"):
+        TelescopeConfig.from_dict(
+            {"pupil_diameter_m": 1.0, "segment_gap_fraction": 0.1}, base=Path.cwd()
+        )
+    telescope = TelescopeConfig.from_dict(
+        {
+            "pupil_diameter_m": 1.0,
+            "segments_across_pupil": 4,
+            "segment_gap_fraction": 0.1,
+        },
+        base=Path.cwd(),
+    )
+    assert telescope.segments_across_pupil == 4

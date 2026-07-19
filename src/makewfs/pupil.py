@@ -68,14 +68,25 @@ def _analytic_mask(
     xx: NDArray[np.float64],
     yy: NDArray[np.float64],
 ) -> NDArray[np.float64]:
-    radius = np.hypot(xx, yy)
+    rotation = float(np.deg2rad(config.pupil_rotation_deg))
+    feature_x: NDArray[np.float64] = xx * np.cos(rotation) + yy * np.sin(rotation)
+    feature_y: NDArray[np.float64] = -xx * np.sin(rotation) + yy * np.cos(rotation)
+    radius = np.hypot(feature_x, feature_y)
     pupil_radius = config.pupil_diameter_m / 2.0
     mask = (radius <= pupil_radius).astype(np.float64)
     inner_radius = pupil_radius * config.central_obscuration_ratio
     if inner_radius > 0:
         mask[radius < inner_radius] = 0.0
+    if config.segments_across_pupil is not None and config.segment_gap_fraction > 0:
+        pitch = config.pupil_diameter_m / config.segments_across_pupil
+        gap = pitch * config.segment_gap_fraction / 2.0
+        local_x = np.mod(feature_x + pupil_radius, pitch)
+        local_y = np.mod(feature_y + pupil_radius, pitch)
+        in_gap = (local_x < gap) | (local_x > pitch - gap)
+        in_gap |= (local_y < gap) | (local_y > pitch - gap)
+        mask[in_gap] = 0.0
     if config.spiders:
-        angle = np.arctan2(yy, xx) - np.deg2rad(config.pupil_rotation_deg)
+        angle = np.arctan2(feature_y, feature_x)
         for spider in config.spiders:
             target = np.deg2rad(spider.angle_deg)
             difference = np.arctan2(np.sin(angle - target), np.cos(angle - target))
