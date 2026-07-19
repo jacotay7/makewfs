@@ -667,9 +667,11 @@ accepts only wavefront plus config.
 - [x] Establish performance-regression checks from stable benchmark kernels. CI
   should compare relative kernels or generous envelopes, not fragile wall-clock
   promises from shared runners.
-- [ ] Audit backend leakage: no unconditional `np.asarray`, NumPy-only allocation,
-  or host scalar extraction inside sensor engines. Keep file I/O, config, metadata,
-  and the CPU `getframes` boundary outside the portable optical kernel.
+- [x] Audit backend leakage: `ArrayBackend` now owns runtime array allocation,
+  reductions, FFTs, interpolation, and optical blur hooks; sensor modules have
+  no direct NumPy allocation/FFT/reduction calls. File I/O, config, metadata,
+  source quadrature, and the CPU `getframes` boundary remain explicit host
+  operations. An AST guard and injected-CPU parity tests enforce the contract.
 - [ ] Implement a private experimental CuPy optical backend only after the audit,
   with CPU/GPU image and response parity tests. Do not declare public GPU support
   until the end-to-end detector boundary is resolved.

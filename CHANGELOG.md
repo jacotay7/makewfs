@@ -29,6 +29,9 @@ All notable changes to `makewfs` are documented here.
   cube contract, with truth preservation and a shipped comparison example.
 - The spectral-QE path uses the upcoming `getframes>=2.1.0` capability when
   available and retains a documented integrated-signal fallback for 2.0.
+- Formalized the private optical `ArrayBackend` boundary and added static
+  leakage/parity checks so a future device backend does not require sensor
+  mathematics to be rewritten.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

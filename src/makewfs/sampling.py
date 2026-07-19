@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
-from .backend import centered_fft2, next_fast_length
+from .backend import ArrayBackend, centered_fft2, cpu_backend, next_fast_length
 
 
 def load_blur_kernel(path: str) -> NDArray[np.float64]:
@@ -42,17 +43,20 @@ def load_blur_kernel(path: str) -> NDArray[np.float64]:
     return np.asarray(kernel / np.sum(kernel), dtype=np.float64)
 
 
-def pad_center(array: NDArray[Any], shape: tuple[int, int]) -> NDArray[Any]:
+def pad_center(
+    array: NDArray[Any], shape: tuple[int, int], *, backend: ArrayBackend | None = None
+) -> NDArray[Any]:
     """Zero-pad a batch of 2-D arrays around their Fourier centre."""
     old_h, old_w = array.shape[-2:]
     new_h, new_w = shape
     if new_h < old_h or new_w < old_w:
         raise ValueError("pad_center cannot crop")
-    result = np.zeros(array.shape[:-2] + shape, dtype=array.dtype)
+    resolved = backend or cpu_backend()
+    result = resolved.zeros(array.shape[:-2] + shape, dtype=array.dtype)
     y0 = (new_h - old_h) // 2
     x0 = (new_w - old_w) // 2
     result[..., y0 : y0 + old_h, x0 : x0 + old_w] = array
-    return result
+    return cast(NDArray[Any], result)
 
 
 def crop_center(array: NDArray[Any], shape: tuple[int, int]) -> NDArray[Any]:
@@ -66,15 +70,18 @@ def crop_center(array: NDArray[Any], shape: tuple[int, int]) -> NDArray[Any]:
     return array[..., y0 : y0 + new_h, x0 : x0 + new_w]
 
 
-def block_sum(array: NDArray[Any], factor: int) -> NDArray[Any]:
+def block_sum(
+    array: NDArray[Any], factor: int, *, backend: ArrayBackend | None = None
+) -> NDArray[Any]:
     """Sum square pixel blocks while preserving total flux."""
     if factor < 1:
         raise ValueError("factor must be positive")
     height, width = array.shape[-2:]
     if height % factor or width % factor:
         raise ValueError(f"shape {array.shape[-2:]} is not divisible by factor {factor}")
+    resolved = backend or cpu_backend()
     reshaped = array.reshape((*array.shape[:-2], height // factor, factor, width // factor, factor))
-    return np.asarray(reshaped.sum(axis=(-1, -3)))
+    return cast(NDArray[Any], resolved.sum(reshaped, axis=(-1, -3)))
 
 
 def spot_intensity(
@@ -88,6 +95,7 @@ def spot_intensity(
     field_stop_radius_lambda_over_d: float | None = None,
     optical_blur_fwhm_pixels: float = 0.0,
     optical_blur_kernel: NDArray[np.float64] | None = None,
+    backend: ArrayBackend | None = None,
 ) -> NDArray[Any]:
     """Propagate lenslet fields and integrate onto ``pixels`` detector pixels.
 
@@ -99,45 +107,42 @@ def spot_intensity(
     # a large detector pixel scale.  The previous implementation only sized
     # the FFT from the optical sampling and could fail while cropping a valid
     # configuration.
+    resolved = backend or cpu_backend()
     nfft = next_fast_length(
         max(
             samples_per_lenslet,
-            int(np.ceil(samples_per_lenslet * sampling * oversampling)),
+            math.ceil(samples_per_lenslet * sampling * oversampling),
             pixels * oversampling,
         )
     )
-    transformed = centered_fft2(pad_center(field, (nfft, nfft)), workers=workers)
-    intensity = np.abs(transformed) ** 2
+    transformed = centered_fft2(
+        pad_center(field, (nfft, nfft), backend=resolved),
+        workers=workers,
+        backend=resolved,
+    )
+    intensity = resolved.abs(transformed) ** 2
     high_resolution_pixels = pixels * oversampling
     cropped = crop_center(intensity, (high_resolution_pixels, high_resolution_pixels))
     if field_stop_radius_lambda_over_d is not None:
-        y, x = np.indices((high_resolution_pixels, high_resolution_pixels), dtype=np.float64)
-        radius_lambda_over_d = np.hypot(
+        coordinates = resolved.arange(high_resolution_pixels, dtype=np.float64)
+        y, x = resolved.meshgrid(coordinates, coordinates, indexing="ij")
+        radius_lambda_over_d = resolved.hypot(
             x - (high_resolution_pixels - 1) / 2.0,
             y - (high_resolution_pixels - 1) / 2.0,
         ) / (oversampling * sampling)
         cropped = cropped * (radius_lambda_over_d <= field_stop_radius_lambda_over_d)
-    native = block_sum(cropped, oversampling)
+    native = block_sum(cropped, oversampling, backend=resolved)
     if optical_blur_kernel is not None and optical_blur_fwhm_pixels > 0.0:
         raise ValueError("provide either optical_blur_fwhm_pixels or optical_blur_kernel")
     if optical_blur_kernel is not None:
-        from scipy.ndimage import convolve
-
-        native = convolve(
-            native,
-            optical_blur_kernel[None, ...],
-            mode="constant",
-            cval=0.0,
-        )
+        native = resolved.convolve(native, resolved.asarray(optical_blur_kernel)[None, ...])
     elif optical_blur_fwhm_pixels > 0.0:
-        from scipy.ndimage import gaussian_filter
-
         sigma = optical_blur_fwhm_pixels / 2.3548200450309493
-        native = gaussian_filter(native, sigma=(0.0, sigma, sigma), mode="constant")
+        native = resolved.gaussian_filter(native, sigma=(0.0, sigma, sigma))
     # Keep the precision produced by the complex FFT through pixel integration.
     # Sensor-level accumulation intentionally converts to the configured photon
     # rate dtype, but this avoids promoting the large spot batch prematurely.
-    return np.asarray(native)
+    return native
 
 
 __all__ = ["block_sum", "crop_center", "load_blur_kernel", "pad_center", "spot_intensity"]

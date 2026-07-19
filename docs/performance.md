@@ -10,10 +10,12 @@ for throughput and memory; float64 is the reference path. Benchmark cold
 construction separately from warm frames and record Python, NumPy, SciPy, and
 hardware versions.
 
-No public GPU option exists yet. The backend helpers are the intended boundary
-for a future CuPy optical implementation; the detector handoff is an explicit
-host-side `getframes` boundary until that package supports device-resident
-signal generation.
+No public GPU option exists yet. `ArrayBackend` is the private optical boundary:
+sensor engines use its allocations, reductions, FFTs, interpolation, and blur
+hooks, while file readers, metadata, and the detector handoff remain explicit
+host-side operations. The detector still requires a host `getframes` frame until
+that package supports device-resident signal generation. A CuPy implementation
+must first provide backend parity and a measured detector-boundary design.
 
 The repository benchmark runner separates cold construction, warm optical
 frames, and warm detector frames:

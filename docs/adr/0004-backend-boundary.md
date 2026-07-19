@@ -2,9 +2,16 @@
 
 Status: accepted
 
-CPU NumPy/SciPy is the reference implementation. Centred FFTs, dtype pairing,
-padding/cropping, and sampling live behind small numerical helpers. Sensors
-operate on those helpers rather than scattering backend-specific transforms.
-There is no pretend GPU option: a future CuPy backend must first reproduce the
-CPU validation suite and document the explicit device-to-host boundary before
-being exposed to users.
+CPU NumPy/SciPy is the reference implementation. `ArrayBackend` owns array
+creation, elementwise operations, reductions, centered FFTs, interpolation,
+and optical blur hooks. Sensor engines receive a backend instance and do not
+call NumPy allocation/FFT/reduction functions directly; an AST guard and CPU
+injection-parity tests protect that rule.
+
+File readers, configuration parsing, source quadrature, metadata, and the
+`getframes` adapter are explicit host-side boundaries. `ArrayBackend.scalar`
+is used only where a scalar must cross into geometry/metadata, and
+`ArrayBackend.to_host` is the named device-to-host escape hatch. The CPU
+backend remains the only supported runtime backend. A future CuPy backend must
+implement the same contract and reproduce the CPU validation suite before it
+is exposed.

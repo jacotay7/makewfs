@@ -103,9 +103,11 @@ write a failing integration test/design note, use the conditional gates in
 - Static grids, masks, ramps, normalization constants, and detector construction
   are cached on the persistent sensor. Benchmark construction separately from
   warm per-frame operation.
-- Write array operations behind the small backend boundary. Avoid unconditional
-  NumPy conversion, host scalar reads, and NumPy-only allocations in optical
-  kernels so a later CuPy backend remains possible.
+- Write array operations behind `ArrayBackend`. Sensor engines must not call
+  NumPy allocation, FFT, or reduction functions directly. File readers,
+  source/config parsing, and the public detector boundary are explicit host
+  operations; use `ArrayBackend.scalar` or `to_host` only at named crossings.
+  The backend-audit AST test and injected-CPU parity tests must remain green.
 - CPU correctness comes first. Never expose `device="gpu"` until parity tests and
   the documented detector-boundary behavior exist.
 

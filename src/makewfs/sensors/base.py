@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from ..backend import ArrayBackend, cpu_backend
 from ..source import SourceState
 
 
@@ -29,6 +30,12 @@ class SensorEngine:
     output_shape: tuple[int, int]
     source_states: tuple[SourceState, ...]
     file_digests: dict[str, str]
+    backend: ArrayBackend
+
+    @staticmethod
+    def resolve_backend(backend: ArrayBackend | None) -> ArrayBackend:
+        """Resolve the private backend injection point."""
+        return backend or cpu_backend()
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         """Render one validated OPD input."""
