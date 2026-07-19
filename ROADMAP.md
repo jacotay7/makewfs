@@ -133,9 +133,9 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Broader independent validation, full gallery artifacts, GPU path, and
-  release completion remain staged; relative benchmark regression envelopes are
-  now in CI.
+- [ ] Broader independent validation, GPU path, and release completion remain
+  staged; the versioned documentation gallery and relative benchmark regression
+  envelopes are now in place.
 
 ## 4. End-state user experience
 
@@ -671,8 +671,8 @@ accepts only wavefront plus config.
   until the end-to-end detector boundary is resolved.
 - [x] Publish benchmark tables with hardware, dependency versions, precision,
   input size, modulation/wavelength samples, construction time, warm latency,
-  throughput, and peak memory. The current snapshot records all available timing
-  and configuration fields; peak-memory instrumentation remains a future metric.
+  throughput, and Python-level peak memory. The snapshot documents that C-level
+  allocator accounting remains a future metric.
 
 **Exit:** CPU behavior is measured and optimized, and the optical kernel can gain
 a real GPU backend without an architectural rewrite.
