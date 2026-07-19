@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 
 from ..backend import centered_fft2, centered_ifft2, complex_dtype, next_fast_length
 from ..config import WFSConfig
+from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
 from ..sampling import crop_center, pad_center
@@ -53,6 +54,7 @@ class PyramidEngine(SensorEngine):
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
         self.source_rate = source_rate_per_s(config.source, config.telescope)
         self.source_states = iter_source_states(config)
+        self.file_digests = referenced_file_digests(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         self._mask = self._make_pyramid_mask()
 

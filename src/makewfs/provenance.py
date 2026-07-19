@@ -22,6 +22,21 @@ def _file_digest(path: str) -> str:
     return digest.hexdigest()[:16]
 
 
+def referenced_file_digests(config: WFSConfig) -> dict[str, str]:
+    """Hash configured external arrays/curves once at sensor construction."""
+    references = {
+        "input_static_opd": config.input.static_opd_path,
+        "telescope_custom_mask": config.telescope.custom_mask_path,
+        "source_sed": config.source.sed_path,
+        "source_transmission": config.source.transmission_path,
+    }
+    return {
+        f"wfs_{name}_sha256": _file_digest(path)
+        for name, path in references.items()
+        if path is not None
+    }
+
+
 def metadata(
     config: WFSConfig,
     *,
@@ -31,6 +46,7 @@ def metadata(
     opd_m: NDArray[Any],
     seed: int | None,
     source_states: tuple[SourceState, ...] | None = None,
+    file_digests: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build serializable metadata for an ideal or detector frame."""
     states = iter_source_states(config) if source_states is None else source_states
@@ -46,15 +62,7 @@ def metadata(
         "wfs_source_state_count": len(states),
         "wfs_source_wavelengths_m": sorted({state.wavelength_m for state in states}),
     }
-    references = {
-        "input_static_opd": config.input.static_opd_path,
-        "telescope_custom_mask": config.telescope.custom_mask_path,
-        "source_sed": config.source.sed_path,
-        "source_transmission": config.source.transmission_path,
-    }
-    for name, path in references.items():
-        if path is not None:
-            result[f"wfs_{name}_sha256"] = _file_digest(path)
+    result.update(referenced_file_digests(config) if file_digests is None else file_digests)
     for package in ("makewfs", "getframes"):
         try:
             result[f"{package}_version"] = importlib.metadata.version(package)

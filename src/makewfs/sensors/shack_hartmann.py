@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from ..backend import complex_dtype
 from ..config import WFSConfig
+from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
 from ..sampling import spot_intensity
@@ -88,6 +89,7 @@ class ShackHartmannEngine(SensorEngine):
             self._lgs_mean_range_m = None
         self.source_rate = source_rate_per_s(config.source, config.telescope)
         self.source_states = iter_source_states(config)
+        self.file_digests = referenced_file_digests(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         base_shape = self.n_lenslets * self.settings.pixels_per_subaperture
         self.output_shape = (

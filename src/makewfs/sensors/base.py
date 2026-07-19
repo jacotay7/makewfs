@@ -26,6 +26,7 @@ class SensorEngine:
     kind: str
     output_shape: tuple[int, int]
     source_states: tuple[SourceState, ...]
+    file_digests: dict[str, str]
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         """Render one validated OPD input."""
