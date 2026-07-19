@@ -55,7 +55,7 @@ def spot_intensity(
     workers: int,
     field_stop_radius_lambda_over_d: float | None = None,
     optical_blur_fwhm_pixels: float = 0.0,
-) -> NDArray[np.float64]:
+) -> NDArray[Any]:
     """Propagate lenslet fields and integrate onto ``pixels`` detector pixels.
 
     The Fourier pixel scale is ``lambda / D_subap / sampling``.  Zero padding
@@ -90,7 +90,10 @@ def spot_intensity(
 
         sigma = optical_blur_fwhm_pixels / 2.3548200450309493
         native = gaussian_filter(native, sigma=(0.0, sigma, sigma), mode="constant")
-    return np.asarray(native, dtype=np.float64)
+    # Keep the precision produced by the complex FFT through pixel integration.
+    # Sensor-level accumulation intentionally converts to the configured photon
+    # rate dtype, but this avoids promoting the large spot batch prematurely.
+    return np.asarray(native)
 
 
 __all__ = ["block_sum", "crop_center", "pad_center", "spot_intensity"]

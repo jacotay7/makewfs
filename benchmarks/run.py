@@ -67,6 +67,10 @@ def main() -> int:
             [
                 root / "benchmarks" / "configs" / "shack_hartmann_20x20_float32.toml",
                 root / "benchmarks" / "configs" / "shack_hartmann_60x60_float64.toml",
+                root / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml",
+                root / "benchmarks" / "configs" / "pyramid_40_float32.toml",
+                root / "benchmarks" / "configs" / "pyramid_60_mod8_float32.toml",
+                root / "benchmarks" / "configs" / "pyramid_80_mod32_float64.toml",
             ]
         )
     report: dict[str, Any] = {

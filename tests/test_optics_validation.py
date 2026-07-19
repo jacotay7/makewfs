@@ -7,7 +7,9 @@ import numpy as np
 
 from makewfs import WavefrontSensor, load_config
 from makewfs.backend import centered_fft2
+from makewfs.config import WFSConfig
 from makewfs.sampling import spot_intensity
+from makewfs.wavefront import _coordinates
 
 SH_CONFIG = Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann_minimal.toml"
 PYRAMID_CONFIG = Path(__file__).parents[1] / "examples" / "configs" / "pyramid_minimal.toml"
@@ -54,6 +56,41 @@ def test_batched_shack_spots_match_direct_random_small_grid() -> None:
     )
     expected = np.stack([np.abs(_direct_centered_dft(field)) ** 2 for field in fields])
     assert np.allclose(spots, expected, atol=1e-12, rtol=1e-12)
+
+
+def test_small_shack_mosaic_matches_independent_random_phase_reference() -> None:
+    data = {
+        "schema_version": 1,
+        "input": {"quantity": "opd", "unit": "m", "shape": [8, 8], "grid_extent_m": 1.0},
+        "telescope": {"pupil_diameter_m": 1.0},
+        "source": {"normalization": "detector_photon_rate", "detector_photon_rate_per_s": 1.0},
+        "sensor": {"kind": "shack_hartmann", "wavelength_m": 700e-9},
+        "shack_hartmann": {
+            "lenslets_across_pupil": 2,
+            "pixels_per_subaperture": 4,
+            "spot_sampling_pixels_per_lambda_over_d": 1.0,
+            "minimum_illuminated_fraction": 0.0,
+        },
+        "detector": {"preset": "generic_cmos", "exposure_s": 0.0},
+        "numerics": {
+            "dtype": "float64",
+            "fft_oversampling": 1,
+            "pupil_samples_per_lenslet": 4,
+        },
+    }
+    config = WFSConfig.from_dict(data)
+    rng = np.random.default_rng(23)
+    opd = rng.normal(scale=0.04e-6, size=config.input.shape)
+    actual = WavefrontSensor(config).photon_rate(opd)
+
+    xx, yy = _coordinates(config.input.shape, config.input.grid_extent_m)
+    pupil = (np.hypot(xx, yy) <= config.telescope.pupil_diameter_m / 2).astype(float)
+    field = pupil * np.exp(2j * np.pi * opd / config.sensor.wavelength_m)
+    subapertures = field.reshape(2, 4, 2, 4).transpose(0, 2, 1, 3).reshape(4, 4, 4)
+    direct_spots = np.stack([np.abs(_direct_centered_dft(subap)) ** 2 for subap in subapertures])
+    expected = direct_spots.reshape(2, 2, 4, 4).transpose(0, 2, 1, 3).reshape(8, 8)
+    expected /= np.sum(pupil)
+    assert np.allclose(actual, expected, atol=1e-12, rtol=1e-12)
 
 
 def test_known_opd_ramp_moves_a_spot_by_the_analytic_amount() -> None:

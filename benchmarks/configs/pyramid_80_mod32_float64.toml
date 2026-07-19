@@ -1,0 +1,37 @@
+schema_version = 1
+
+[input]
+quantity = "opd"
+unit = "m"
+shape = [128, 128]
+grid_extent_m = 8.0
+
+[telescope]
+pupil_diameter_m = 8.0
+central_obscuration_ratio = 0.14
+
+[source]
+kind = "ngs"
+normalization = "detector_photon_rate"
+detector_photon_rate_per_s = 2.0e6
+
+[sensor]
+kind = "pyramid"
+wavelength_m = 7.0e-7
+
+[pyramid]
+pixels_across_pupil = 80
+pupil_separation_pixels = 28
+modulation_radius_lambda_over_d = 3.0
+modulation_samples = 32
+
+[detector]
+preset = "generic_cmos"
+exposure_s = 0.001
+binning = 1
+precision = "float64"
+
+[numerics]
+dtype = "float64"
+fft_oversampling = 2
+fft_workers = 1

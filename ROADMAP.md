@@ -526,7 +526,7 @@ CI, and the numerical/API contracts needed by both sensors are frozen.
 - [x] Add analytic validation: zero-OPD symmetry, piston invariance, total and
   per-lenslet flux, square-aperture diffraction profile, and spot displacement
   under a known phase ramp.
-- [ ] Add independent brute-force small-grid comparisons for random phase maps so
+- [x] Add independent brute-force small-grid comparisons for random phase maps so
   vectorization cannot conceal an indexing/transposition error.
 - [x] Add seeded end-to-end tests showing expected `getframes` QE, Poisson/read
   statistics, binning shape, saturation, and reproducibility without duplicating
@@ -569,7 +569,7 @@ Shack–Hartmann frame through `getframes`.
   validation extra only.
 - [ ] Add the NGS magnitude-series, realistic pupil, polychromatic, and LGS worked
   examples listed in section 10.
-- [ ] Extend benchmarks across wavelength and sodium-range sample counts; document
+- [x] Extend benchmarks across wavelength and sodium-range sample counts; document
   accuracy/performance choices and stable convergence defaults.
 
 **Exit:** the SH path covers the realistic source, pupil, radiometry, and sampling
@@ -604,7 +604,7 @@ choices needed for AO design studies, with LGS limitations stated honestly.
 - [x] Write the pyramid physics/sampling/modulation guide, configuration reference,
   validation discussion, performance guide, and API docs.
 - [x] Add unmodulated/modulated PWFS and fair SH-versus-PWFS worked examples.
-- [ ] Establish pyramid benchmarks at representative 40-, 60-, and 80-pixel pupil
+- [x] Establish pyramid benchmarks at representative 40-, 60-, and 80-pixel pupil
   samplings with 1, 8, and 32 modulation samples, warm/cold and both precisions.
 
 **Exit:** the same public API and detector pipeline produce validated unmodulated
@@ -622,7 +622,7 @@ or modulated pyramid frames.
   weighted temporal phase samples. Verify it averages ideal intensities (never
   complex fields or phase), invokes `getframes` once, conserves mean photon rate,
   and remains distinct from the multiple-read `expose_many` path.
-- [ ] Add lightweight timing/provenance hooks useful to a closed-loop driver,
+- [x] Add lightweight timing/provenance hooks useful to a closed-loop driver,
   without adding controller/DM/reconstructor abstractions.
 - [x] Add `pyturb` and `getframes` compatibility tests pinned to their supported
   public contracts. Test minimum supported and current local versions in CI where
@@ -645,17 +645,17 @@ accepts only wavefront plus config.
 
 ### Phase 5 — CPU optimization and GPU-ready boundaries (0.5)
 
-- [ ] Profile warm SH and PWFS paths before optimizing; store profiles/benchmark
+- [x] Profile warm SH and PWFS paths before optimizing; store profiles/benchmark
   metadata and identify FFT, assembly, quadrature, and detector costs separately.
 - [ ] Ensure static pupil/lenslet masks, phase ramps, pyramid masks, quadrature,
   index maps, and detector objects are built once and cached immutably.
 - [ ] Remove avoidable Python loops and temporaries from hot paths; use batched
   FFTs, in-place-safe operations, and configurable chunks where the full batch
   would exceed a memory budget.
-- [ ] Verify float32/complex64 does not accidentally promote in hot operations;
+- [x] Verify float32/complex64 does not accidentally promote in hot operations;
   quantify its image/response error against float64 and document when to select
   each precision.
-- [ ] Add `scipy.fft` worker control and confirm determinism/tolerances across
+- [x] Add `scipy.fft` worker control and confirm determinism/tolerances across
   worker counts and supported platforms.
 - [ ] Establish performance-regression checks from stable benchmark kernels. CI
   should compare relative kernels or generous envelopes, not fragile wall-clock
@@ -675,10 +675,10 @@ a real GPU backend without an architectural rewrite.
 
 ### Phase 6 — 1.0 validation and release
 
-- [ ] Create `validation/run.py` to produce a deterministic visual gallery and
+- [x] Create `validation/run.py` to produce a deterministic visual gallery and
   machine-readable metrics for analytic sensor response, flux, convergence,
   broadband behavior, LGS geometry, and reference cross-checks.
-- [ ] Run validation in CI and upload the gallery/JSON as artifacts. Physics
+- [x] Run validation in CI and upload the gallery/JSON as artifacts. Physics
   tolerances cite a derivation, paper, or independent implementation and explain
   sampling limitations.
 - [ ] Achieve the agreed branch-coverage threshold with meaningful assertions;

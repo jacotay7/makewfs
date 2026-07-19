@@ -144,5 +144,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev,validation]"
+      - run: pip install -e ".[dev,validation,examples]"
       - run: python -m pytest -q -m validation
+      - name: Build deterministic validation gallery
+        run: |
+          mkdir -p "$RUNNER_TEMP/makewfs-validation"
+          python validation/run.py \
+            --output "$RUNNER_TEMP/makewfs-validation/validation-metrics.json" \
+            --plot "$RUNNER_TEMP/makewfs-validation/validation.png"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validation-gallery
+          path: ${{ runner.temp }}/makewfs-validation

@@ -10,7 +10,7 @@ from makewfs.backend import centered_fft2, centered_ifft2, complex_dtype, real_d
 from makewfs.config import SourceConfig, SpiderConfig, TelescopeConfig
 from makewfs.pupil import make_pupil
 from makewfs.radiometry import source_rate_per_s
-from makewfs.sampling import block_sum, crop_center, pad_center
+from makewfs.sampling import block_sum, crop_center, pad_center, spot_intensity
 
 
 def test_centered_fft_roundtrip_and_dtype() -> None:
@@ -19,6 +19,25 @@ def test_centered_fft_roundtrip_and_dtype() -> None:
     transformed = centered_fft2(array)
     assert transformed.dtype == np.complex64
     assert np.allclose(centered_ifft2(transformed), array, atol=1e-6)
+
+
+def test_fft_worker_count_is_deterministic() -> None:
+    rng = np.random.default_rng(31)
+    array = (rng.normal(size=(16, 16)) + 1j * rng.normal(size=(16, 16))).astype(np.complex64)
+    assert np.array_equal(centered_fft2(array, workers=1), centered_fft2(array, workers=2))
+
+
+def test_spot_integration_preserves_float32_batch_precision() -> None:
+    field = np.ones((1, 8, 8), dtype=np.complex64)
+    spots = spot_intensity(
+        field,
+        pixels=8,
+        samples_per_lenslet=8,
+        sampling=1.0,
+        oversampling=1,
+        workers=1,
+    )
+    assert spots.dtype == np.float32
 
 
 def test_backend_rejects_unknown_dtype() -> None:

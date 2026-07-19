@@ -61,6 +61,14 @@ def test_seeded_detector_frame_repeats() -> None:
     assert np.array_equal(first, second)
 
 
+def test_frame_records_optical_and_detector_timings() -> None:
+    sensor = _sensor()
+    frame = sensor.expose(np.zeros(sensor.config.input.shape), seed=3)
+    assert frame.metadata["wfs_optical_render_s"] >= 0.0
+    assert frame.metadata["wfs_detector_expose_s"] >= 0.0
+    assert frame.metadata["wfs_total_expose_s"] >= frame.metadata["wfs_optical_render_s"]
+
+
 def test_detector_binning_changes_frame_shape_but_preserves_optical_truth() -> None:
     sensor = _sensor()
     configured = WavefrontSensor(

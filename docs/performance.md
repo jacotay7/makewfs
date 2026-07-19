@@ -26,6 +26,11 @@ Benchmark JSON includes source-state count, output shape, environment, and
 per-frame timings. Wall-clock values are evidence for local comparisons, not
 portable CI performance promises.
 
+Each returned detector frame also records `wfs_optical_render_s`,
+`wfs_detector_expose_s`, and `wfs_total_expose_s`. These are lightweight
+diagnostics for a closed-loop driver, not scheduling guarantees or controller
+abstractions.
+
 Representative Shack–Hartmann configurations are provided under
 `benchmarks/configs/`:
 
@@ -33,5 +38,13 @@ Representative Shack–Hartmann configurations are provided under
 python benchmarks/run.py --representative --frames 3 --output benchmark-results.json
 ```
 
-They cover 20×20 float32 and 60×60 float64 lenslet grids while keeping the
-minimal SH and pyramid smoke cases in the default benchmark run.
+They cover 20×20 float32 and 60×60 float64 lenslet grids, a broadband
+range-resolved SH source, and 40/60/80-pixel pyramid cases with 1/8/32
+modulation samples while keeping the minimal SH and pyramid smoke cases in the
+default benchmark run.
+
+For call-level hotspot inspection, write a compact cumulative `cProfile` report:
+
+```bash
+python benchmarks/profile_warm.py --frames 3 --output profile-results.json
+```

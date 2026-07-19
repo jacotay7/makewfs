@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import numpy as np
@@ -55,7 +56,10 @@ class WavefrontSensor:
 
     def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
         """Render one wavefront and expose it through the configured detector."""
+        total_start = perf_counter()
+        optical_start = total_start
         result = self._render(wavefront)
+        optical_elapsed = perf_counter() - optical_start
         frame_metadata = metadata(
             self.config,
             sensor_kind=self.config.sensor.kind,
@@ -66,7 +70,13 @@ class WavefrontSensor:
             source_states=self.engine.source_states,
             file_digests=self.engine.file_digests,
         )
-        return self.detector.expose(result.photon_rate, metadata=frame_metadata, seed=seed)
+        detector_start = perf_counter()
+        frame = self.detector.expose(result.photon_rate, metadata=frame_metadata, seed=seed)
+        detector_elapsed = perf_counter() - detector_start
+        frame.metadata["wfs_optical_render_s"] = optical_elapsed
+        frame.metadata["wfs_detector_expose_s"] = detector_elapsed
+        frame.metadata["wfs_total_expose_s"] = perf_counter() - total_start
+        return frame
 
     def expose_many(
         self, phases: Iterable[ArrayLike], seeds: Iterable[int | None] | None = None
@@ -81,6 +91,8 @@ class WavefrontSensor:
         self, phase_samples: ArrayLike | Iterable[ArrayLike], *, seed: int | None = None
     ) -> Any:
         """Expose one detector frame after uniformly averaging temporal OPD samples."""
+        total_start = perf_counter()
+        optical_start = total_start
         rates: list[NDArray[np.float64]] = []
         opds: list[NDArray[np.float64]] = []
         launched = 0.0
@@ -106,7 +118,13 @@ class WavefrontSensor:
             file_digests=self.engine.file_digests,
         )
         frame_metadata["wfs_temporal_samples"] = len(rates)
-        return self.detector.expose(average_rate, metadata=frame_metadata, seed=seed)
+        optical_elapsed = perf_counter() - optical_start
+        detector_start = perf_counter()
+        frame = self.detector.expose(average_rate, metadata=frame_metadata, seed=seed)
+        frame.metadata["wfs_optical_render_s"] = optical_elapsed
+        frame.metadata["wfs_detector_expose_s"] = perf_counter() - detector_start
+        frame.metadata["wfs_total_expose_s"] = perf_counter() - total_start
+        return frame
 
 
 def simulate(

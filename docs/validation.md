@@ -36,4 +36,6 @@ python validation/run.py --output validation-metrics.json --plot validation.png
 
 The JSON records the normalized configuration digest, reference flux, piston
 error, warm render time, and pyramid quadrant spread. The independent small-grid
-and analytic assertions live in `tests/test_optics_validation.py`.
+and analytic assertions live in `tests/test_optics_validation.py`; the small
+Shack–Hartmann case compares a random phase map against a direct brute-force DFT
+through mosaic assembly.
