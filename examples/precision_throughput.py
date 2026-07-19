@@ -27,9 +27,7 @@ def main() -> None:
     except ImportError as exc:
         raise SystemExit("install makewfs[examples] to run this example") from exc
 
-    config = makewfs.load_config(
-        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_20x20_float32.toml"
-    )
+    config = makewfs.load_config(Path(__file__).parent / "configs" / "precision_throughput.toml")
     phase = np.zeros(config.input.shape, dtype=np.float64)
     results: dict[str, tuple[float, np.ndarray]] = {}
     for precision in ("float32", "float64"):
