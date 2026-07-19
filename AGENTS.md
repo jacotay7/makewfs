@@ -164,6 +164,12 @@ dependencies, never core dependencies.
 For performance changes, run the affected warm and cold benchmarks and report the
 hardware/dependency context. Do not claim a speedup from one timing sample or
 weaken physics accuracy to win a benchmark without an explicit documented mode.
+The representative CI guard is reproducible locally with:
+
+```bash
+python benchmarks/run.py --representative --frames 1 --output /tmp/makewfs-benchmark.json
+python benchmarks/check_regression.py /tmp/makewfs-benchmark.json
+```
 
 ## Documentation and examples
 
