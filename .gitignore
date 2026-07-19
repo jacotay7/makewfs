@@ -225,3 +225,5 @@ __marimo__/
 *.fits
 *.fit
 *.png
+validation-metrics.json
+benchmark-results.json

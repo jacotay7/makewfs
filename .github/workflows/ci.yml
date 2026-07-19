@@ -45,6 +45,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
       - run: python -m pytest -q --cov=makewfs --cov-branch --cov-report=term-missing
+      - name: Validation smoke report
+        run: python validation/run.py --output /tmp/makewfs-validation.json
+      - name: Benchmark smoke report
+        run: python benchmarks/run.py --frames 1 --output /tmp/makewfs-benchmark.json
 
   package:
     name: Build and install wheel

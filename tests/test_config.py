@@ -17,6 +17,14 @@ def test_load_config_and_digest() -> None:
     assert __version__ == "0.1.0.dev0"
 
 
+def test_config_round_trip_preserves_digest() -> None:
+    from makewfs.config import WFSConfig
+
+    config = load_config(CONFIG)
+    round_tripped = WFSConfig.from_dict(config.to_dict())
+    assert round_tripped.digest == config.digest
+
+
 def test_all_shipped_configurations_load() -> None:
     for path in sorted(CONFIG.parent.glob("*.toml")):
         config = load_config(path)
@@ -69,3 +77,15 @@ def test_broadband_source_fields_are_validated() -> None:
     )
     assert source.wavelength_weights == (1.0, 3.0)
     assert source.angular_quadrature_order == 3
+
+
+def test_sensor_specific_tables_cannot_be_mixed() -> None:
+    from makewfs.config import WFSConfig
+
+    data = load_config(CONFIG).to_dict()
+    data["pyramid"] = {
+        "pixels_across_pupil": 64,
+        "pupil_separation_pixels": 16,
+    }
+    with pytest.raises(ConfigError, match="pyramid"):
+        WFSConfig.from_dict(data)

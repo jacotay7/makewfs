@@ -42,6 +42,16 @@ class ShackHartmannEngine(SensorEngine):
         self.wavefront = WavefrontInput(config, load_static_opd(config))
         self.xx, self.yy = _coordinates(self.internal_shape, config.input.grid_extent_m)
         self.lenslet_mask = self._make_lenslet_mask()
+        self.lenslet_illumination = np.asarray(
+            self.lenslet_mask.reshape(
+                self.n_lenslets,
+                self.samples_per_lenslet,
+                self.n_lenslets,
+                self.samples_per_lenslet,
+            ).mean(axis=(1, 3)),
+            dtype=np.float64,
+        )
+        self.lenslet_valid = self.lenslet_illumination >= self.settings.minimum_illuminated_fraction
         centers = self.xx.reshape(
             self.n_lenslets, self.samples_per_lenslet, self.n_lenslets, self.samples_per_lenslet
         ).mean(axis=(1, 3))

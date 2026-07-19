@@ -56,7 +56,7 @@ packages = ["src/makewfs"]
 path = "src/makewfs/__about__.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/makewfs", "tests", "docs", "examples", "README.md", "ROADMAP.md", "AGENTS.md", "LICENSE", "CHANGELOG.md"]
+include = ["src/makewfs", "tests", "docs", "examples", "validation", "benchmarks", "README.md", "ROADMAP.md", "AGENTS.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.ruff]
 line-length = 100

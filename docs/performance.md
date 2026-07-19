@@ -14,3 +14,14 @@ No public GPU option exists yet. The backend helpers are the intended boundary
 for a future CuPy optical implementation; the detector handoff is an explicit
 host-side `getframes` boundary until that package supports device-resident
 signal generation.
+
+The repository benchmark runner separates cold construction, warm optical
+frames, and warm detector frames:
+
+```bash
+python benchmarks/run.py --frames 10 --output benchmark-results.json
+```
+
+Benchmark JSON includes source-state count, output shape, environment, and
+per-frame timings. Wall-clock values are evidence for local comparisons, not
+portable CI performance promises.

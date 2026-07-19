@@ -17,3 +17,13 @@ discretized CPU checks, not a claim of independent-reference parity.
 The roadmap adds analytic tilt displacement, lenslet diffraction, broadband
 convergence, sodium-LGS geometry, and pyramid modulation response. HCIPy is a
 validation-only dependency, never a runtime dependency.
+
+Run the deterministic repository-level report with:
+
+```bash
+python validation/run.py --output validation-metrics.json --plot validation.png
+```
+
+The JSON records the normalized configuration digest, reference flux, piston
+error, warm render time, and pyramid quadrant spread. The independent small-grid
+and analytic assertions live in `tests/test_optics_validation.py`.

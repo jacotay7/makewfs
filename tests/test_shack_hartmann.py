@@ -23,6 +23,18 @@ def test_reference_is_nonnegative_and_flux_bounded() -> None:
     assert reference.sum() > 0.0
 
 
+def test_lenslet_illumination_and_validity_maps_are_explicit() -> None:
+    sensor = _sensor()
+    illumination = sensor.engine.lenslet_illumination
+    valid = sensor.engine.lenslet_valid
+    assert illumination.shape == (8, 8)
+    assert valid.shape == illumination.shape
+    assert np.all((illumination >= 0) & (illumination <= 1))
+    assert np.array_equal(
+        valid, illumination >= sensor.config.shack_hartmann.minimum_illuminated_fraction
+    )
+
+
 def test_piston_invariance() -> None:
     sensor = _sensor()
     phase = np.zeros((128, 128))

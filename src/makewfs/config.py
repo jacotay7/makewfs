@@ -14,7 +14,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -577,6 +577,10 @@ class WFSConfig:
         telescope_config = TelescopeConfig.from_dict(table("telescope"), base=base_path)
         source_config = SourceConfig.from_dict(table("source"))
         sensor = SensorConfig.from_dict(table("sensor"))
+        if sensor.kind == "shack_hartmann" and "pyramid" in data:
+            raise ConfigError("pyramid: remove this table for a Shack-Hartmann sensor")
+        if sensor.kind == "pyramid" and "shack_hartmann" in data:
+            raise ConfigError("shack_hartmann: remove this table for a pyramid sensor")
         sh_data = table("shack_hartmann") if sensor.kind == "shack_hartmann" else None
         pyramid_data = table("pyramid") if sensor.kind == "pyramid" else None
         if sensor.kind == "shack_hartmann" and sh_data is None:
@@ -621,7 +625,15 @@ class WFSConfig:
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON/TOML-friendly representation."""
-        data = asdict(self)
+
+        def serialise(value: Any) -> Any:
+            if isinstance(value, tuple):
+                return [serialise(item) for item in value]
+            if isinstance(value, dict):
+                return {key: serialise(item) for key, item in value.items()}
+            return value
+
+        data = cast(dict[str, Any], serialise(asdict(self)))
         data.pop("source_path", None)
         return data
 
