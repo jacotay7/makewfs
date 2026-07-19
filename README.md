@@ -14,7 +14,9 @@ noise; neither model will be reimplemented here.
 > source morphology and Shack–Hartmann LGS elongation are implemented. An
 > optional wavelength-resolved detector-QE prototype is available with the
 > unreleased `getframes` cube API; full range-resolved turbulence and a released
-> spectral-QE contract remain roadmap work.
+> spectral-QE contract remain roadmap work. A private optional CuPy optical path
+> is available for parity experiments, but public GPU detector support is not
+> advertised.
 
 - [Complete implementation roadmap](ROADMAP.md)
 - [Instructions for implementation agents](AGENTS.md)

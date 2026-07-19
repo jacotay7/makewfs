@@ -23,12 +23,12 @@ pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, and a documented SH sodium-range geometry
 model. It also includes a versioned labelled documentation gallery, benchmark
-reference snapshot, non-editable-wheel clean-room smoke evidence, and an
-optional wavelength-resolved detector-QE prototype that uses the unreleased
-`getframes` cube API (with an integrated fallback for released 2.0 cameras).
-Do not present range-resolved turbulent LGS OPD, the spectral-QE path as a
-released/stable contract, broad independent-reference parity, or GPU behavior
-as implemented until their gates pass.
+reference snapshot, non-editable-wheel clean-room smoke evidence, an optional
+wavelength-resolved detector-QE prototype, and a private experimental CuPy
+optical path with CPU parity tests. Do not present range-resolved turbulent LGS
+OPD, the spectral-QE path as a released/stable contract, broad
+independent-reference parity, or GPU detector support as implemented until
+their gates pass.
 
 ## Product boundary
 
@@ -108,8 +108,9 @@ write a failing integration test/design note, use the conditional gates in
   source/config parsing, and the public detector boundary are explicit host
   operations; use `ArrayBackend.scalar` or `to_host` only at named crossings.
   The backend-audit AST test and injected-CPU parity tests must remain green.
-- CPU correctness comes first. Never expose `device="gpu"` until parity tests and
-  the documented detector-boundary behavior exist.
+- CPU correctness comes first. The private `_backend=cupy_backend()` hook is
+  allowed only for the optional parity-tested optical path; never expose a
+  public `device="gpu"` option until the detector-boundary behavior is resolved.
 
 ## Configuration rules
 
@@ -167,6 +168,10 @@ Test public behavior, units, signs, shapes, failure modes, precision, and seeded
 reproducibility. Statistical tests use ensemble uncertainty and non-flaky
 tolerances. Independent reference packages such as HCIPy are optional validation
 dependencies, never core dependencies.
+
+When CUDA 12 CuPy and a device are available, also run `python -m pytest -q -m
+gpu`. GPU tests are optional and must verify CPU parity plus the explicit host
+detector boundary; they must not make ordinary CI depend on CUDA.
 
 For performance changes, run the affected warm and cold benchmarks and report the
 hardware/dependency context. Do not claim a speedup from one timing sample or

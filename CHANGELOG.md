@@ -32,6 +32,9 @@ All notable changes to `makewfs` are documented here.
 - Formalized the private optical `ArrayBackend` boundary and added static
   leakage/parity checks so a future device backend does not require sensor
   mathematics to be rewritten.
+- Added an optional private CUDA 12 CuPy optical path with SH/pyramid parity
+  tests and one explicit host transfer before `getframes`; public GPU support
+  remains gated on a device-resident detector chain.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

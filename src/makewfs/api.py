@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from .backend import ArrayBackend, cpu_backend
 from .config import WFSConfig, load_config
 from .detector import DetectorAdapter
 from .provenance import metadata
@@ -27,13 +28,14 @@ class WavefrontSensor:
     use another detector or need an ideal reference image.
     """
 
-    def __init__(self, config: WFSConfig) -> None:
+    def __init__(self, config: WFSConfig, *, _backend: ArrayBackend | None = None) -> None:
         self.config = config
+        self.backend = _backend or cpu_backend()
         self.engine: SensorEngine
         if config.sensor.kind == "shack_hartmann":
-            self.engine = ShackHartmannEngine(config)
+            self.engine = ShackHartmannEngine(config, backend=self.backend)
         elif config.sensor.kind == "pyramid":
-            self.engine = PyramidEngine(config)
+            self.engine = PyramidEngine(config, backend=self.backend)
         else:
             raise NotImplementedError(f"unsupported sensor kind {config.sensor.kind!r}")
         self.detector = DetectorAdapter(config.detector, self.engine.output_shape)
@@ -44,7 +46,11 @@ class WavefrontSensor:
         return cls(load_config(path))
 
     def _render(self, wavefront: ArrayLike) -> OpticalResult:
-        return self.engine.render(np.asarray(wavefront, dtype=np.float64))
+        return self.engine.render(cast(NDArray[np.float64], wavefront))
+
+    def _opd_rms(self, opd: Any) -> float:
+        """Reduce OPD RMS on the optical backend before detector handoff."""
+        return self.backend.scalar(self.backend.sqrt(self.backend.mean(opd**2)))
 
     def photon_rate(self, wavefront: ArrayLike) -> NDArray[np.float64]:
         """Return the ideal native-pixel photon rate before detector noise."""
@@ -65,17 +71,22 @@ class WavefrontSensor:
             sensor_kind=self.config.sensor.kind,
             launched_rate=result.launched_rate_per_s,
             captured_rate=result.captured_rate_per_s,
-            opd_m=result.opd_m,
+            opd_m=None,
+            opd_rms_m=self._opd_rms(result.opd_m),
             seed=seed,
             source_states=self.engine.source_states,
             file_digests=self.engine.file_digests,
         )
         detector_start = perf_counter()
         frame = self.detector.expose(
-            result.photon_rate,
+            self.backend.to_host(result.photon_rate),
             metadata=frame_metadata,
             seed=seed,
-            spectral_photon_rate=result.spectral_photon_rate,
+            spectral_photon_rate=(
+                None
+                if result.spectral_photon_rate is None
+                else self.backend.to_host(result.spectral_photon_rate)
+            ),
             spectral_wavelengths_m=result.spectral_wavelengths_m,
         )
         detector_elapsed = perf_counter() - detector_start
@@ -99,11 +110,15 @@ class WavefrontSensor:
         """Expose one detector frame after uniformly averaging temporal OPD samples."""
         total_start = perf_counter()
         optical_start = total_start
-        rates: list[NDArray[np.float64]] = []
-        opds: list[NDArray[np.float64]] = []
+        rates: list[Any] = []
+        opds: list[Any] = []
         launched = 0.0
         captured = 0.0
-        for sample in iter_phase_samples(phase_samples, self.config.input.shape):
+        for sample in iter_phase_samples(
+            phase_samples,
+            self.config.input.shape,
+            backend=self.backend,
+        ):
             result = self._render(sample)
             rates.append(result.photon_rate)
             opds.append(result.opd_m)
@@ -111,14 +126,15 @@ class WavefrontSensor:
             captured += result.captured_rate_per_s
         if not rates:
             raise ValueError("phase_samples must contain at least one sample")
-        average_rate = np.mean(np.stack(rates, axis=0), axis=0)
-        average_opd = np.mean(np.stack(opds, axis=0), axis=0)
+        average_rate = self.backend.mean(self.backend.stack(rates), axis=0)
+        average_opd = self.backend.mean(self.backend.stack(opds), axis=0)
         frame_metadata = metadata(
             self.config,
             sensor_kind=self.config.sensor.kind,
             launched_rate=launched,
             captured_rate=captured / len(rates),
-            opd_m=average_opd,
+            opd_m=None,
+            opd_rms_m=self._opd_rms(average_opd),
             seed=seed,
             source_states=self.engine.source_states,
             file_digests=self.engine.file_digests,
@@ -126,7 +142,11 @@ class WavefrontSensor:
         frame_metadata["wfs_temporal_samples"] = len(rates)
         optical_elapsed = perf_counter() - optical_start
         detector_start = perf_counter()
-        frame = self.detector.expose(average_rate, metadata=frame_metadata, seed=seed)
+        frame = self.detector.expose(
+            self.backend.to_host(average_rate),
+            metadata=frame_metadata,
+            seed=seed,
+        )
         frame.metadata["wfs_optical_render_s"] = optical_elapsed
         frame.metadata["wfs_detector_expose_s"] = perf_counter() - detector_start
         frame.metadata["wfs_total_expose_s"] = perf_counter() - total_start

@@ -44,13 +44,23 @@ def referenced_file_digests(config: WFSConfig) -> dict[str, str]:
     }
 
 
+def _opd_rms(opd_m: NDArray[Any] | None, opd_rms_m: float | None) -> float:
+    """Resolve a host OPD RMS, accepting a backend-reduced value."""
+    if opd_rms_m is not None:
+        return float(opd_rms_m)
+    if opd_m is None:
+        raise ValueError("metadata requires opd_m or opd_rms_m")
+    return float(np.sqrt(np.mean(np.asarray(opd_m) ** 2)))
+
+
 def metadata(
     config: WFSConfig,
     *,
     sensor_kind: str,
     launched_rate: float,
     captured_rate: float,
-    opd_m: NDArray[Any],
+    opd_m: NDArray[Any] | None = None,
+    opd_rms_m: float | None = None,
     seed: int | None,
     source_states: tuple[SourceState, ...] | None = None,
     file_digests: dict[str, str] | None = None,
@@ -64,7 +74,7 @@ def metadata(
         "wfs_wavelength_m": config.sensor.wavelength_m,
         "wfs_launched_photons_s": float(launched_rate),
         "wfs_captured_photons_s": float(captured_rate),
-        "wfs_input_opd_rms_m": float(np.sqrt(np.mean(np.asarray(opd_m) ** 2))),
+        "wfs_input_opd_rms_m": _opd_rms(opd_m, opd_rms_m),
         "wfs_seed": seed if seed is not None else "internal",
         "wfs_source_kind": config.source.kind,
         "wfs_source_state_count": len(states),

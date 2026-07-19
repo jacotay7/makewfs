@@ -142,10 +142,14 @@ def resample_opd(
 
 
 def iter_phase_samples(
-    value: ArrayLike | Iterable[ArrayLike], shape: tuple[int, int]
+    value: ArrayLike | Iterable[ArrayLike],
+    shape: tuple[int, int],
+    *,
+    backend: ArrayBackend | None = None,
 ) -> Iterable[ArrayLike]:
     """Yield one or more samples for an integrated exposure."""
-    array = np.asarray(value) if not isinstance(value, (list, tuple)) else None
+    resolved = backend or cpu_backend()
+    array = resolved.asarray(value) if not isinstance(value, (list, tuple)) else None
     if array is not None and array.ndim == 3:
         if tuple(array.shape[1:]) != shape:
             raise ValueError(f"integrated wavefront stack must end in shape {shape}")
@@ -155,7 +159,7 @@ def iter_phase_samples(
         yield array
         return
     for sample in value:  # type: ignore[union-attr]
-        sample_array = np.asarray(sample)
+        sample_array = resolved.asarray(sample)
         if sample_array.shape != shape:
             raise ValueError(f"integrated wavefront sample must have shape {shape}")
         yield sample_array

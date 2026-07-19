@@ -204,33 +204,45 @@ class ArrayBackend:
 
     def map_coordinates(self, array: Any, coordinates: Any, *, order: int, mode: str) -> Any:
         """Interpolate coordinates, using SciPy only for the CPU backend."""
-        if not self.is_cpu:  # pragma: no cover - reserved for a future device backend
-            raise NotImplementedError("map_coordinates is not implemented for this backend")
-        from scipy.ndimage import map_coordinates
+        if self.is_cpu:
+            from scipy.ndimage import map_coordinates
 
-        return map_coordinates(array, coordinates, order=order, mode=mode)
+            return map_coordinates(array, coordinates, order=order, mode=mode)
+        from cupyx.scipy.ndimage import map_coordinates  # pragma: no cover - GPU optional
+
+        device_coordinates = (
+            self.xp.stack(coordinates, axis=0)
+            if isinstance(coordinates, (list, tuple))
+            else coordinates
+        )
+        return map_coordinates(array, device_coordinates, order=order, mode=mode)
 
     def convolve(self, array: Any, kernel: Any) -> Any:
         """Convolve a batch of arrays with a backend-compatible kernel."""
-        if not self.is_cpu:  # pragma: no cover - reserved for a future device backend
-            raise NotImplementedError("measured blur is not implemented for this backend")
-        from scipy.ndimage import convolve
+        if self.is_cpu:
+            from scipy.ndimage import convolve
+
+            return convolve(array, kernel, mode="constant", cval=0.0)
+        from cupyx.scipy.ndimage import convolve  # pragma: no cover - GPU optional
 
         return convolve(array, kernel, mode="constant", cval=0.0)
 
     def gaussian_filter(self, array: Any, sigma: Any) -> Any:
         """Apply a Gaussian filter through the CPU numerical backend."""
-        if not self.is_cpu:  # pragma: no cover - reserved for a future device backend
-            raise NotImplementedError("Gaussian blur is not implemented for this backend")
-        from scipy.ndimage import gaussian_filter
+        if self.is_cpu:
+            from scipy.ndimage import gaussian_filter
+
+            return gaussian_filter(array, sigma=sigma, mode="constant")
+        from cupyx.scipy.ndimage import gaussian_filter  # pragma: no cover - GPU optional
 
         return gaussian_filter(array, sigma=sigma, mode="constant")
 
     def next_fast_length(self, value: int) -> int:
         """Return an FFT-friendly length using this backend's implementation."""
-        if not self.is_cpu:  # pragma: no cover - reserved for a future device backend
-            raise NotImplementedError("next_fast_length is not implemented for this backend")
-        from scipy.fft import next_fast_len
+        if self.is_cpu:
+            from scipy.fft import next_fast_len
+        else:  # pragma: no cover - GPU optional
+            from cupyx.scipy.fft import next_fast_len
 
         return int(next_fast_len(value))
 
@@ -243,7 +255,7 @@ class ArrayBackend:
         """Copy an array to host NumPy storage at an explicit boundary."""
         if self.is_cpu:
             return cast(NDArray[Any], value)
-        return np.asarray(value)
+        return np.asarray(self.xp.asnumpy(value))
 
 
 _CPU_BACKEND = ArrayBackend(np, name="cpu")
@@ -252,6 +264,20 @@ _CPU_BACKEND = ArrayBackend(np, name="cpu")
 def cpu_backend() -> ArrayBackend:
     """Return the shared CPU backend instance."""
     return _CPU_BACKEND
+
+
+def cupy_backend() -> ArrayBackend:
+    """Return the private optional CuPy backend.
+
+    CuPy is intentionally imported lazily so the core package remains usable
+    without CUDA.  Callers should treat this as experimental and keep the
+    explicit host transfer before the ``getframes`` detector adapter.
+    """
+    try:
+        import cupy
+    except ImportError as exc:  # pragma: no cover - depends on optional install
+        raise ImportError("the private CuPy backend requires makewfs[gpu]") from exc
+    return ArrayBackend(cupy, name="cupy")
 
 
 def real_dtype(name: str) -> np.dtype[Any]:
@@ -297,6 +323,7 @@ __all__ = [
     "centered_ifft2",
     "complex_dtype",
     "cpu_backend",
+    "cupy_backend",
     "next_fast_length",
     "real_dtype",
 ]

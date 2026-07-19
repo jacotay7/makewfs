@@ -90,14 +90,14 @@ class PyramidEngine(SensorEngine):
         field_angle_opd = self.xx * state.angle_x_rad + self.yy * state.angle_y_rad
         total_opd = internal + field_angle_opd
         illuminated = self.pupil > 0
-        piston = (
-            self.backend.scalar(self.backend.mean(total_opd[illuminated]))
-            if self.backend.scalar(self.backend.any(illuminated))
-            else 0.0
+        illuminated_weight = self.backend.astype(illuminated, total_opd.dtype)
+        illuminated_count = self.backend.sum(illuminated_weight)
+        piston = self.backend.sum(total_opd * illuminated_weight) / self.backend.where(
+            illuminated_count > 0,
+            illuminated_count,
+            1.0,
         )
         relative_opd = total_opd - piston
-        if self.backend.scalar(self.backend.ptp(total_opd[illuminated])) == 0.0:
-            relative_opd = self.backend.zeros_like(total_opd)
         phase = 2.0 * math.pi * relative_opd / state.wavelength_m
         return cast(
             NDArray[Any],
@@ -138,8 +138,8 @@ class PyramidEngine(SensorEngine):
         spectral_photon_rate = self.backend.zeros(
             (len(wavelengths), *self.output_shape), dtype=self._rate_dtype
         )
-        total_field_flux: float | None = None
-        captured = 0.0
+        total_field_flux: Any | None = None
+        captured: Any | None = None
         pixels = self.settings.pixels_across_pupil
         separation = self.settings.pupil_separation_pixels
         margin = self.settings.detector_margin_pixels
@@ -167,22 +167,25 @@ class PyramidEngine(SensorEngine):
                 ] = mosaic
                 mosaic = padded
             if total_field_flux is None:
-                total_field_flux = self.backend.scalar(
-                    self.backend.sum(self.backend.abs(fields[0]) ** 2)
+                total_field_flux = self.backend.asarray(
+                    self.backend.sum(self.backend.abs(fields[0]) ** 2),
+                    dtype=self._rate_dtype,
                 )
-            cropped_flux = self.backend.scalar(self.backend.sum(mosaic))
-            if cropped_flux < 0.0:
-                raise ValueError("pyramid propagation produced negative flux")
-            contribution = mosaic * (self.source_rate * state.weight / total_field_flux)
+            cropped_flux = self.backend.sum(mosaic)
+            normalizer = self.backend.where(total_field_flux > 0, total_field_flux, 1.0)
+            contribution = mosaic * (self.source_rate * state.weight / normalizer)
             photon_rate += contribution
             spectral_photon_rate[wavelength_index[state.wavelength_m]] += contribution
-            captured += self.source_rate * state.weight * cropped_flux / total_field_flux
-        if total_field_flux is None or total_field_flux <= 0.0:
+            captured = (0.0 if captured is None else captured) + (
+                self.source_rate * state.weight * cropped_flux / normalizer
+            )
+        if total_field_flux is None or self.backend.scalar(total_field_flux) <= 0.0:
             raise ValueError("pupil has no illuminated pixels")
+        assert captured is not None
         return OpticalResult(
             photon_rate,
             self.source_rate,
-            captured,
+            self.backend.scalar(captured),
             wavefront,
             spectral_photon_rate,
             wavelengths,

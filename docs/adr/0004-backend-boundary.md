@@ -11,7 +11,7 @@ injection-parity tests protect that rule.
 File readers, configuration parsing, source quadrature, metadata, and the
 `getframes` adapter are explicit host-side boundaries. `ArrayBackend.scalar`
 is used only where a scalar must cross into geometry/metadata, and
-`ArrayBackend.to_host` is the named device-to-host escape hatch. The CPU
-backend remains the only supported runtime backend. A future CuPy backend must
-implement the same contract and reproduce the CPU validation suite before it
-is exposed.
+`ArrayBackend.to_host` is the named device-to-host escape hatch. The public
+runtime remains CPU-only; the private optional CuPy backend implements the
+contract and has parity tests, but is not advertised until a device-resident
+detector boundary exists.

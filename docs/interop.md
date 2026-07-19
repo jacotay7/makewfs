@@ -13,6 +13,12 @@ CPU optical path. `examples/lgs_thin_beacon.py` uses the same pattern with
 `lgs_altitude`; range-resolved sodium elongation is not silently inferred from
 that single OPD map.
 
+For CUDA experiments, install `makewfs[gpu]` and use the private
+`WavefrontSensor(config, _backend=cupy_backend())` hook with CuPy phase arrays.
+The optical result stays on the device until `makewfs` performs one explicit
+host transfer for the CPU `getframes` adapter; this is not a public end-to-end
+GPU contract.
+
 ## getframes
 
 `wfs.expose()` returns the existing array-like `getframes.Frame`. Use

@@ -10,12 +10,19 @@ for throughput and memory; float64 is the reference path. Benchmark cold
 construction separately from warm frames and record Python, NumPy, SciPy, and
 hardware versions.
 
-No public GPU option exists yet. `ArrayBackend` is the private optical boundary:
-sensor engines use its allocations, reductions, FFTs, interpolation, and blur
-hooks, while file readers, metadata, and the detector handoff remain explicit
-host-side operations. The detector still requires a host `getframes` frame until
-that package supports device-resident signal generation. A CuPy implementation
-must first provide backend parity and a measured detector-boundary design.
+No public GPU option exists yet. Install the optional CUDA 12 extra to exercise
+the private CuPy optical path:
+
+```bash
+python -m pip install -e '.[gpu]'
+python -m pytest -q -m gpu
+```
+
+Sensor allocations, reductions, FFTs, interpolation, and blur hooks remain on
+the device; the facade performs one explicit host copy before `getframes`. The
+GPU tests compare ideal SH/PWFS maps with the CPU reference and verify that the
+detector frame remains host-side. Public GPU support still requires a measured
+device-resident detector design.
 
 The repository benchmark runner separates cold construction, warm optical
 frames, and warm detector frames:

@@ -31,7 +31,8 @@ The 1.0 release is complete when all of the following are true:
   behavior have quantitative tests against analytic results or an independent
   reference.
 - The common CPU path is vectorized, benchmarked, and free of repeated setup in
-  the per-frame loop. Its array/FFT boundary is ready for a later CuPy backend.
+  the per-frame loop. Its `ArrayBackend` boundary also supports the private
+  parity-tested CuPy optical path; detector execution remains host-side.
 - Every public object and every configuration field is documented. The
   quickstart, configuration reference, physics guides, examples, validation
   gallery, performance notes, and API reference build in strict mode.
@@ -133,9 +134,10 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Broader independent validation, GPU path, and release completion remain
-  staged; the versioned documentation gallery and relative benchmark regression
-  envelopes are now in place.
+- [ ] Broader independent validation, public GPU support, and release completion
+  remain staged; the private CuPy optical path now has CPU parity evidence, and
+  the versioned documentation gallery and relative benchmark regression
+  envelopes are in place.
 
 ## 4. End-state user experience
 
@@ -346,7 +348,7 @@ src/makewfs/
   __about__.py         # version
   api.py               # WavefrontSensor facade and simulate()
   config.py            # immutable validated config + TOML loading
-  backend.py           # CPU array/FFT boundary; future CuPy backend protocol
+  backend.py           # CPU boundary plus private experimental CuPy backend
   wavefront.py         # units, coordinates, OPD conversion, validation
   pupil.py             # analytic/custom pupil sampling
   sampling.py          # centred FFTs, flux-conserving integration/rebinning
@@ -474,8 +476,8 @@ and validation of the near-field geometry.
   projects. Test Python 3.10 through the current stable version supported by the
   runtime dependencies rather than baking in an unnecessary upper bound.
 - [x] Add runtime dependencies (`numpy`, `scipy`, `getframes>=2.0`) and separated
-  `dev`, `docs`, `examples`, `interop`, and future `gpu` extras. `pyturb` belongs
-  to `interop/examples`, not core.
+  `dev`, `docs`, `examples`, `interop`, and optional CUDA 12 `gpu` extras.
+  `pyturb` belongs to `interop/examples`, not core.
 - [x] Configure Ruff lint and format, strict mypy, pytest strict markers, branch
   coverage, and pre-commit. Use 100-character lines and NumPy-style docstrings to
   match `getframes` unless an ADR records a change.
@@ -672,9 +674,11 @@ accepts only wavefront plus config.
   no direct NumPy allocation/FFT/reduction calls. File I/O, config, metadata,
   source quadrature, and the CPU `getframes` boundary remain explicit host
   operations. An AST guard and injected-CPU parity tests enforce the contract.
-- [ ] Implement a private experimental CuPy optical backend only after the audit,
-  with CPU/GPU image and response parity tests. Do not declare public GPU support
-  until the end-to-end detector boundary is resolved.
+- [x] Implement a private experimental CuPy optical backend after the audit,
+  with CPU/GPU image and response parity tests. The optional `gpu` extra uses
+  CUDA 12 CuPy; `WavefrontSensor(..., _backend=cupy_backend())` is intentionally
+  private, and the detector boundary performs one explicit device-to-host copy.
+  Public GPU support remains gated on an end-to-end detector design.
 - [x] Publish benchmark tables with hardware, dependency versions, precision,
   input size, modulation/wavelength samples, construction time, warm latency,
   throughput, and Python-level peak memory. The snapshot documents that C-level
@@ -858,13 +862,13 @@ it appears only in a dataclass docstring.
 
 ### GPU path
 
-`pyturb` already emits CuPy arrays. The optical core must therefore keep array
-creation, FFTs, reductions, indexing, and scalar access behind a small backend
-object and avoid hidden host copies. The first supported backend is CPU only.
+`pyturb` already emits CuPy arrays. The optical core now keeps array creation,
+FFTs, reductions, indexing, and scalar access behind `ArrayBackend`; the private
+CuPy path is parity-tested but not part of the public configuration/API.
 
 Full device-resident phase → ADU will additionally require a GPU-capable
 `getframes` signal chain. Until that exists, an experimental GPU optical path
-would end in one explicit device-to-host copy at the detector adapter. This is
+ends in one explicit device-to-host copy at the detector adapter. This is
 acceptable for exploration but is not advertised as end-to-end GPU support.
 
 ## 13. Conditional sibling-repository work

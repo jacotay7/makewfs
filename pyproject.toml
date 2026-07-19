@@ -41,6 +41,7 @@ docs = ["mkdocs>=1.5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.24"]
 examples = ["matplotlib>=3.7"]
 interop = ["pyturb>=1.0"]
 validation = ["hcipy>=0.6"]
+gpu = ["cupy-cuda12x>=13.0"]
 
 [project.scripts]
 makewfs = "makewfs.cli:main"
@@ -80,7 +81,7 @@ warn_unused_ignores = true
 files = ["src/makewfs"]
 
 [[tool.mypy.overrides]]
-module = ["getframes.*", "scipy.*", "matplotlib.*"]
+module = ["cupy.*", "cupyx.*", "getframes.*", "scipy.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -88,6 +89,7 @@ minversion = "7.0"
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
 markers = [
+    "gpu: optional CuPy/CUDA backend parity tests",
     "slow: slower statistical or gallery tests",
     "validation: theory/reference validation tests",
     "interop: tests requiring optional pyturb/getframes sibling APIs",
