@@ -64,6 +64,9 @@ jobs:
       - name: Representative SH benchmark report
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         run: python benchmarks/run.py --representative --frames 1 --output "${{ runner.temp }}/makewfs-representative-benchmark.json"
+      - name: Check relative performance envelopes
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: python benchmarks/check_regression.py "${{ runner.temp }}/makewfs-representative-benchmark.json"
       - name: Upload validation and benchmark reports
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4

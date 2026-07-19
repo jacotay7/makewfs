@@ -19,6 +19,8 @@ All notable changes to `makewfs` are documented here.
   CI job; HCIPy remains outside runtime dependencies.
 - Added configuration-relative measured SH optical blur kernels with unit-sum
   validation, cached convolution, and provenance hashes.
+- Added a public API/configuration stability audit and same-run benchmark
+  regression envelopes for representative CPU kernels.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

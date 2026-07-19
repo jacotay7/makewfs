@@ -48,3 +48,9 @@ For call-level hotspot inspection, write a compact cumulative `cProfile` report:
 ```bash
 python benchmarks/profile_warm.py --frames 3 --output profile-results.json
 ```
+
+CI also runs `benchmarks/check_regression.py` on the representative report. It
+checks generous same-run ratios for 60x60 versus 20x20 SH, the nine-state
+broadband LGS case versus minimal SH, and 32-sample versus unmodulated pyramid
+optics. These are order-of-magnitude regression alarms, not portable latency
+promises; inspect the full JSON report for machine-specific performance work.

@@ -88,19 +88,15 @@ class PyramidEngine(SensorEngine):
             return base[None, ...]
         angles = np.arange(samples, dtype=np.float64) * 2.0 * np.pi / samples
         diameter = self.config.telescope.pupil_diameter_m
-        tilts = np.asarray(
-            [
-                np.exp(
-                    2j
-                    * np.pi
-                    * radius
-                    * (self.xx * np.cos(angle) + self.yy * np.sin(angle))
-                    / diameter
-                )
-                for angle in angles
-            ],
-            dtype=self._complex_dtype,
-        )
+        cosines = np.cos(angles)[:, None, None]
+        sines = np.sin(angles)[:, None, None]
+        tilts = np.exp(
+            2j
+            * np.pi
+            * radius
+            * (cosines * self.xx[None, ...] + sines * self.yy[None, ...])
+            / diameter
+        ).astype(self._complex_dtype, copy=False)
         return np.asarray(base[None, ...] * tilts, dtype=self._complex_dtype)
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:

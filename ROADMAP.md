@@ -564,9 +564,9 @@ Shack–Hartmann frame through `getframes`.
   `makewfs` supplies detector-plane sodium elongation.
 - [ ] Resolve the wavelength-resolved detector-QE gate in section 13 before
   claiming fully quantitative broadband detector frames.
-- [ ] Cross-validate selected monochromatic SH cases against an independent
-  Fourier-optics package or frozen trusted calculation; keep that package in a
-  validation extra only.
+- [x] Cross-validate selected monochromatic SH cases against an independent
+  Fourier-optics calculation; the small-grid direct DFT reference is frozen in
+  the core test suite, while optional package references remain validation-only.
 - [x] Add the NGS magnitude-series, realistic pupil, polychromatic, and LGS worked
   examples listed in section 10.
 - [x] Extend benchmarks across wavelength and sodium-range sample counts; document
@@ -649,15 +649,16 @@ accepts only wavefront plus config.
   metadata and identify FFT, assembly, quadrature, and detector costs separately.
 - [x] Ensure static pupil/lenslet masks, phase ramps, pyramid masks, quadrature,
   index maps, and detector objects are built once and cached immutably.
-- [ ] Remove avoidable Python loops and temporaries from hot paths; use batched
+- [x] Remove avoidable Python loops and temporaries from hot paths; use batched
   FFTs, in-place-safe operations, and configurable chunks where the full batch
-  would exceed a memory budget.
+  would exceed a memory budget. Source-state iteration remains intentionally
+  bounded to avoid materializing a potentially large wavelength/source cube.
 - [x] Verify float32/complex64 does not accidentally promote in hot operations;
   quantify its image/response error against float64 and document when to select
   each precision.
 - [x] Add `scipy.fft` worker control and confirm determinism/tolerances across
   worker counts and supported platforms.
-- [ ] Establish performance-regression checks from stable benchmark kernels. CI
+- [x] Establish performance-regression checks from stable benchmark kernels. CI
   should compare relative kernels or generous envelopes, not fragile wall-clock
   promises from shared runners.
 - [ ] Audit backend leakage: no unconditional `np.asarray`, NumPy-only allocation,
@@ -688,7 +689,7 @@ a real GPU backend without an architectural rewrite.
 - [x] Complete README, quickstart, concepts, configuration reference, both sensor
   guides, radiometry/detector/interop guides, examples, validation, performance,
   API, contributing, changelog, citation, and release documentation.
-- [ ] Audit every public name and config key. Remove accidental public surfaces,
+- [x] Audit every public name and config key. Remove accidental public surfaces,
   document stability, and record intentional future extension points.
 - [ ] Verify clean-room installation using released `pyturb` and `getframes`, not
   editable sibling checkouts. Record minimum compatible versions.
