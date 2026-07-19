@@ -66,6 +66,7 @@ configuration digest.
 | `field_angle_arcsec` | Source centroid `[x, y]` in arcsec (default `[0, 0]`). |
 | `angular_fwhm_arcsec` | Non-negative Gaussian source FWHM (default `0`); nonzero values require quadrature order at least 2. |
 | `angular_quadrature_order` | Positive deterministic source quadrature order (default `3`). |
+| `angular_kernel_path` | Optional three-column `x_arcsec y_arcsec weight` source kernel; mutually exclusive with nonzero FWHM and resolved relative to the TOML file. |
 | `wavelengths_m` | Optional positive wavelength nodes. Empty means the sensor wavelength. |
 | `wavelength_weights` | Optional non-negative weights matching `wavelengths_m`; normalized internally. |
 | `lgs_ranges_m` | Optional positive sodium range nodes; only valid for LGS. Empty means a thin layer at the configured mean. |
@@ -77,6 +78,20 @@ configuration digest.
 SED and transmission curves use trapezoid quadrature on their common wavelength
 nodes. The resulting normalized wavelength, source-angle, and (for SH) range
 states are recorded in provenance.
+
+An angular kernel is an arbitrary incoherent source morphology. Its offsets are
+added to `field_angle_arcsec`, its non-negative weights are normalized, and each
+sample is propagated independently. For example:
+
+```text
+# x_arcsec  y_arcsec  relative_weight
+-0.15       0.00      1
+ 0.00       0.00      2
+ 0.15       0.00      1
+```
+
+This is useful for measured binary-guide-star or resolved-source profiles. The
+kernel file hash and all normalized states are included in frame provenance.
 
 ### `sensor`, `detector`, and `numerics`
 

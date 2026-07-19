@@ -54,7 +54,9 @@ def _minimal_tables() -> dict[str, object]:
 
 
 def test_all_shipped_configurations_load() -> None:
-    for path in sorted(CONFIG.parent.glob("*.toml")):
+    benchmark_configs = CONFIG.parents[2] / "benchmarks" / "configs"
+    paths = sorted(CONFIG.parent.glob("*.toml")) + sorted(benchmark_configs.glob("*.toml"))
+    for path in paths:
         config = load_config(path)
         assert config.source_path == str(path.resolve())
 
@@ -240,6 +242,16 @@ def test_source_quadrature_and_curve_fields_are_checked(tmp_path: Path) -> None:
         base=tmp_path,
     )
     assert source.sed_path == str((tmp_path / "sed.txt").resolve())
+    with pytest.raises(ConfigError, match="mutually exclusive"):
+        SourceConfig.from_dict(
+            {
+                "normalization": "detector_photon_rate",
+                "detector_photon_rate_per_s": 1,
+                "angular_fwhm_arcsec": 0.2,
+                "angular_kernel_path": "kernel.txt",
+            },
+            base=tmp_path,
+        )
 
 
 def test_sensor_specific_validation_and_defaults() -> None:

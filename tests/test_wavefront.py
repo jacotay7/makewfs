@@ -102,6 +102,14 @@ def test_opd_resampling_preserves_plane() -> None:
     assert np.isclose(result[5, 5] - result[5, 4], 0.5, atol=1e-12)
 
 
+def test_opd_resampling_preserves_y_plane_and_constant() -> None:
+    source_y = np.tile(np.arange(5, dtype=float)[:, None], (1, 5))
+    result_y = resample_opd(source_y, (10, 10), 1.0)
+    assert np.isclose(result_y[5, 5] - result_y[4, 5], 0.5, atol=1e-12)
+    constant = resample_opd(np.full((5, 7), 3.2), (9, 11), 1.0)
+    assert np.allclose(constant, 3.2)
+
+
 def test_circular_pupil_area_is_reasonable() -> None:
     config = _config()
     pupil = make_pupil(config.telescope, (256, 256), 2.0)

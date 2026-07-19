@@ -534,9 +534,9 @@ CI, and the numerical/API contracts needed by both sensors are frozen.
   getframes' own unit suite.
 - [x] Write the quickstart, configuration reference, units/conventions guide,
   Shack–Hartmann physics guide, detector handoff guide, and API docs.
-- [ ] Add a deterministic quickstart example that saves phase, ideal rate, noisy
+- [x] Add a deterministic quickstart example that saves phase, ideal rate, noisy
   ADU, and a spot-row profile as plots; smoke-run it in CI at reduced resolution.
-- [ ] Establish SH benchmarks for at least 20x20 and 60x60 lenslets, float32 and
+- [x] Establish SH benchmarks for at least 20x20 and 60x60 lenslets, float32 and
   float64, cold construction and warm per-frame paths, with environment metadata.
 
 **Exit:** a TOML file plus OPD array produces a quantitatively validated noisy
@@ -551,7 +551,7 @@ Shack–Hartmann frame through `getframes`.
   Test monochromatic convergence, broadband flux, and diffraction scaling.
 - [ ] Complete pupil support: custom masks, pupil rotation, segment gaps, static
   WFS-path OPD, lenslet-grid rotation/offset, and sampled partial subapertures.
-- [ ] Add finite NGS angular size and user-supplied source kernels as incoherent
+- [x] Add finite NGS angular size and user-supplied source kernels as incoherent
   sums/convolutions with flux conservation and centroid tests.
 - [x] Add physical lenslet/relay configuration and cross-check the derived spot
   sampling and tilt displacement against the normalized configuration.

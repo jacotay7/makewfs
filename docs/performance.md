@@ -25,3 +25,13 @@ python benchmarks/run.py --frames 10 --output benchmark-results.json
 Benchmark JSON includes source-state count, output shape, environment, and
 per-frame timings. Wall-clock values are evidence for local comparisons, not
 portable CI performance promises.
+
+Representative Shack–Hartmann configurations are provided under
+`benchmarks/configs/`:
+
+```bash
+python benchmarks/run.py --representative --frames 3 --output benchmark-results.json
+```
+
+They cover 20×20 float32 and 60×60 float64 lenslet grids while keeping the
+minimal SH and pyramid smoke cases in the default benchmark run.

@@ -17,7 +17,10 @@ calibration or a separately modeled source.
 `angular_fwhm_arcsec` and `angular_quadrature_order` form a two-dimensional
 Gaussian quadrature around that centroid. Every angular state is propagated
 independently and summed in intensity, preserving incoherence and total source
-flux.
+flux. A measured or otherwise user-defined morphology can instead be supplied
+with `angular_kernel_path`, a three-column `x_arcsec y_arcsec weight` table;
+kernel offsets are relative to `field_angle_arcsec` and are mutually exclusive
+with Gaussian FWHM mode.
 
 ## Wavelength states
 

@@ -61,6 +61,18 @@ jobs:
         run: python validation/run.py --output "${{ runner.temp }}/makewfs-validation.json"
       - name: Benchmark smoke report
         run: python benchmarks/run.py --frames 1 --output "${{ runner.temp }}/makewfs-benchmark.json"
+      - name: Representative SH benchmark report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: python benchmarks/run.py --representative --frames 1 --output "${{ runner.temp }}/makewfs-representative-benchmark.json"
+      - name: Upload validation and benchmark reports
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-benchmark-reports
+          path: |
+            ${{ runner.temp }}/makewfs-validation.json
+            ${{ runner.temp }}/makewfs-benchmark.json
+            ${{ runner.temp }}/makewfs-representative-benchmark.json
 
   package:
     name: Build and install wheel
@@ -114,6 +126,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/makewfs-examples"
           python examples/quickstart.py --output "$RUNNER_TEMP/makewfs-examples/quickstart.png"
+          python examples/quickstart.py --config examples/configs/shack_hartmann_extended_source.toml --output "$RUNNER_TEMP/makewfs-examples/extended-source.png"
           python examples/compare_sensors.py --output "$RUNNER_TEMP/makewfs-examples/compare.png"
           python examples/lgs_elongation.py --output "$RUNNER_TEMP/makewfs-examples/lgs.png"
           python examples/moving_atmosphere.py --steps 6 --output "$RUNNER_TEMP/makewfs-examples/moving.png"

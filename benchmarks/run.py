@@ -48,6 +48,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", action="append", type=Path)
     parser.add_argument("--frames", type=int, default=3)
+    parser.add_argument(
+        "--representative",
+        action="store_true",
+        help="also measure the 20x20 float32 and 60x60 float64 SH benchmark configs",
+    )
     parser.add_argument("--output", type=Path, default=Path("benchmark-results.json"))
     args = parser.parse_args()
     if args.frames < 1:
@@ -57,6 +62,13 @@ def main() -> int:
         root / "examples" / "configs" / "shack_hartmann_minimal.toml",
         root / "examples" / "configs" / "pyramid_minimal.toml",
     ]
+    if args.representative:
+        configs.extend(
+            [
+                root / "benchmarks" / "configs" / "shack_hartmann_20x20_float32.toml",
+                root / "benchmarks" / "configs" / "shack_hartmann_60x60_float64.toml",
+            ]
+        )
     report: dict[str, Any] = {
         "python": sys.version,
         "platform": platform.platform(),

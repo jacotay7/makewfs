@@ -190,6 +190,7 @@ class SourceConfig:
     field_angle_arcsec: tuple[float, float] = (0.0, 0.0)
     angular_fwhm_arcsec: float = 0.0
     angular_quadrature_order: int = 3
+    angular_kernel_path: str | None = None
     wavelengths_m: tuple[float, ...] = ()
     wavelength_weights: tuple[float, ...] = ()
     lgs_ranges_m: tuple[float, ...] = ()
@@ -213,6 +214,7 @@ class SourceConfig:
                 "field_angle_arcsec",
                 "angular_fwhm_arcsec",
                 "angular_quadrature_order",
+                "angular_kernel_path",
                 "wavelengths_m",
                 "wavelength_weights",
                 "lgs_ranges_m",
@@ -273,6 +275,11 @@ class SourceConfig:
             raise ConfigError(
                 "source.angular_quadrature_order: finite source extent requires order >= 2"
             )
+        angular_kernel = data.get("angular_kernel_path")
+        if angular_kernel is not None and angular_fwhm > 0:
+            raise ConfigError(
+                "source: angular_kernel_path and angular_fwhm_arcsec are mutually exclusive"
+            )
         wavelengths = _tuple_floats(data.get("wavelengths_m", []), "source.wavelengths_m")
         if any(value <= 0 for value in wavelengths):
             raise ConfigError("source.wavelengths_m: values must be positive")
@@ -306,6 +313,9 @@ class SourceConfig:
         if kind != "lgs" and (lgs_ranges or lgs_weights or any(value != 0 for value in launch)):
             raise ConfigError("source: LGS geometry fields require source.kind = 'lgs'")
         base_path = Path.cwd() if base is None else base
+        angular_kernel_path = (
+            None if angular_kernel is None else str((base_path / str(angular_kernel)).resolve())
+        )
         sed = data.get("sed_path")
         transmission = data.get("transmission_path")
         sed_path = None if sed is None else str((base_path / str(sed)).resolve())
@@ -323,6 +333,7 @@ class SourceConfig:
             (angle[0], angle[1]),
             angular_fwhm,
             angular_order,
+            angular_kernel_path,
             wavelengths,
             weights,
             lgs_ranges,

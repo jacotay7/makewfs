@@ -1,0 +1,4 @@
+# x_arcsec  y_arcsec  relative_weight
+-0.15  0.00  1.0
+ 0.00  0.00  2.0
+ 0.15  0.00  1.0

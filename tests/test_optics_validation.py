@@ -40,6 +40,22 @@ def test_centered_fft_matches_independent_small_dft() -> None:
     assert np.allclose(centered_fft2(array), _direct_centered_dft(array), atol=1e-12)
 
 
+def test_batched_shack_spots_match_direct_random_small_grid() -> None:
+    rng = np.random.default_rng(19)
+    phase = rng.normal(size=(3, 4, 4))
+    fields = np.exp(1j * phase)
+    spots = spot_intensity(
+        fields,
+        pixels=4,
+        samples_per_lenslet=4,
+        sampling=1.0,
+        oversampling=1,
+        workers=1,
+    )
+    expected = np.stack([np.abs(_direct_centered_dft(field)) ** 2 for field in fields])
+    assert np.allclose(spots, expected, atol=1e-12, rtol=1e-12)
+
+
 def test_known_opd_ramp_moves_a_spot_by_the_analytic_amount() -> None:
     samples = 16
     physical_width_m = 1.0

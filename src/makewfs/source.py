@@ -35,6 +35,25 @@ def _angular_states(config: WFSConfig) -> list[tuple[float, float, float]]:
     source = config.source
     base_x = math.radians(source.field_angle_arcsec[0] / 3600.0)
     base_y = math.radians(source.field_angle_arcsec[1] / 3600.0)
+    if source.angular_kernel_path is not None:
+        data = np.atleast_2d(
+            np.asarray(np.loadtxt(Path(source.angular_kernel_path)), dtype=np.float64)
+        )
+        if data.ndim != 2 or data.shape[1] != 3:
+            raise ValueError(
+                "source angular kernel must contain three columns: x_arcsec y_arcsec weight"
+            )
+        if not np.all(np.isfinite(data)) or np.any(data[:, 2] < 0) or np.sum(data[:, 2]) <= 0:
+            raise ValueError("source angular kernel must be finite with non-negative weights")
+        weights = data[:, 2] / np.sum(data[:, 2])
+        return [
+            (
+                base_x + math.radians(float(x) / 3600.0),
+                base_y + math.radians(float(y) / 3600.0),
+                float(weight),
+            )
+            for (x, y), weight in zip(data[:, :2], weights)
+        ]
     if source.angular_fwhm_arcsec == 0.0:
         return [(base_x, base_y, 1.0)]
     order = source.angular_quadrature_order

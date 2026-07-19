@@ -17,5 +17,9 @@ The most complete current workflows are:
   boundary;
 - `detector_choices.py`: identical ideal maps through several getframes presets.
 
+The extended-source configuration at
+`examples/configs/shack_hartmann_extended_source.toml` demonstrates the
+three-column angular-kernel input used for resolved or binary guide sources.
+
 Full-resolution galleries, timing traces, detector-presets comparisons, and a
 closed-loop toy injection plot are scheduled in the roadmap.

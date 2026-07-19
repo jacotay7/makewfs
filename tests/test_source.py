@@ -63,6 +63,39 @@ def test_broadband_and_finite_source_maps_are_flux_preserving() -> None:
     assert rate.sum() > source.detector_photon_rate_per_s * 0.8
 
 
+def test_user_angular_kernel_is_normalized_and_flux_preserving(tmp_path: Path) -> None:
+    config = load_config(SH_CONFIG)
+    path = tmp_path / "binary_kernel.txt"
+    np.savetxt(path, [[-0.2, 0.0, 1.0], [0.0, 0.0, 2.0], [0.2, 0.0, 1.0]])
+    source = replace(config.source, angular_kernel_path=str(path), field_angle_arcsec=(0.1, -0.05))
+    states = iter_source_states(replace(config, source=source))
+    assert len(states) == 3
+    assert np.isclose(sum(state.weight for state in states), 1.0)
+    assert np.isclose(
+        sum(state.weight * state.angle_x_rad for state in states), np.deg2rad(0.1 / 3600)
+    )
+    image = WavefrontSensor(replace(config, source=source)).photon_rate(
+        np.zeros(config.input.shape)
+    )
+    assert image.sum() <= source.detector_photon_rate_per_s * (1.0 + 1e-12)
+
+
+def test_user_angular_kernel_validation(tmp_path: Path) -> None:
+    config = load_config(SH_CONFIG)
+    malformed = tmp_path / "malformed_kernel.txt"
+    np.savetxt(malformed, [[0.0, 0.0]])
+    with pytest.raises(ValueError, match="three columns"):
+        iter_source_states(
+            replace(config, source=replace(config.source, angular_kernel_path=str(malformed)))
+        )
+    negative = tmp_path / "negative_kernel.txt"
+    np.savetxt(negative, [[0.0, 0.0, -1.0]])
+    with pytest.raises(ValueError, match="non-negative"):
+        iter_source_states(
+            replace(config, source=replace(config.source, angular_kernel_path=str(negative)))
+        )
+
+
 def test_thin_lgs_profile_matches_a_single_mean_range() -> None:
     config = load_config(SH_CONFIG)
     telescope = replace(config.telescope, central_obscuration_ratio=0.0)

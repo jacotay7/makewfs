@@ -18,5 +18,7 @@ with `python -m pip install -e '.[examples,interop]'` from the repository root.
   the toy attenuation is explicitly external to makewfs.
 - `detector_choices.py` holds the ideal optical map fixed while swapping
   existing CCD, EMCCD, sCMOS, and eAPD getframes presets.
+- `configs/shack_hartmann_extended_source.toml` plus its kernel file show a
+  measured/arbitrary finite-source morphology without changing the API.
 
 Use `--help` on each script for output and resolution controls.
