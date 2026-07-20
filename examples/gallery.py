@@ -81,7 +81,7 @@ def main() -> None:
         normalization="magnitude",
         detector_photon_rate_per_s=None,
         magnitude_system="vega",
-        magnitude=12.0,
+        magnitude=6.0,
         band="R",
         throughput=0.35,
     )
@@ -118,7 +118,7 @@ def main() -> None:
     _image(
         axes[1, 2],
         magnitude_frame,
-        title="NGS magnitude 12 detector frame",
+        title="NGS magnitude 6 detector frame",
         label="detector signal (ADU)",
     )
     figure.suptitle(

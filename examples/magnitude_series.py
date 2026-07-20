@@ -14,7 +14,7 @@ import makewfs
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="magnitude_series.png")
-    parser.add_argument("--magnitudes", nargs="+", type=float, default=[8.0, 12.0, 16.0])
+    parser.add_argument("--magnitudes", nargs="+", type=float, default=[5.0, 8.0, 11.0])
     args = parser.parse_args()
     try:
         import matplotlib

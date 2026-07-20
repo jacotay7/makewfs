@@ -128,7 +128,10 @@ def test_known_opd_ramp_moves_a_spot_by_the_analytic_amount() -> None:
 def test_source_rate_scales_ideal_image_linearly() -> None:
     config = load_config(SH_CONFIG)
     low = WavefrontSensor(config).photon_rate(np.zeros(config.input.shape))
-    source = replace(config.source, detector_photon_rate_per_s=3.0e6)
+    assert config.source.detector_photon_rate_per_s is not None
+    source = replace(
+        config.source, detector_photon_rate_per_s=1.5 * config.source.detector_photon_rate_per_s
+    )
     high = WavefrontSensor(replace(config, source=source)).photon_rate(np.zeros(config.input.shape))
     assert np.allclose(high, low * 1.5, rtol=1e-12, atol=1e-12)
 
@@ -287,6 +290,7 @@ def test_pyramid_detector_margin_is_zero_filled() -> None:
     settings = replace(config.pyramid, detector_margin_pixels=3)
     sensor = WavefrontSensor(replace(config, pyramid=settings))
     image = sensor.photon_rate(np.zeros(config.input.shape))
-    assert image.shape == (90, 90)
+    size = settings.pixels_across_pupil + settings.pupil_separation_pixels + 6
+    assert image.shape == (size, size)
     assert np.all(image[:3] == 0)
     assert np.all(image[-3:] == 0)

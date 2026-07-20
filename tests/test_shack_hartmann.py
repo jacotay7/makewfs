@@ -22,7 +22,9 @@ def test_reference_is_nonnegative_and_flux_bounded() -> None:
     reference = sensor.reference()
     assert reference.shape == (64, 64)
     assert np.all(reference >= 0)
-    assert reference.sum() <= 2.0e6 * (1.0 + 1e-12)
+    rate = sensor.config.source.detector_photon_rate_per_s
+    assert rate is not None
+    assert reference.sum() <= rate * (1.0 + 1e-12)
     assert reference.sum() > 0.0
 
 

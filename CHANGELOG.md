@@ -4,6 +4,13 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Fixed the pyramid propagation grid to honor `numerics.fft_oversampling`, so
+  the diffraction halo no longer wraps onto the pupil rims; cropped flux is
+  reported as captured rate and independent HCIPy parity improved.
+- Reconfigured the shipped example TOMLs to be representative demonstrations:
+  pyramid pupils are now separated (`pupil_separation_pixels` larger than
+  `pixels_across_pupil`) and source photon rates correspond to a bright guide
+  star so detector frames show spots above read noise.
 - Added deterministic broadband/finite-source quadrature, measured SED and
   transmission curves, physical SH sampling, field stops, optical blur,
   detector margins, and sodium-range SH elongation examples.

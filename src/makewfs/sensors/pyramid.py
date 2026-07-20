@@ -47,7 +47,12 @@ class PyramidEngine(SensorEngine):
         margin = self.settings.detector_margin_pixels
         self.internal_shape = (pixels, pixels)
         self.output_shape = (pixels + separation + 2 * margin, pixels + separation + 2 * margin)
-        self.nfft = self.backend.next_fast_length(max(self.output_shape))
+        # Oversample the propagation grid so the diffraction halo lands outside
+        # the detector crop instead of wrapping onto the pupil rims; cropped
+        # flux is reported as captured rate, never renormalized.
+        self.nfft = self.backend.next_fast_length(
+            config.numerics.fft_oversampling * max(self.output_shape)
+        )
         self.pupil = make_pupil(
             config.telescope,
             self.internal_shape,

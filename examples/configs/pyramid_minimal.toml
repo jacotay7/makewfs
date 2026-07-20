@@ -13,7 +13,9 @@ central_obscuration_ratio = 0.14
 [source]
 kind = "ngs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 2.0e6
+# ~2e6 detected photons per 1 ms frame: a bright NGS (R ~ 5 on an 8 m
+# aperture with ~35% throughput), so example frames sit well above read noise.
+detector_photon_rate_per_s = 2.0e9
 
 [sensor]
 kind = "pyramid"
@@ -21,7 +23,9 @@ wavelength_m = 7.0e-7
 
 [pyramid]
 pixels_across_pupil = 64
-pupil_separation_pixels = 20
+# Centre-to-centre pupil spacing; larger than pixels_across_pupil so the four
+# pupil images stay separated with a 16-pixel gap between their edges.
+pupil_separation_pixels = 80
 modulation_radius_lambda_over_d = 0.0
 modulation_samples = 1
 

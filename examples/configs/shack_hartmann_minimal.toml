@@ -13,7 +13,9 @@ central_obscuration_ratio = 0.14
 [source]
 kind = "ngs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 2.0e6
+# ~2e6 detected photons per 1 ms frame: a bright NGS (R ~ 5 on an 8 m
+# aperture with ~35% throughput), so example frames sit well above read noise.
+detector_photon_rate_per_s = 2.0e9
 
 [sensor]
 kind = "shack_hartmann"

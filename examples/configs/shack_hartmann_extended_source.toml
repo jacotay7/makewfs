@@ -16,7 +16,7 @@ segment_gap_fraction = 0.02
 [source]
 kind = "ngs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 2.0e6
+detector_photon_rate_per_s = 2.0e9
 angular_kernel_path = "angular_kernel.txt"
 
 [sensor]

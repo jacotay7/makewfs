@@ -13,7 +13,7 @@ central_obscuration_ratio = 0.14
 [source]
 kind = "ngs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 2.0e6
+detector_photon_rate_per_s = 2.0e9
 wavelengths_m = [5.85e-7, 5.90e-7, 5.95e-7]
 wavelength_weights = [0.25, 0.5, 0.25]
 

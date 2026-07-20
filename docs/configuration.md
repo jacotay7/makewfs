@@ -111,7 +111,7 @@ kernel file hash and all normalized states are included in frame provenance.
 | `detector.include_truth` | Boolean (default `true`) controlling detector truth arrays. |
 | `detector.qe_curve_path` | Optional configuration-relative two-column `wavelength_nm qe` curve passed to `getframes`; enables wavelength-resolved QE for broadband optical cubes. |
 | `numerics.dtype` | Optical real precision, `"float32"` or `"float64"` (default `"float64"`). |
-| `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). |
+| `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). Also scales the pyramid propagation grid so diffraction beyond the detector crop is discarded instead of wrapping onto the pupil rims. |
 | `numerics.fft_workers` | Positive `scipy.fft` worker count (default `1`). |
 | `numerics.pupil_samples_per_lenslet` | Optional integer ≥4 for SH internal pupil sampling; otherwise derived from input shape. |
 | `numerics.pupil_supersampling` | Positive analytic pupil boundary sub-sampling factor (default `1`). |
@@ -170,7 +170,7 @@ For laboratory or already-calibrated flux, use:
 [source]
 kind = "ngs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 2.0e6
+detector_photon_rate_per_s = 2.0e9
 ```
 
 The rate is photons/s at the detector surface before detector QE. For an NGS,
@@ -209,7 +209,7 @@ intensities—not complex fields—are summed:
 [source]
 kind = "ngs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 2.0e6
+detector_photon_rate_per_s = 2.0e9
 wavelengths_m = [650e-9, 700e-9, 750e-9]
 wavelength_weights = [0.2, 0.5, 0.3]
 angular_fwhm_arcsec = 0.25
@@ -233,7 +233,7 @@ profile. The range model is currently Shack–Hartmann-specific:
 [source]
 kind = "lgs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 5.0e5
+detector_photon_rate_per_s = 2.0e8
 lgs_ranges_m = [89000.0, 90000.0, 91000.0]
 lgs_range_weights = [0.25, 0.5, 0.25]
 lgs_launch_position_m = [0.0, 0.0]

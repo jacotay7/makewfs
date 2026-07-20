@@ -1,16 +1,16 @@
 {
-  "python": "3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:19:41) [GCC 14.3.0]",
-  "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
+  "python": "3.12.0 | packaged by conda-forge | (main, Oct  3 2023, 08:43:22) [GCC 12.3.0]",
+  "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
   "dependencies": {
     "makewfs": "0.1.0.dev0",
     "numpy": "2.2.6",
-    "scipy": "1.17.1",
-    "getframes": "2.0.0",
+    "scipy": "1.16.3",
+    "getframes": "2.1.0",
     "pyturb": "1.0.0"
   },
   "results": [
     {
-      "config": "/home/donkeykong/makewfs/examples/configs/shack_hartmann_minimal.toml",
+      "config": "/localhome/dev/makewfs/examples/configs/shack_hartmann_minimal.toml",
       "sensor": "shack_hartmann",
       "shape": [
         64,
@@ -24,21 +24,21 @@
       "dtype": "float32",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 1.7433572269947035,
-      "warm_optical_total_s": 0.01683158199011814,
-      "warm_optical_frame_s": 0.005610527330039379,
-      "warm_detector_total_s": 0.02934996700787451,
-      "warm_detector_frame_s": 0.00978332233595817,
-      "warm_optical_frames_per_s": 178.23636552769116,
-      "warm_detector_frames_per_s": 102.21476566549832,
-      "python_peak_memory_mib": 37.419321060180664
+      "construction_s": 0.8489557770080864,
+      "warm_optical_total_s": 0.006073662079870701,
+      "warm_optical_frame_s": 0.002024554026623567,
+      "warm_detector_total_s": 0.011556541081517935,
+      "warm_detector_frame_s": 0.003852180360505978,
+      "warm_optical_frames_per_s": 493.9359418665362,
+      "warm_detector_frames_per_s": 259.5932449717,
+      "python_peak_memory_mib": 41.55846118927002
     },
     {
-      "config": "/home/donkeykong/makewfs/examples/configs/pyramid_minimal.toml",
+      "config": "/localhome/dev/makewfs/examples/configs/pyramid_minimal.toml",
       "sensor": "pyramid",
       "shape": [
-        84,
-        84
+        144,
+        144
       ],
       "source_states": 1,
       "wavelength_samples": 1,
@@ -48,17 +48,17 @@
       "dtype": "float32",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.002763905009487644,
-      "warm_optical_total_s": 0.003650042010121979,
-      "warm_optical_frame_s": 0.0012166806700406596,
-      "warm_detector_total_s": 0.013197931999457069,
-      "warm_detector_frame_s": 0.00439931066648569,
-      "warm_optical_frames_per_s": 821.9083483643917,
-      "warm_detector_frames_per_s": 227.30833892184114,
-      "python_peak_memory_mib": 1.0105352401733398
+      "construction_s": 0.003742150031030178,
+      "warm_optical_total_s": 0.003714269958436489,
+      "warm_optical_frame_s": 0.0012380899861454964,
+      "warm_detector_total_s": 0.01179320178925991,
+      "warm_detector_frame_s": 0.003931067263086637,
+      "warm_optical_frames_per_s": 807.6957339048239,
+      "warm_detector_frames_per_s": 254.38384364219945,
+      "python_peak_memory_mib": 6.035679817199707
     },
     {
-      "config": "/home/donkeykong/makewfs/benchmarks/configs/shack_hartmann_20x20_float32.toml",
+      "config": "/localhome/dev/makewfs/benchmarks/configs/shack_hartmann_20x20_float32.toml",
       "sensor": "shack_hartmann",
       "shape": [
         160,
@@ -72,17 +72,17 @@
       "dtype": "float32",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.005044288991484791,
-      "warm_optical_total_s": 0.07188537900219671,
-      "warm_optical_frame_s": 0.02396179300073224,
-      "warm_detector_total_s": 0.08363014900533017,
-      "warm_detector_frame_s": 0.027876716335110057,
-      "warm_optical_frames_per_s": 41.73310402812684,
-      "warm_detector_frames_per_s": 35.87223071680519,
-      "python_peak_memory_mib": 45.53852367401123
+      "construction_s": 0.0020179208368062973,
+      "warm_optical_total_s": 0.044730284716933966,
+      "warm_optical_frame_s": 0.014910094905644655,
+      "warm_detector_total_s": 0.053896063938736916,
+      "warm_detector_frame_s": 0.01796535464624564,
+      "warm_optical_frames_per_s": 67.06865424588415,
+      "warm_detector_frames_per_s": 55.662691869485464,
+      "python_peak_memory_mib": 45.344970703125
     },
     {
-      "config": "/home/donkeykong/makewfs/benchmarks/configs/shack_hartmann_60x60_float64.toml",
+      "config": "/localhome/dev/makewfs/benchmarks/configs/shack_hartmann_60x60_float64.toml",
       "sensor": "shack_hartmann",
       "shape": [
         360,
@@ -96,17 +96,17 @@
       "dtype": "float64",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.010814348002895713,
-      "warm_optical_total_s": 0.3124019859969849,
-      "warm_optical_frame_s": 0.1041339953323283,
-      "warm_detector_total_s": 0.3471122599876253,
-      "warm_detector_frame_s": 0.11570408666254177,
-      "warm_optical_frames_per_s": 9.603011934850358,
-      "warm_detector_frames_per_s": 8.64273707908488,
-      "python_peak_memory_mib": 190.88866806030273
+      "construction_s": 0.003899330273270607,
+      "warm_optical_total_s": 0.278306654188782,
+      "warm_optical_frame_s": 0.09276888472959399,
+      "warm_detector_total_s": 0.2994307358749211,
+      "warm_detector_frame_s": 0.09981024529164036,
+      "warm_optical_frames_per_s": 10.779476361226452,
+      "warm_detector_frames_per_s": 10.019011546139897,
+      "python_peak_memory_mib": 191.88284587860107
     },
     {
-      "config": "/home/donkeykong/makewfs/benchmarks/configs/shack_hartmann_broadband_lgs.toml",
+      "config": "/localhome/dev/makewfs/benchmarks/configs/shack_hartmann_broadband_lgs.toml",
       "sensor": "shack_hartmann",
       "shape": [
         64,
@@ -120,17 +120,17 @@
       "dtype": "float32",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.002930702001322061,
-      "warm_optical_total_s": 0.09495133699965663,
-      "warm_optical_frame_s": 0.03165044566655221,
-      "warm_detector_total_s": 0.10298564800177701,
-      "warm_detector_frame_s": 0.03432854933392567,
-      "warm_optical_frames_per_s": 31.595131725326297,
-      "warm_detector_frames_per_s": 29.130272598257918,
-      "python_peak_memory_mib": 7.754311561584473
+      "construction_s": 0.001960190013051033,
+      "warm_optical_total_s": 0.04560716962441802,
+      "warm_optical_frame_s": 0.015202389874806007,
+      "warm_detector_total_s": 0.050942877773195505,
+      "warm_detector_frame_s": 0.016980959257731836,
+      "warm_optical_frames_per_s": 65.77913132311117,
+      "warm_detector_frames_per_s": 58.88948820984163,
+      "python_peak_memory_mib": 7.825143814086914
     },
     {
-      "config": "/home/donkeykong/makewfs/benchmarks/configs/pyramid_40_float32.toml",
+      "config": "/localhome/dev/makewfs/benchmarks/configs/pyramid_40_float32.toml",
       "sensor": "pyramid",
       "shape": [
         54,
@@ -144,17 +144,17 @@
       "dtype": "float32",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.0023157779942266643,
-      "warm_optical_total_s": 0.0029738240118604153,
-      "warm_optical_frame_s": 0.0009912746706201385,
-      "warm_detector_total_s": 0.012029881996568292,
-      "warm_detector_frame_s": 0.004009960665522764,
-      "warm_optical_frames_per_s": 1008.8021308709552,
-      "warm_detector_frames_per_s": 249.37900478623115,
-      "python_peak_memory_mib": 0.6633358001708984
+      "construction_s": 0.001422547735273838,
+      "warm_optical_total_s": 0.001843750011175871,
+      "warm_optical_frame_s": 0.0006145833370586237,
+      "warm_detector_total_s": 0.007507978938519955,
+      "warm_detector_frame_s": 0.0025026596461733184,
+      "warm_optical_frames_per_s": 1627.1186342050344,
+      "warm_detector_frames_per_s": 399.5749088490902,
+      "python_peak_memory_mib": 1.1620798110961914
     },
     {
-      "config": "/home/donkeykong/makewfs/benchmarks/configs/pyramid_60_mod8_float32.toml",
+      "config": "/localhome/dev/makewfs/benchmarks/configs/pyramid_60_mod8_float32.toml",
       "sensor": "pyramid",
       "shape": [
         80,
@@ -168,17 +168,17 @@
       "dtype": "float32",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.002243240989628248,
-      "warm_optical_total_s": 0.007839526995667256,
-      "warm_optical_frame_s": 0.002613175665222419,
-      "warm_detector_total_s": 0.017815617989981547,
-      "warm_detector_frame_s": 0.005938539329993849,
-      "warm_optical_frames_per_s": 382.6761489128155,
-      "warm_detector_frames_per_s": 168.39157651937884,
-      "python_peak_memory_mib": 2.7807207107543945
+      "construction_s": 0.0015320982784032822,
+      "warm_optical_total_s": 0.00740769924595952,
+      "warm_optical_frame_s": 0.002469233081986507,
+      "warm_detector_total_s": 0.01265660673379898,
+      "warm_detector_frame_s": 0.004218868911266327,
+      "warm_optical_frames_per_s": 404.984044355787,
+      "warm_detector_frames_per_s": 237.03035601071616,
+      "python_peak_memory_mib": 8.824076652526855
     },
     {
-      "config": "/home/donkeykong/makewfs/benchmarks/configs/pyramid_80_mod32_float64.toml",
+      "config": "/localhome/dev/makewfs/benchmarks/configs/pyramid_80_mod32_float64.toml",
       "sensor": "pyramid",
       "shape": [
         108,
@@ -192,14 +192,14 @@
       "dtype": "float64",
       "fft_workers": 1,
       "frames": 3,
-      "construction_s": 0.0023819890047889203,
-      "warm_optical_total_s": 0.0567940819892101,
-      "warm_optical_frame_s": 0.018931360663070034,
-      "warm_detector_total_s": 0.0677471959934337,
-      "warm_detector_frame_s": 0.022582398664477903,
-      "warm_optical_frames_per_s": 52.82240499230093,
-      "warm_detector_frames_per_s": 44.282275539356206,
-      "python_peak_memory_mib": 32.464229583740234
+      "construction_s": 0.001847779843956232,
+      "warm_optical_total_s": 0.14104840299114585,
+      "warm_optical_frame_s": 0.04701613433038195,
+      "warm_detector_total_s": 0.14975371723994613,
+      "warm_detector_frame_s": 0.04991790574664871,
+      "warm_optical_frames_per_s": 21.269294344214032,
+      "warm_detector_frames_per_s": 20.032891705741,
+      "python_peak_memory_mib": 118.51890754699707
     }
   ]
 }

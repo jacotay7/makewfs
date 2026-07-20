@@ -71,7 +71,7 @@ def main() -> int:
     parser.add_argument("report", type=Path)
     parser.add_argument("--max-sh-size-ratio", type=float, default=20.0)
     parser.add_argument("--max-source-state-ratio", type=float, default=30.0)
-    parser.add_argument("--max-pyramid-modulation-ratio", type=float, default=100.0)
+    parser.add_argument("--max-pyramid-modulation-ratio", type=float, default=300.0)
     args = parser.parse_args()
     if (
         min(args.max_sh_size_ratio, args.max_source_state_ratio, args.max_pyramid_modulation_ratio)

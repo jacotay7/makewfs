@@ -36,7 +36,7 @@ def test_fixed_pyramid_reference_tracks_hcipy() -> None:
         separation=config.pyramid.pupil_separation_pixels * diameter / pupil_pixels,  # type: ignore[union-attr]
         pupil_diameter=diameter,
         wavelength_0=config.sensor.wavelength_m,
-        q=2,
+        q=max(2, int(np.ceil(output_pixels / pupil_pixels))),
         num_airy=pupil_pixels / 2,
     )
     reference = np.asarray(optics.forward(wavefront).intensity).reshape(ours.shape)

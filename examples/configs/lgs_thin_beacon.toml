@@ -13,7 +13,10 @@ central_obscuration_ratio = 0.14
 [source]
 kind = "lgs"
 normalization = "detector_photon_rate"
-detector_photon_rate_per_s = 5.0e5
+# User-supplied sodium-LGS return at the detector surface (makewfs never
+# predicts laser return flux); ~2e5 photons per 1 ms frame keeps the spots
+# visible over generic_cmos read noise.
+detector_photon_rate_per_s = 2.0e8
 
 [sensor]
 kind = "shack_hartmann"
