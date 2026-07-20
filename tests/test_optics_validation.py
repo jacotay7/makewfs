@@ -36,6 +36,27 @@ def _direct_centered_dft(array: np.ndarray) -> np.ndarray:
     return result
 
 
+def _direct_centered_idft(array: np.ndarray) -> np.ndarray:
+    """Small independent unitary inverse DFT used by the pyramid reference."""
+    shifted = np.fft.ifftshift(array)
+    height, width = shifted.shape
+    result = np.zeros_like(shifted, dtype=np.complex128)
+    for output_y in range(height):
+        frequency_y = (output_y - height // 2) % height
+        for output_x in range(width):
+            frequency_x = (output_x - width // 2) % width
+            total = 0j
+            for input_y in range(height):
+                for input_x in range(width):
+                    total += shifted[input_y, input_x] * np.exp(
+                        2j
+                        * np.pi
+                        * (frequency_y * input_y / height + frequency_x * input_x / width)
+                    )
+            result[output_y, output_x] = total / np.sqrt(height * width)
+    return result
+
+
 def test_centered_fft_matches_independent_small_dft() -> None:
     rng = np.random.default_rng(4)
     array = rng.normal(size=(5, 5)) + 1j * rng.normal(size=(5, 5))
@@ -91,6 +112,58 @@ def test_small_shack_mosaic_matches_independent_random_phase_reference() -> None
     expected = direct_spots.reshape(2, 2, 4, 4).transpose(0, 2, 1, 3).reshape(8, 8)
     expected /= np.sum(pupil)
     assert np.allclose(actual, expected, atol=1e-12, rtol=1e-12)
+
+
+def test_small_pyramid_matches_independent_direct_dft_reference() -> None:
+    """Verify both pyramid propagation legs without using the FFT implementation."""
+    data = {
+        "schema_version": 1,
+        "input": {"quantity": "opd", "unit": "m", "shape": [8, 8], "grid_extent_m": 1.0},
+        "telescope": {"pupil_diameter_m": 1.0},
+        "source": {"normalization": "detector_photon_rate", "detector_photon_rate_per_s": 1.0},
+        "sensor": {"kind": "pyramid", "wavelength_m": 700e-9},
+        "pyramid": {
+            "pixels_across_pupil": 8,
+            "pupil_separation_pixels": 2,
+            "modulation_radius_lambda_over_d": 0.0,
+            "modulation_samples": 1,
+        },
+        "detector": {"preset": "generic_cmos", "exposure_s": 0.0},
+        "numerics": {"dtype": "float64", "fft_oversampling": 1},
+    }
+    config = WFSConfig.from_dict(data)
+    sensor = WavefrontSensor(config)
+    rng = np.random.default_rng(29)
+    opd = rng.normal(scale=0.025 * config.sensor.wavelength_m, size=config.input.shape)
+    actual = sensor.photon_rate(opd)
+
+    pupil = np.asarray(sensor.engine.pupil)
+    field = pupil * np.exp(2j * np.pi * opd / config.sensor.wavelength_m)
+    nfft = sensor.engine.nfft
+    padded = np.zeros((nfft, nfft), dtype=np.complex128)
+    start = (nfft - field.shape[0]) // 2
+    padded[start : start + field.shape[0], start : start + field.shape[1]] = field
+    focal = _direct_centered_dft(padded)
+    frequencies = np.fft.fftshift(np.fft.fftfreq(nfft)) * nfft
+    fy, fx = np.meshgrid(frequencies, frequencies, indexing="ij")
+    sign_x = np.where(fx >= 0.0, 1.0, -1.0)
+    sign_y = np.where(fy >= 0.0, 1.0, -1.0)
+    half_separation = config.pyramid.pupil_separation_pixels / 2  # type: ignore[union-attr]
+    mask = np.exp(-2j * np.pi * half_separation * (sign_x * fx + sign_y * fy) / nfft)
+    exit_pupil = _direct_centered_idft(focal * mask)
+    output_size = actual.shape[0]
+    crop_start = (nfft - output_size) // 2
+    expected = (
+        np.abs(
+            exit_pupil[
+                crop_start : crop_start + output_size,
+                crop_start : crop_start + output_size,
+            ]
+        )
+        ** 2
+    )
+    expected /= np.sum(pupil)
+    assert np.allclose(actual, expected, atol=2e-12, rtol=2e-12)
 
 
 def test_known_opd_ramp_moves_a_spot_by_the_analytic_amount() -> None:

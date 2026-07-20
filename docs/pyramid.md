@@ -28,3 +28,11 @@ spacing of adjacent pupil images, so keep it larger than
 diameter is allowed and intentionally produces overlapping pupil images; the
 propagation does not assign pixels to a single pupil. Pyramid reconstruction remains
 outside this repository.
+
+The propagation is verified internally against a direct-summation forward and
+inverse DFT on a random small grid. Optional HCIPy and OOPAO comparisons exercise
+the flat reference plus tip, tilt, and focus push/pull response maps. HCIPy's
+detector plane is rotated by 180 degrees for the comparison because its named
+viewing convention is opposite to makewfs's fixed face order; this is an explicit
+coordinate transform, not a fitted image registration. See [Validation](validation.md)
+for quantitative tolerances and reproduction commands.

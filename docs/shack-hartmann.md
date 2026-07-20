@@ -28,6 +28,14 @@ The phase-ramp sign and spot displacement are fixed by analytic tests. This
 repository produces the image; centroiding, slope extraction, and reconstruction
 belong downstream.
 
+Verification uses centroids only as a test observable: makewfs does not expose a
+centroiding or reconstruction API. A direct-summation DFT checks random spot
+mosaics, the analytic OPD-ramp test fixes displacement in detector pixels, and
+optional HCIPy/OOPAO comparisons check multi-amplitude response gain, sign, and
+cross-axis leakage on both axes. See [Validation](validation.md) for the numerical
+tolerances and why the external-package gain is not expected to match machine
+precision.
+
 ## Current limitations
 
 The CPU path supports deterministic wavelength quadrature, finite NGS angular

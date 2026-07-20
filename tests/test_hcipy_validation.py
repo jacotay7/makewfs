@@ -8,6 +8,26 @@ import pytest
 import makewfs
 
 
+def _normalized(image: np.ndarray) -> np.ndarray:
+    return image / np.sum(image)
+
+
+def _hcipy_pyramid_image(
+    hcipy: object,
+    optics: object,
+    aperture: np.ndarray,
+    input_grid: object,
+    mode: np.ndarray,
+    wavelength: float,
+    amplitude: float,
+    output_shape: tuple[int, int],
+    sign: float,
+) -> np.ndarray:
+    field = aperture * np.exp(2j * np.pi * sign * amplitude * mode / wavelength)
+    wavefront = hcipy.Wavefront(hcipy.Field(field, input_grid), wavelength=wavelength)
+    return _normalized(np.asarray(optics.forward(wavefront).intensity).reshape(output_shape))
+
+
 @pytest.mark.validation
 def test_fixed_pyramid_reference_tracks_hcipy() -> None:
     hcipy = pytest.importorskip("hcipy")
@@ -40,15 +60,93 @@ def test_fixed_pyramid_reference_tracks_hcipy() -> None:
         num_airy=pupil_pixels / 2,
     )
     reference = np.asarray(optics.forward(wavefront).intensity).reshape(ours.shape)
-    ours /= ours.sum()
-    reference /= reference.sum()
+    ours = _normalized(ours)
+    reference = _normalized(reference)
     assert np.sqrt(np.mean((ours - reference) ** 2)) < 1.0e-4
     assert np.corrcoef(ours.ravel(), reference.ravel())[0, 1] > 0.9
 
 
 @pytest.mark.validation
-def test_shack_hartmann_tilt_direction_and_scale_track_hcipy() -> None:
-    """Compare a small SH centroid response to HCIPy's independent optics."""
+def test_pyramid_low_order_response_maps_track_hcipy() -> None:
+    """Compare tip, tilt, and focus push/pull maps, not only the flat image."""
+    hcipy = pytest.importorskip("hcipy")
+    config = makewfs.load_config(
+        Path(__file__).parents[1] / "examples" / "configs" / "pyramid_minimal.toml"
+    )
+    sensor = makewfs.WavefrontSensor(config)
+    assert config.pyramid is not None
+    pupil_pixels = config.pyramid.pixels_across_pupil
+    output_pixels = sensor.engine.output_shape[0]
+    diameter = config.telescope.pupil_diameter_m
+    wavelength = config.sensor.wavelength_m
+    input_grid = hcipy.make_pupil_grid(pupil_pixels, diameter=diameter)
+    output_grid = hcipy.make_pupil_grid(
+        output_pixels, diameter=output_pixels * diameter / pupil_pixels
+    )
+    aperture = np.asarray(
+        hcipy.make_obstructed_circular_aperture(
+            diameter, config.telescope.central_obscuration_ratio
+        )(input_grid)
+    )
+    optics = hcipy.PyramidWavefrontSensorOptics(
+        input_grid,
+        output_grid,
+        separation=config.pyramid.pupil_separation_pixels * diameter / pupil_pixels,
+        pupil_diameter=diameter,
+        wavelength_0=wavelength,
+        q=max(2, int(np.ceil(output_pixels / pupil_pixels))),
+        num_airy=pupil_pixels / 2,
+    )
+
+    input_y, input_x = np.indices(config.input.shape, dtype=np.float64)
+    input_x = (input_x + 0.5 - config.input.shape[1] / 2) * diameter / config.input.shape[1]
+    input_y = (input_y + 0.5 - config.input.shape[0] / 2) * diameter / config.input.shape[0]
+    modes = {
+        "tip": (input_x / diameter, np.asarray(input_grid.x) / diameter),
+        "tilt": (input_y / diameter, np.asarray(input_grid.y) / diameter),
+        "focus": (
+            (input_x**2 + input_y**2) / diameter**2,
+            (np.asarray(input_grid.x) ** 2 + np.asarray(input_grid.y) ** 2) / diameter**2,
+        ),
+    }
+    amplitude = 0.02 * wavelength
+    for name, (our_mode, hcipy_mode) in modes.items():
+        ours = _normalized(sensor.photon_rate(amplitude * our_mode)) - _normalized(
+            sensor.photon_rate(-amplitude * our_mode)
+        )
+        reference = _hcipy_pyramid_image(
+            hcipy,
+            optics,
+            aperture,
+            input_grid,
+            hcipy_mode,
+            wavelength,
+            amplitude,
+            ours.shape,
+            1.0,
+        ) - _hcipy_pyramid_image(
+            hcipy,
+            optics,
+            aperture,
+            input_grid,
+            hcipy_mode,
+            wavelength,
+            amplitude,
+            ours.shape,
+            -1.0,
+        )
+        # The two packages name the detector faces from opposite viewing sides.
+        # A 180-degree detector-frame rotation makes those fixed conventions coincide.
+        reference = np.rot90(reference, 2)
+        correlation = float(np.corrcoef(ours.ravel(), reference.ravel())[0, 1])
+        gain_ratio = float(np.linalg.norm(ours) / np.linalg.norm(reference))
+        assert correlation > 0.95, name
+        assert 0.8 < gain_ratio < 1.25, name
+
+
+@pytest.mark.validation
+def test_shack_hartmann_tilt_response_curves_track_hcipy() -> None:
+    """Compare two-axis SH centroid curves to HCIPy's independent Fresnel optics."""
     hcipy = pytest.importorskip("hcipy")
     from makewfs.config import WFSConfig
 
@@ -88,12 +186,17 @@ def test_shack_hartmann_tilt_direction_and_scale_track_hcipy() -> None:
     mla = hcipy.MicroLensArray(grid, lenslet_grid, 0.5, lenslet_shape=square_lenslet)
     optics = hcipy.ShackHartmannWavefrontSensorOptics(grid, mla)
     aperture = np.asarray(hcipy.make_circular_aperture(1.0)(grid)).reshape(pixels, pixels)
-    coordinates = np.asarray(grid.x).reshape(pixels, pixels)
 
-    def hcipy_image(cycles_per_aperture: float) -> np.ndarray:
-        field = aperture * np.exp(2j * np.pi * cycles_per_aperture * coordinates)
+    coordinate_maps = {
+        "x": np.asarray(grid.x).reshape(pixels, pixels),
+        "y": np.asarray(grid.y).reshape(pixels, pixels),
+    }
+
+    def hcipy_image(cycles_per_aperture: float, axis: str) -> np.ndarray:
+        field = aperture * np.exp(2j * np.pi * cycles_per_aperture * coordinate_maps[axis])
         wavefront = hcipy.Wavefront(hcipy.Field(field.ravel(), grid), wavelength=wavelength)
         image = np.asarray(optics.forward(wavefront).intensity).reshape(pixels, pixels)
+        # Integrate HCIPy's two-times-finer detector grid onto the configured pixels.
         return image.reshape(16, 2, 16, 2).sum(axis=(1, 3))
 
     def centroids(image: np.ndarray) -> np.ndarray:
@@ -114,14 +217,32 @@ def test_shack_hartmann_tilt_direction_and_scale_track_hcipy() -> None:
 
     zero = np.zeros(config.input.shape)
     ours_zero = centroids(sensor.photon_rate(zero))
-    ours_tilt = centroids(sensor.photon_rate(wavelength * 0.2 * coordinates))
-    hcipy_zero = centroids(hcipy_image(0.0))
-    hcipy_tilt = centroids(hcipy_image(0.2))
-    ours_delta = ours_tilt - ours_zero
-    hcipy_delta = hcipy_tilt - hcipy_zero
-    assert np.all(ours_delta[:, 0] > 0)
-    assert np.all(hcipy_delta[:, 0] > 0)
-    assert np.max(np.abs(ours_delta[:, 1])) < 0.02
-    assert np.max(np.abs(hcipy_delta[:, 1])) < 0.02
-    scale_ratio = np.median(ours_delta[:, 0] / hcipy_delta[:, 0])
-    assert 0.4 < scale_ratio < 1.8
+    hcipy_zero = centroids(hcipy_image(0.0, "x"))
+    cycles = np.asarray([-0.3, -0.15, 0.15, 0.3])
+    gains: list[float] = []
+    for axis, component in (("x", 0), ("y", 1)):
+        ours_curve: list[float] = []
+        hcipy_curve: list[float] = []
+        for cycle in cycles:
+            ours_delta = (
+                centroids(sensor.photon_rate(wavelength * cycle * coordinate_maps[axis]))
+                - ours_zero
+            )
+            hcipy_delta = centroids(hcipy_image(float(cycle), axis)) - hcipy_zero
+            cross_component = 1 - component
+            assert np.max(np.abs(ours_delta[:, cross_component])) < 0.01
+            assert np.max(np.abs(hcipy_delta[:, cross_component])) < 0.01
+            ours_curve.append(float(np.mean(ours_delta[:, component])))
+            hcipy_curve.append(float(np.mean(hcipy_delta[:, component])))
+        ours_values = np.asarray(ours_curve)
+        hcipy_values = np.asarray(hcipy_curve)
+        assert np.all(np.sign(ours_values) == np.sign(cycles))
+        assert np.all(np.sign(hcipy_values) == np.sign(cycles))
+        assert np.corrcoef(ours_values, hcipy_values)[0, 1] > 0.999
+        gains.append(
+            float(np.vdot(hcipy_values, ours_values) / np.vdot(hcipy_values, hcipy_values))
+        )
+    # Pixel-area integration and HCIPy's Fresnel sampling produce a modest gain
+    # difference; the analytic makewfs displacement test fixes the absolute scale.
+    assert all(0.55 < gain < 0.9 for gain in gains)
+    assert np.isclose(gains[0], gains[1], rtol=0.01)

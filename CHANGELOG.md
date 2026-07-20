@@ -4,6 +4,10 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Expanded optical verification with a direct-DFT pyramid reference,
+  multi-amplitude HCIPy SH response curves, HCIPy low-order pyramid response
+  maps, supplementary local OOPAO comparisons, and quantitative SH/pyramid
+  metrics in the deterministic validation report.
 - Fixed the pyramid propagation grid to honor `numerics.fft_oversampling`, so
   the diffraction halo no longer wraps onto the pupil rims; cropped flux is
   reported as captured rate and independent HCIPy parity improved.
