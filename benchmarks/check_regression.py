@@ -25,11 +25,14 @@ def _load(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _results(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _results(report: dict[str, Any], *, device: str) -> dict[str, dict[str, Any]]:
     by_name: dict[str, dict[str, Any]] = {}
     for entry in report["results"]:
         if not isinstance(entry, dict):
             raise SystemExit("benchmark result entry is not an object")
+        entry_device = entry.get("device", "cpu")
+        if entry_device != device:
+            continue
         config = entry.get("config")
         if not isinstance(config, str):
             raise SystemExit("benchmark result is missing its config path")
@@ -72,6 +75,9 @@ def main() -> int:
     parser.add_argument("--max-sh-size-ratio", type=float, default=20.0)
     parser.add_argument("--max-source-state-ratio", type=float, default=30.0)
     parser.add_argument("--max-pyramid-modulation-ratio", type=float, default=300.0)
+    parser.add_argument(
+        "--device", choices=("cpu", "gpu"), default="cpu", help="device rows to check"
+    )
     args = parser.parse_args()
     if (
         min(args.max_sh_size_ratio, args.max_source_state_ratio, args.max_pyramid_modulation_ratio)
@@ -79,7 +85,7 @@ def main() -> int:
     ):
         parser.error("ratio limits must be positive")
 
-    entries = _results(_load(args.report))
+    entries = _results(_load(args.report), device=args.device)
     checks = [
         _ratio(
             entries,

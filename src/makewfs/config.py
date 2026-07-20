@@ -640,13 +640,14 @@ class DetectorConfig:
 
 @dataclass(frozen=True)
 class NumericsConfig:
-    """Numerical precision and FFT controls."""
+    """Numerical precision, execution device, and FFT controls."""
 
     dtype: str = "float64"
     fft_oversampling: int = 2
     fft_workers: int = 1
     pupil_samples_per_lenslet: int | None = None
     pupil_supersampling: int = 1
+    device: str = "cpu"
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> NumericsConfig:
@@ -658,12 +659,16 @@ class NumericsConfig:
                 "fft_workers",
                 "pupil_samples_per_lenslet",
                 "pupil_supersampling",
+                "device",
             },
             "numerics",
         )
         dtype = str(data.get("dtype", "float64"))
         if dtype not in {"float32", "float64"}:
             raise ConfigError("numerics.dtype: expected 'float32' or 'float64'")
+        device = str(data.get("device", "cpu"))
+        if device not in {"cpu", "gpu"}:
+            raise ConfigError("numerics.device: expected 'cpu' or 'gpu'")
         samples = data.get("pupil_samples_per_lenslet")
         sample_value = (
             None
@@ -676,6 +681,7 @@ class NumericsConfig:
             _positive_int(data.get("fft_workers", 1), "numerics.fft_workers"),
             sample_value,
             _positive_int(data.get("pupil_supersampling", 1), "numerics.pupil_supersampling"),
+            device,
         )
 
 

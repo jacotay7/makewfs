@@ -31,8 +31,9 @@ The 1.0 release is complete when all of the following are true:
   behavior have quantitative tests against analytic results or an independent
   reference.
 - The common CPU path is vectorized, benchmarked, and free of repeated setup in
-  the per-frame loop. Its `ArrayBackend` boundary also supports the private
-  parity-tested CuPy optical path; detector execution remains host-side.
+  the per-frame loop. `numerics.device = "gpu"` selects the parity-tested CuPy
+  optics and GPU-capable `getframes` detector path, keeping OPD through ADU on
+  device.
 - Every public object and every configuration field is documented. The
   quickstart, configuration reference, physics guides, examples, validation
   gallery, performance notes, and API reference build in strict mode.
@@ -154,10 +155,10 @@ must not be implemented until its acceptance test demonstrates the need.
   bright-guide-star photon rates), and all worked examples were reworked for
   legibility: colorbars with units, real named getframes presets, a GIF for the
   moving-atmosphere example, and a verified LGS-elongation figure.
-- [ ] Broader independent validation, public GPU support, the wavelength-resolved
+- [ ] Broader independent validation, the wavelength-resolved
   detector-QE gate (implemented on getframes `main`, awaiting the getframes 2.1.1
   release before it can be pinned), and release completion remain staged. The
-  private CuPy optical path now has CPU parity evidence, and the versioned
+  public CuPy optical/detector path now has parity evidence, and the versioned
   documentation gallery and relative benchmark regression envelopes are in place.
 
 ## 4. End-state user experience
@@ -369,7 +370,7 @@ src/makewfs/
   __about__.py         # version
   api.py               # WavefrontSensor facade and simulate()
   config.py            # immutable validated config + TOML loading
-  backend.py           # CPU boundary plus private experimental CuPy backend
+  backend.py           # CPU reference plus optional CuPy optical backend
   wavefront.py         # units, coordinates, OPD conversion, validation
   pupil.py             # analytic/custom pupil sampling
   sampling.py          # centred FFTs, flux-conserving integration/rebinning
@@ -422,7 +423,7 @@ camera state, and RNGs do not live in configuration objects.
 - `[sensor]`: kind and reference wavelength.
 - `[detector]`: `getframes` preset or complete inline `CameraConfig`, allowed
   overrides, exposure, temperature, binning, binning mode, precision, truth.
-- `[numerics]`: float32/float64, optional internal pupil sampling, FFT
+- `[numerics]`: CPU/GPU device, float32/float64, optional internal pupil sampling, FFT
   oversampling, FFT workers, quadrature and modulation chunk sizes, pupil
   supersampling, and diagnostic tolerances.
 - `[random]`: optional base seed and independently derived stream names. A
@@ -696,20 +697,24 @@ accepts only wavefront plus config.
 - [x] Audit backend leakage: `ArrayBackend` now owns runtime array allocation,
   reductions, FFTs, interpolation, and optical blur hooks; sensor modules have
   no direct NumPy allocation/FFT/reduction calls. File I/O, config, metadata,
-  source quadrature, and the CPU `getframes` boundary remain explicit host
-  operations. An AST guard and injected-CPU parity tests enforce the contract.
+  source quadrature, and metadata remain explicit host operations. An AST guard
+  and injected-CPU parity tests enforce the contract.
 - [x] Implement a private experimental CuPy optical backend after the audit,
   with CPU/GPU image and response parity tests. The optional `gpu` extra uses
-  CUDA 12 CuPy; `WavefrontSensor(..., _backend=cupy_backend())` is intentionally
-  private, and the detector boundary performs one explicit device-to-host copy.
-  Public GPU support remains gated on an end-to-end detector design.
+  CUDA 12 CuPy; the original `WavefrontSensor(..., _backend=cupy_backend())`
+  injection remains private as the implementation hook underneath the later
+  public config path.
+- [x] After the device-resident `getframes` gate passed, promote GPU execution
+  through `numerics.device = "gpu"`; preserve CuPy arrays through SH/PWFS optics,
+  spectral rate maps, detector truth, and ADU, with direct `pyturb` integration
+  and synchronized end-to-end benchmarks.
 - [x] Publish benchmark tables with hardware, dependency versions, precision,
   input size, modulation/wavelength samples, construction time, warm latency,
   throughput, and Python-level peak memory. The snapshot documents that C-level
   allocator accounting remains a future metric.
 
-**Exit:** CPU behavior is measured and optimized, and the optical kernel can gain
-a real GPU backend without an architectural rewrite.
+**Exit:** CPU behavior is measured and optimized, and SH/PWFS can run through the
+detector on GPU without an architectural rewrite.
 
 ### Phase 6 — 1.0 validation and release
 
@@ -892,14 +897,13 @@ it appears only in a dataclass docstring.
 
 ### GPU path
 
-`pyturb` already emits CuPy arrays. The optical core now keeps array creation,
-FFTs, reductions, indexing, and scalar access behind `ArrayBackend`; the private
-CuPy path is parity-tested but not part of the public configuration/API.
-
-Full device-resident phase → ADU will additionally require a GPU-capable
-`getframes` signal chain. Until that exists, an experimental GPU optical path
-ends in one explicit device-to-host copy at the detector adapter. This is
-acceptable for exploration but is not advertised as end-to-end GPU support.
+`pyturb` emits CuPy OPD arrays, and the optical core keeps array creation, FFTs,
+reductions, indexing, and scalar access behind `ArrayBackend`. The completed
+`getframes` CuPy signal chain removes the former detector host boundary.
+`numerics.device = "gpu"` now keeps phase → photon rate → detector truth → ADU
+device-resident for both sensors. CPU remains the reference; deterministic
+optics use numerical parity while stochastic detector paths use seeded
+within-backend reproducibility and CPU/GPU statistical parity.
 
 ## 13. Conditional sibling-repository work
 
@@ -940,9 +944,11 @@ helpers or mislabel electron rate as photon rate.
 
 ### getframes: device-resident detector path
 
-- [ ] **Gate:** a measured end-to-end GPU use case is dominated by the host copy or
-  CPU detector chain after the `makewfs` optical kernel is accelerated.
-- [ ] If gated in, design GPU support in `getframes` itself, including its RNG,
+- [x] **Gate:** a measured end-to-end GPU use case is dominated by the host copy or
+  CPU detector chain after the `makewfs` optical kernel is accelerated. On the
+  RTX 5090, representative 20x20 float32 SH measured ~0.60 ms GPU optics and
+  ~0.89 ms CPU detector (59% of total); the copy itself was ~0.02 ms.
+- [x] If gated in, design GPU support in `getframes` itself, including its RNG,
   stochastic distributions, fixed patterns, truth arrays, and CPU/GPU statistical
   parity. Do not recreate a second detector in `makewfs`.
 

@@ -10,10 +10,10 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from .backend import ArrayBackend, cpu_backend
+from .backend import ArrayBackend, cpu_backend, cupy_backend
 from .config import WFSConfig, load_config
 from .detector import DetectorAdapter
-from .provenance import metadata
+from .provenance import metadata as build_metadata
 from .sensors.base import OpticalResult, SensorEngine
 from .sensors.pyramid import PyramidEngine
 from .sensors.shack_hartmann import ShackHartmannEngine
@@ -30,7 +30,9 @@ class WavefrontSensor:
 
     def __init__(self, config: WFSConfig, *, _backend: ArrayBackend | None = None) -> None:
         self.config = config
-        self.backend = _backend or cpu_backend()
+        self.backend = _backend or (
+            cupy_backend() if config.numerics.device == "gpu" else cpu_backend()
+        )
         self.engine: SensorEngine
         if config.sensor.kind == "shack_hartmann":
             self.engine = ShackHartmannEngine(config, backend=self.backend)
@@ -38,7 +40,21 @@ class WavefrontSensor:
             self.engine = PyramidEngine(config, backend=self.backend)
         else:
             raise NotImplementedError(f"unsupported sensor kind {config.sensor.kind!r}")
-        self.detector = DetectorAdapter(config.detector, self.engine.output_shape)
+        self.detector = DetectorAdapter(
+            config.detector,
+            self.engine.output_shape,
+            device="cpu" if self.backend.is_cpu else "gpu",
+        )
+        self._metadata_base = build_metadata(
+            self.config,
+            sensor_kind=self.config.sensor.kind,
+            launched_rate=0.0,
+            captured_rate=0.0,
+            opd_rms_m=0.0,
+            seed=None,
+            source_states=self.engine.source_states,
+            file_digests=self.engine.file_digests,
+        )
 
     @classmethod
     def from_toml(cls, path: str | Path) -> WavefrontSensor:
@@ -52,13 +68,33 @@ class WavefrontSensor:
         """Reduce OPD RMS on the optical backend before detector handoff."""
         return self.backend.scalar(self.backend.sqrt(self.backend.mean(opd**2)))
 
-    def photon_rate(self, wavefront: ArrayLike) -> NDArray[np.float64]:
+    def _frame_metadata(
+        self,
+        *,
+        launched_rate: float,
+        captured_rate: float,
+        opd_rms_m: float,
+        seed: int | None,
+    ) -> dict[str, Any]:
+        """Copy cached static provenance and fill the per-frame values."""
+        result = dict(self._metadata_base)
+        result.update(
+            {
+                "wfs_launched_photons_s": float(launched_rate),
+                "wfs_captured_photons_s": float(captured_rate),
+                "wfs_input_opd_rms_m": float(opd_rms_m),
+                "wfs_seed": seed if seed is not None else "internal",
+            }
+        )
+        return result
+
+    def photon_rate(self, wavefront: ArrayLike) -> Any:
         """Return the ideal native-pixel photon rate before detector noise."""
         return self._render(wavefront).photon_rate
 
-    def reference(self) -> NDArray[np.float64]:
+    def reference(self) -> Any:
         """Return the ideal image for a zero dynamic OPD."""
-        return self.photon_rate(np.zeros(self.config.input.shape, dtype=np.float64))
+        return self.photon_rate(self.backend.zeros(self.config.input.shape, dtype=np.float64))
 
     def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
         """Render one wavefront and expose it through the configured detector."""
@@ -66,26 +102,19 @@ class WavefrontSensor:
         optical_start = total_start
         result = self._render(wavefront)
         optical_elapsed = perf_counter() - optical_start
-        frame_metadata = metadata(
-            self.config,
-            sensor_kind=self.config.sensor.kind,
+        frame_metadata = self._frame_metadata(
             launched_rate=result.launched_rate_per_s,
             captured_rate=result.captured_rate_per_s,
-            opd_m=None,
             opd_rms_m=self._opd_rms(result.opd_m),
             seed=seed,
-            source_states=self.engine.source_states,
-            file_digests=self.engine.file_digests,
         )
         detector_start = perf_counter()
         frame = self.detector.expose(
-            self.backend.to_host(result.photon_rate),
+            result.photon_rate,
             metadata=frame_metadata,
             seed=seed,
             spectral_photon_rate=(
-                None
-                if result.spectral_photon_rate is None
-                else self.backend.to_host(result.spectral_photon_rate)
+                None if result.spectral_photon_rate is None else result.spectral_photon_rate
             ),
             spectral_wavelengths_m=result.spectral_wavelengths_m,
         )
@@ -128,22 +157,17 @@ class WavefrontSensor:
             raise ValueError("phase_samples must contain at least one sample")
         average_rate = self.backend.mean(self.backend.stack(rates), axis=0)
         average_opd = self.backend.mean(self.backend.stack(opds), axis=0)
-        frame_metadata = metadata(
-            self.config,
-            sensor_kind=self.config.sensor.kind,
+        frame_metadata = self._frame_metadata(
             launched_rate=launched,
             captured_rate=captured / len(rates),
-            opd_m=None,
             opd_rms_m=self._opd_rms(average_opd),
             seed=seed,
-            source_states=self.engine.source_states,
-            file_digests=self.engine.file_digests,
         )
         frame_metadata["wfs_temporal_samples"] = len(rates)
         optical_elapsed = perf_counter() - optical_start
         detector_start = perf_counter()
         frame = self.detector.expose(
-            self.backend.to_host(average_rate),
+            average_rate,
             metadata=frame_metadata,
             seed=seed,
         )

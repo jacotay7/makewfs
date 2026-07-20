@@ -7,24 +7,37 @@
 `expose_integrated()` for multiple atmosphere samples within one detector
 integration. `makewfs` does not import or simulate the atmosphere internally.
 
-The runnable `examples/moving_atmosphere.py` script demonstrates this boundary,
-including the explicit `pyturb.to_numpy` device-to-host conversion before the
-CPU optical path. `examples/lgs_thin_beacon.py` uses the same pattern with
+The runnable `examples/moving_atmosphere.py` script demonstrates the default CPU
+boundary. `examples/lgs_thin_beacon.py` uses the same pattern with
 `lgs_altitude`; range-resolved sodium elongation is not silently inferred from
 that single OPD map.
 
-For CUDA experiments, install `makewfs[gpu]` and use the private
-`WavefrontSensor(config, _backend=cupy_backend())` hook with CuPy phase arrays.
-The optical result stays on the device until `makewfs` performs one explicit
-host transfer for the CPU `getframes` adapter; this is not a public end-to-end
-GPU contract.
+For the public CUDA path, construct `pyturb` with `device="gpu"` and set
+`numerics.device = "gpu"` in the makewfs TOML:
+
+```python
+import pyturb
+import makewfs
+
+atmosphere = pyturb.Atmosphere.from_profile(
+    "mauna-kea", seeing=0.7, diameter=8.0, n=512, device="gpu", seed=1
+)
+wfs = makewfs.WavefrontSensor.from_toml("gpu_wfs.toml")
+
+for _, opd_m_gpu in atmosphere.frames(dt=1e-3, steps=1000):
+    frame = wfs.expose(opd_m_gpu)
+    adu_gpu = frame.data
+```
+
+No array crosses the host boundary in that loop. GPU-capable `getframes` is
+required; an older detector package produces an actionable construction error.
 
 ## getframes
 
-`wfs.expose()` returns the existing array-like `getframes.Frame`. Use
-`np.asarray(frame)` for ADU data, `frame.truth` for noise-free detector truth,
-and `frame.metadata` for sensor/config provenance. Use `frame.to_fits()` for FITS
-output when Astropy is installed.
+`wfs.expose()` returns the existing array-like `getframes.Frame`. On CPU,
+`frame.data` is NumPy; on GPU it is CuPy. `np.asarray(frame)`,
+`getframes.to_numpy(frame.data)`, and `frame.to_fits()` are explicit host-facing
+operations. `frame.truth` follows the selected device.
 
 ## Closed-loop injection
 

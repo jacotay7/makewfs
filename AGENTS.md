@@ -18,17 +18,17 @@ Before changing anything:
    `/home/donkeykong/pyturb` for atmosphere and
    `/home/donkeykong/getframes` for detector/radiometry.
 
-The repository is currently in the CPU Shack-Hartmann and fixed-mask four-face
+The repository is currently in the Shack-Hartmann and fixed-mask four-face
 pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, and a documented SH sodium-range geometry
 model. It also includes a versioned labelled documentation gallery, benchmark
 reference snapshot, non-editable-wheel clean-room smoke evidence, an optional
-wavelength-resolved detector-QE prototype, and a private experimental CuPy
-optical path with CPU parity tests. Do not present range-resolved turbulent LGS
-OPD, the spectral-QE path as a released/stable contract, broad
-independent-reference parity, or GPU detector support as implemented until
-their gates pass.
+wavelength-resolved detector-QE prototype, and public end-to-end CuPy execution
+with CPU parity tests. The GPU path uses `numerics.device = "gpu"` and the
+sibling `getframes` CuPy detector. Do not present range-resolved turbulent LGS
+OPD, the spectral-QE path as a released/stable contract, or broad
+independent-reference parity as implemented until their gates pass.
 
 ## Product boundary
 
@@ -104,13 +104,15 @@ write a failing integration test/design note, use the conditional gates in
   are cached on the persistent sensor. Benchmark construction separately from
   warm per-frame operation.
 - Write array operations behind `ArrayBackend`. Sensor engines must not call
-  NumPy allocation, FFT, or reduction functions directly. File readers,
-  source/config parsing, and the public detector boundary are explicit host
-  operations; use `ArrayBackend.scalar` or `to_host` only at named crossings.
+  NumPy allocation, FFT, or reduction functions directly. File readers and
+  source/config parsing are explicit host operations; the detector boundary
+  preserves the selected backend. Use `ArrayBackend.scalar` or `to_host` only at
+  named metadata/file crossings.
   The backend-audit AST test and injected-CPU parity tests must remain green.
-- CPU correctness comes first. The private `_backend=cupy_backend()` hook is
-  allowed only for the optional parity-tested optical path; never expose a
-  public `device="gpu"` option until the detector-boundary behavior is resolved.
+- CPU correctness comes first. The private `_backend=cupy_backend()` hook remains
+  an implementation/testing escape hatch. The supported GPU contract is the
+  serializable `numerics.device = "gpu"` field and requires device-resident
+  `getframes`; never reimplement detector behavior in this repository.
 
 ## Configuration rules
 
@@ -170,8 +172,9 @@ tolerances. Independent reference packages such as HCIPy are optional validation
 dependencies, never core dependencies.
 
 When CUDA 12 CuPy and a device are available, also run `python -m pytest -q -m
-gpu`. GPU tests are optional and must verify CPU parity plus the explicit host
-detector boundary; they must not make ordinary CI depend on CUDA.
+gpu`. GPU tests are optional and must verify CPU optical parity, device-resident
+detector/truth arrays, direct `pyturb` interoperability, and seeded detector
+behavior; they must not make ordinary CI depend on CUDA.
 
 For performance changes, run the affected warm and cold benchmarks and report the
 hardware/dependency context. Do not claim a speedup from one timing sample or

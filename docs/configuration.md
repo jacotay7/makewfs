@@ -14,7 +14,7 @@ The root requires `schema_version = 1` and has these tables:
 | `shack_hartmann` | lenslet and spot sampling |
 | `pyramid` | pupil separation and modulation |
 | `detector` | `getframes` preset, exposure, temperature, binning |
-| `numerics` | dtype, FFT oversampling/workers, internal sampling |
+| `numerics` | device, dtype, FFT oversampling/workers, internal sampling |
 
 Unknown keys and conflicting normalization choices are errors. File paths are
 resolved relative to the TOML file. The normalized configuration has a short
@@ -111,10 +111,21 @@ kernel file hash and all normalized states are included in frame provenance.
 | `detector.include_truth` | Boolean (default `true`) controlling detector truth arrays. |
 | `detector.qe_curve_path` | Optional configuration-relative two-column `wavelength_nm qe` curve passed to `getframes`; enables wavelength-resolved QE for broadband optical cubes. |
 | `numerics.dtype` | Optical real precision, `"float32"` or `"float64"` (default `"float64"`). |
+| `numerics.device` | Execution device, `"cpu"` (default) or `"gpu"`. GPU requires the `makewfs[gpu]` extra and a GPU-capable `getframes`; optical, truth, and ADU arrays stay device-resident. |
 | `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). Also scales the pyramid propagation grid so diffraction beyond the detector crop is discarded instead of wrapping onto the pupil rims. |
 | `numerics.fft_workers` | Positive `scipy.fft` worker count (default `1`). |
 | `numerics.pupil_samples_per_lenslet` | Optional integer ≥4 for SH internal pupil sampling; otherwise derived from input shape. |
 | `numerics.pupil_supersampling` | Positive analytic pupil boundary sub-sampling factor (default `1`). |
+
+For a device-resident atmosphere → WFS → detector loop:
+
+```toml
+[numerics]
+device = "gpu"
+dtype = "float32"
+fft_oversampling = 2
+fft_workers = 1  # CPU-only FFT control; accepted but ignored by CuPy FFTs
+```
 
 `[shack_hartmann]` keys are:
 

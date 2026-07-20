@@ -33,11 +33,11 @@ def render(report: dict[str, Any], *, source: str) -> str:
         f"- Platform: `{report.get('platform', 'unknown')}`",
         f"- Dependencies: {dependency_text}",
         "",
-        "| Configuration | Sensor | Shape | Dtype | States | Construction (ms) | "
+        "| Configuration | Sensor | Device | Shape | Dtype | States | Construction (ms) | "
         "Wavelengths | Ranges | Modulation | Warm optics (ms/frame) | "
         "Warm detector (ms/frame) | Optics (frames/s) | Detector (frames/s) | "
         "Python peak (MiB) |",
-        "| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | "
+        "| --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | "
         "---: | ---: | ---: | ---: |",
     ]
     for item in results:
@@ -47,12 +47,14 @@ def render(report: dict[str, Any], *, source: str) -> str:
         shape = "x".join(str(value) for value in item["shape"])
         lines.append(
             (
-                "| {config} | {sensor} | {shape} | {dtype} | {states} | {construction} | "
+                "| {config} | {sensor} | {device} | {shape} | {dtype} | {states} | "
+                "{construction} | "
                 "{wavelengths} | {ranges} | {modulation} @ {radius} λ/D | {optics} | "
                 "{detector} | {optics_fps:.1f} | {detector_fps:.1f} | {memory} |"
             ).format(
                 config=config,
                 sensor=item["sensor"],
+                device=item.get("device", "cpu"),
                 shape=shape,
                 dtype=item.get("dtype", "unknown"),
                 states=item["source_states"],

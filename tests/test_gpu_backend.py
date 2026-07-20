@@ -9,7 +9,7 @@ import pytest
 
 from makewfs import WavefrontSensor
 from makewfs.backend import cupy_backend
-from makewfs.config import load_config
+from makewfs.config import WFSConfig, load_config
 
 
 def _cupy() -> object:
@@ -26,12 +26,18 @@ def _config(name: str):
     return load_config(Path(__file__).parents[1] / "examples" / "configs" / name)
 
 
+def _gpu_config(name: str) -> WFSConfig:
+    data = _config(name).to_dict()
+    data["numerics"]["device"] = "gpu"
+    return WFSConfig.from_dict(data)
+
+
 @pytest.mark.gpu
-def test_shack_hartmann_gpu_matches_cpu_and_returns_host_detector_frame() -> None:
+def test_shack_hartmann_gpu_matches_cpu_and_keeps_detector_frame_on_device() -> None:
     cupy = _cupy()
     config = _config("shack_hartmann_minimal.toml")
     cpu_sensor = WavefrontSensor(config)
-    gpu_sensor = WavefrontSensor(config, _backend=cupy_backend())
+    gpu_sensor = WavefrontSensor(_gpu_config("shack_hartmann_minimal.toml"))
     opd = np.zeros(config.input.shape, dtype=np.float64)
     device_opd = cupy.asarray(opd)
 
@@ -41,6 +47,8 @@ def test_shack_hartmann_gpu_matches_cpu_and_returns_host_detector_frame() -> Non
     np.testing.assert_allclose(cupy.asnumpy(gpu_rate), cpu_rate, rtol=5e-5, atol=5e-4)
 
     frame = gpu_sensor.expose(device_opd, seed=41)
+    assert isinstance(frame.data, cupy.ndarray)
+    assert isinstance(frame.truth.mean_electrons, cupy.ndarray)
     assert not isinstance(np.asarray(frame), cupy.ndarray)
     assert np.asarray(frame).shape == cpu_sensor.engine.output_shape
     assert frame.metadata["wfs_input_opd_rms_m"] == 0.0
@@ -51,7 +59,7 @@ def test_pyramid_gpu_matches_cpu_and_integrated_stack_stays_on_device_until_dete
     cupy = _cupy()
     config = _config("pyramid_minimal.toml")
     cpu_sensor = WavefrontSensor(config)
-    gpu_sensor = WavefrontSensor(config, _backend=cupy_backend())
+    gpu_sensor = WavefrontSensor(_gpu_config("pyramid_minimal.toml"))
     zero = np.zeros(config.input.shape, dtype=np.float64)
     tilt = zero.copy()
     tilt[:, config.input.shape[1] // 2 :] = 1.0e-8
@@ -62,5 +70,41 @@ def test_pyramid_gpu_matches_cpu_and_integrated_stack_stays_on_device_until_dete
     np.testing.assert_allclose(cupy.asnumpy(gpu_rate), cpu_rate, rtol=5e-5, atol=5e-4)
 
     frame = gpu_sensor.expose_integrated(device_samples, seed=42)
+    assert isinstance(frame.data, cupy.ndarray)
     assert np.asarray(frame).shape == cpu_sensor.engine.output_shape
     assert frame.metadata["wfs_temporal_samples"] == 2
+
+
+@pytest.mark.gpu
+def test_private_backend_hook_also_selects_gpu_detector_for_compatibility() -> None:
+    cupy = _cupy()
+    config = _config("shack_hartmann_minimal.toml")
+    sensor = WavefrontSensor(config, _backend=cupy_backend())
+
+    frame = sensor.expose(cupy.zeros(config.input.shape), seed=43)
+
+    assert isinstance(frame.data, cupy.ndarray)
+    assert frame.metadata["wfs_device"] == "gpu"
+
+
+@pytest.mark.gpu
+def test_pyturb_gpu_opd_flows_to_shack_hartmann_adu_without_host_copy() -> None:
+    cupy = _cupy()
+    pyturb = pytest.importorskip("pyturb")
+    config = _gpu_config("shack_hartmann_minimal.toml")
+    atmosphere = pyturb.Atmosphere.from_profile(
+        "paranal-median",
+        seeing=0.8,
+        diameter=config.telescope.pupil_diameter_m,
+        n=config.input.shape[0],
+        seed=5,
+        device="gpu",
+    )
+    sensor = WavefrontSensor(config)
+
+    opd_m = atmosphere.opd()
+    frame = sensor.expose(opd_m, seed=44)
+
+    assert isinstance(opd_m, cupy.ndarray)
+    assert isinstance(frame.data, cupy.ndarray)
+    assert isinstance(frame.truth.photon_rate, cupy.ndarray)

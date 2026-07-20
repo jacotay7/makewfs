@@ -4,6 +4,17 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Added public end-to-end GPU execution through `numerics.device = "gpu"`.
+  CuPy OPD, SH/PWFS optics, wavelength-resolved photon maps, the `getframes`
+  detector chain, truth, and ADU remain device-resident. The runtime reports an
+  actionable error when the installed `getframes` lacks its GPU camera contract.
+- Added direct `pyturb` GPU OPD → Shack–Hartmann → GPU ADU integration coverage,
+  updated SH/PWFS CUDA parity tests, synchronized GPU benchmark mode, and measured
+  detector-only timing.
+- Added a paired CPU/GPU bulk-throughput artifact and rendered comparison for
+  representative SH, broadband LGS, and modulated pyramid workflows, with
+  README and performance-guide results plus exact reproduction commands.
+
 - Expanded optical verification with a direct-DFT pyramid reference,
   multi-amplitude HCIPy SH response curves, HCIPy low-order pyramid response
   maps, supplementary local OOPAO comparisons, and quantitative SH/pyramid
@@ -43,9 +54,9 @@ All notable changes to `makewfs` are documented here.
 - Formalized the private optical `ArrayBackend` boundary and added static
   leakage/parity checks so a future device backend does not require sensor
   mathematics to be rewritten.
-- Added an optional private CUDA 12 CuPy optical path with SH/pyramid parity
-  tests and one explicit host transfer before `getframes`; public GPU support
-  remains gated on a device-resident detector chain.
+- Added the original private CUDA 12 CuPy optical path with SH/pyramid parity
+  tests; it is retained as a compatibility hook underneath the public
+  configuration-driven GPU path.
 - Added the monochromatic CPU four-face pyramid engine, modulation support, a
   complete pyramid example configuration, and symmetry/flux/detector tests.
 - Added the implementation roadmap and agent guide.

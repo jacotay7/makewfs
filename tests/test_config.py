@@ -177,6 +177,7 @@ def test_lenslet_grid_rotation_and_offset_fields() -> None:
         (SourceConfig.from_dict, {"normalization": "detector_photon_rate"}, "direct-rate", "plain"),
         (DetectorConfig.from_dict, {"preset": "generic_cmos"}, "exposure_s", "plain"),
         (NumericsConfig.from_dict, {"dtype": "complex64"}, "dtype", "plain"),
+        (NumericsConfig.from_dict, {"device": "tpu"}, "device", "plain"),
     ],
 )
 def test_individual_config_tables_reject_invalid_values(factory, data, message, call_mode) -> None:  # type: ignore[no-untyped-def]
@@ -187,6 +188,20 @@ def test_individual_config_tables_reject_invalid_values(factory, data, message, 
             factory(data, "spider")
         else:
             factory(data)
+
+
+def test_numerics_accepts_serializable_gpu_device() -> None:
+    config = NumericsConfig.from_dict({"device": "gpu", "dtype": "float32"})
+
+    assert config.device == "gpu"
+    assert config.dtype == "float32"
+
+    cpu_wfs = load_config(CONFIG)
+    gpu_data = cpu_wfs.to_dict()
+    gpu_data["numerics"]["device"] = "gpu"
+    gpu_wfs = WFSConfig.from_dict(gpu_data)
+    assert gpu_wfs.to_dict()["numerics"]["device"] == "gpu"
+    assert gpu_wfs.digest != cpu_wfs.digest
 
 
 def test_source_magnitude_and_lgs_constraints() -> None:

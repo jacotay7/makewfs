@@ -88,6 +88,7 @@ ignore_missing_imports = true
 minversion = "7.0"
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "gpu: optional CuPy/CUDA backend parity tests",
     "slow: slower statistical or gallery tests",
