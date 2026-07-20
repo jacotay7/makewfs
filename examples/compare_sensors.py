@@ -31,16 +31,25 @@ def main() -> None:
     sh_rate = sh.photon_rate(opd)
     pyramid_rate = pyramid.photon_rate(opd)
 
-    figure, axes = plt.subplots(1, 3, figsize=(12, 4))
-    axes[0].imshow(opd * 1e9, origin="lower")
-    axes[0].set_title("injected OPD (nm)")
-    axes[1].imshow(sh_rate, origin="lower")
-    axes[1].set_title("Shack-Hartmann rate")
-    axes[2].imshow(pyramid_rate, origin="lower")
-    axes[2].set_title("pyramid rate")
-    for axis in axes:
-        axis.set_axis_off()
-    figure.tight_layout()
+    figure, axes = plt.subplots(1, 3, figsize=(14, 4.5), constrained_layout=True)
+    panels = (
+        (axes[0], opd * 1e9, "injected OPD", "OPD (nm)", "coolwarm"),
+        (
+            axes[1],
+            sh_rate,
+            "Shack-Hartmann ideal image",
+            "photon rate (photons/s/pixel)",
+            "viridis",
+        ),
+        (axes[2], pyramid_rate, "pyramid ideal image", "photon rate (photons/s/pixel)", "viridis"),
+    )
+    for axis, image, title, label, cmap in panels:
+        artist = axis.imshow(image, origin="lower", cmap=cmap)
+        axis.set_title(title)
+        axis.set_xlabel("detector x (pixel)")
+        axis.set_ylabel("detector y (pixel)")
+        figure.colorbar(artist, ax=axis, fraction=0.046, pad=0.04, label=label)
+    figure.suptitle("Same wavefront through two sensors (ideal photon rate, before detector)")
     figure.savefig(args.output, dpi=140)
     print(f"wrote {args.output}")
 

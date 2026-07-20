@@ -1,31 +1,41 @@
 # Worked examples
 
-All scripts save plots without opening a window. Install the optional packages
-with `python -m pip install -e '.[examples,interop]'` from the repository root.
+All scripts save plots (or a GIF) without opening a window. Install the optional
+packages with `python -m pip install -e '.[examples,interop]'` from the
+repository root. Every raster panel carries a colorbar with units, and each
+script accepts `--help` for output and resolution controls.
 
 - `quickstart.py` renders one configured Shack–Hartmann exposure.
 - `compare_sensors.py` applies the same OPD to the SH and pyramid configurations.
-- `moving_atmosphere.py` consumes frozen-flow OPD frames from `pyturb` and sends
-  each one through `makewfs` and `getframes`.
-- `magnitude_series.py` keeps the detector configuration fixed while comparing
-  NGS magnitudes through the `getframes` radiometry path.
+- `moving_atmosphere.py` animates frozen-flow OPD frames from `pyturb` through
+  `makewfs` and `getframes` and writes a **GIF**. A residual-scaling factor
+  emulates partial correction so the drifting spots stay legible.
+- `magnitude_series.py` keeps a fixed real sCMOS preset while comparing NGS
+  magnitudes from photon-rich to read-noise-limited.
 - `lgs_thin_beacon.py` demonstrates the current LGS contract: `pyturb` supplies
-  cone-effect OPD and the user supplies a detector-surface return rate. Sodium
-  range elongation is not implied by this thin-beacon plot.
+  cone-effect OPD and the user supplies a detector-surface return rate. It
+  contrasts the flat point-like beacon with the turbulent one; no range
+  elongation is implied.
 - `lgs_elongation.py` compares thin, centre-launched, and side-launched sodium
-  range profiles using the current Shack–Hartmann geometry model.
-- `closed_loop_injection.py` shows residual OPD entering a persistent sensor;
-  the toy attenuation is explicitly external to makewfs.
-- `detector_choices.py` holds the ideal optical map fixed while swapping
-  existing CCD, EMCCD, sCMOS, and eAPD getframes presets.
+  range profiles; spots elongate radially from the launch, growing with launch
+  distance, using a wide subaperture field of view so the streaks are not clipped.
+- `closed_loop_injection.py` drives a low-order residual toward zero via a toy
+  external loop and tracks the residual RMS and the frame's departure from the
+  flat reference; the controller is explicitly outside makewfs.
+- `detector_choices.py` holds the ideal optical map fixed at a faint magnitude
+  while swapping real CCD, EMCCD, sCMOS, and CMOS getframes presets so their
+  noise characters differ.
 - `sh_design_trade.py`: field-stop and blur sampling choices.
 - `pyramid_modulation.py`: unmodulated versus circularly modulated PWFS response.
-- `realistic_broadband.py`: rotated segmented pupil and incoherent spectral sensing.
-- `precision_throughput.py`: float32/float64 warm-path latency and image agreement.
+- `realistic_broadband.py`: rotated segmented pupil (shown as an amplitude mask)
+  and incoherent broadband sensing with a zoom on the chromatic spot smearing.
+- `precision_throughput.py`: float32/float64 warm-path latency plus the actual
+  images and their difference map.
 - `gallery.py`: deterministic six-panel documentation gallery with labelled
   units, color bars, configuration digests, and modeling notes.
-- `spectral_qe.py`: wavelength-resolved detector QE versus the scalar-QE path;
-  its curve and TOML are under `configs/`.
+- `spectral_qe.py`: wavelength-resolved versus scalar detector QE, shown as a
+  blue guide star and a red one on a real CMOS preset whose QE rolls off in the
+  red; only the spectral path penalizes the red star.
 - `configs/precision_throughput.toml` is the representative 20x20 lenslet
   configuration used by that precision example.
 - `configs/shack_hartmann_extended_source.toml` plus its kernel file show a

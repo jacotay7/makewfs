@@ -227,3 +227,4 @@ __marimo__/
 *.png
 validation-metrics.json
 benchmark-results.json
+*.gif
