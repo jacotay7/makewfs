@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -14,13 +14,17 @@ from .config import WFSConfig
 
 
 def _coordinates(
-    shape: tuple[int, int], extent_m: float, *, backend: ArrayBackend | None = None
+    shape: tuple[int, int],
+    extent_m: float,
+    *,
+    backend: ArrayBackend | None = None,
+    dtype: object = np.float64,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Return centered physical ``(x, y)`` coordinates for an array shape."""
     resolved = backend or cpu_backend()
     height, width = shape
-    x = (resolved.arange(width, dtype=np.float64) - (width - 1) / 2.0) * extent_m / width
-    y = (resolved.arange(height, dtype=np.float64) - (height - 1) / 2.0) * extent_m / height
+    x = (resolved.arange(width, dtype=dtype) - (width - 1) / 2.0) * extent_m / width
+    y = (resolved.arange(height, dtype=dtype) - (height - 1) / 2.0) * extent_m / height
     xx, yy = resolved.meshgrid(x, y)
     return xx, yy
 
@@ -71,11 +75,7 @@ class WavefrontInput:
         self.static_opd = (
             None if static_opd is None else self.backend.asarray(static_opd, dtype=np.float64)
         )
-        self._input_coordinates = _coordinates(
-            config.input.shape,
-            config.input.grid_extent_m,
-            backend=self.backend,
-        )
+        self._resample_coordinates: dict[tuple[int, int], Any] = {}
 
     def opd(
         self, value: ArrayLike, *, target_shape: tuple[int, int] | None = None
@@ -97,11 +97,21 @@ class WavefrontInput:
         if not self.backend.scalar(self.backend.all(self.backend.isfinite(converted))):
             raise ValueError("wavefront contains non-finite OPD")
         if target_shape is not None and tuple(target_shape) != converted.shape:
+            coordinates = self._resample_coordinates.get(target_shape)
+            if coordinates is None:
+                coordinates = _resampling_coordinates(
+                    converted.shape,
+                    target_shape,
+                    backend=self.backend,
+                    dtype=converted.dtype,
+                )
+                self._resample_coordinates[target_shape] = coordinates
             converted = resample_opd(
                 converted,
                 target_shape,
                 self.config.input.grid_extent_m,
                 backend=self.backend,
+                coordinates=coordinates,
             )
         return cast(NDArray[np.float64], converted)
 
@@ -117,6 +127,7 @@ def resample_opd(
     extent_m: float,
     *,
     backend: ArrayBackend | None = None,
+    coordinates: Any | None = None,
 ) -> NDArray[np.float64]:
     """Resample OPD on physical coordinates without wrapping phase.
 
@@ -126,19 +137,38 @@ def resample_opd(
     same contract later.
     """
     resolved = backend or cpu_backend()
-    source_height, source_width = opd.shape
-    target_height, target_width = target_shape
-    source_y = (
-        resolved.arange(target_height, dtype=np.float64) + 0.5
-    ) * source_height / target_height - 0.5
-    source_x = (
-        resolved.arange(target_width, dtype=np.float64) + 0.5
-    ) * source_width / target_width - 0.5
-    yy, xx = resolved.meshgrid(source_y, source_x, indexing="ij")
+    sample_coordinates = (
+        _resampling_coordinates(
+            cast(tuple[int, int], opd.shape),
+            target_shape,
+            backend=resolved,
+            dtype=opd.dtype,
+        )
+        if coordinates is None
+        else coordinates
+    )
     return cast(
         NDArray[np.float64],
-        resolved.map_coordinates(opd, [yy, xx], order=1, mode="nearest"),
+        resolved.map_coordinates(opd, sample_coordinates, order=1, mode="nearest"),
     )
+
+
+def _resampling_coordinates(
+    source_shape: tuple[int, int],
+    target_shape: tuple[int, int],
+    *,
+    backend: ArrayBackend,
+    dtype: object,
+) -> Any:
+    """Build a backend-native interpolation grid for one immutable shape pair."""
+    source_height, source_width = source_shape
+    target_height, target_width = target_shape
+    source_y = (
+        backend.arange(target_height, dtype=dtype) + 0.5
+    ) * source_height / target_height - 0.5
+    source_x = (backend.arange(target_width, dtype=dtype) + 0.5) * source_width / target_width - 0.5
+    yy, xx = backend.meshgrid(source_y, source_x, indexing="ij")
+    return backend.stack((yy, xx), axis=0)
 
 
 def iter_phase_samples(

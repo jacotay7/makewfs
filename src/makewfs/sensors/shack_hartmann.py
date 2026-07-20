@@ -150,6 +150,27 @@ class ShackHartmannEngine(SensorEngine):
             base_shape + 2 * self.settings.detector_margin_pixels,
         )
         self._expected_output_shape = self.output_shape
+        self._base_shape = base_shape
+        self._total_field_flux = self.backend.asarray(
+            self.backend.sum(self.backend.abs(self.lenslet_mask) ** 2),
+            dtype=self._rate_dtype,
+        )
+        if self.backend.scalar(self._total_field_flux) <= 0.0:
+            raise ValueError("pupil has no illuminated pixels")
+        piston_score = self.lenslet_mask / (1.0 + self.xx**2 + self.yy**2)
+        flat_piston_index = int(self.backend.scalar(self.backend.argmax(piston_score)))
+        self._piston_index = divmod(flat_piston_index, self.internal_shape[1])
+        self._field_angle_opd = tuple(
+            self._field_angle_for_state(state) for state in self.source_states
+        )
+        self._state_spot_sampling = tuple(
+            self._spot_sampling(state.wavelength_m) for state in self.source_states
+        )
+        self._wavelengths = tuple(dict.fromkeys(state.wavelength_m for state in self.source_states))
+        wavelength_index = {value: index for index, value in enumerate(self._wavelengths)}
+        self._state_wavelength_indices = tuple(
+            wavelength_index[state.wavelength_m] for state in self.source_states
+        )
 
     def _make_lenslet_mask(self) -> NDArray[np.float64]:
         """Apply optional square lenslet fill factor to the entrance pupil."""
@@ -191,33 +212,27 @@ class ShackHartmannEngine(SensorEngine):
             )
         return configured * wavelength_m / self.config.sensor.wavelength_m
 
+    def _field_angle_for_state(self, state: SourceState) -> NDArray[np.float64]:
+        """Build immutable source/range geometry once for a persistent sensor."""
+        if state.range_m is None:
+            return self._field_x * state.angle_x_rad + self._field_y * state.angle_y_rad
+        if self._lgs_mean_range_m is None:
+            raise ValueError("LGS range state is missing its weighted mean range")
+        launch_x, launch_y = self.config.source.lgs_launch_position_m
+        range_delta = 1.0 / state.range_m - 1.0 / self._lgs_mean_range_m
+        angle_x = state.angle_x_rad + (launch_x - self._subap_x) * range_delta
+        angle_y = state.angle_y_rad + (launch_y - self._subap_y) * range_delta
+        return cast(NDArray[np.float64], self._field_x * angle_x + self._field_y * angle_y)
+
     def _field(
         self,
         internal: NDArray[np.float64],
         state: SourceState,
+        state_index: int,
     ) -> NDArray[Any]:
-        internal = self._sample_to_lenslet_grid(internal)
-        self.wavefront.validate_finite_inside(internal, self.lenslet_mask)
-        angle_x = self.backend.full(self.internal_shape, state.angle_x_rad, dtype=self._real_dtype)
-        angle_y = self.backend.full(self.internal_shape, state.angle_y_rad, dtype=self._real_dtype)
-        if state.range_m is not None:
-            if self._lgs_mean_range_m is None:
-                raise ValueError("LGS range state is missing its weighted mean range")
-            launch_x, launch_y = self.config.source.lgs_launch_position_m
-            range_delta = 1.0 / state.range_m - 1.0 / self._lgs_mean_range_m
-            angle_x += (launch_x - self._subap_x) * range_delta
-            angle_y += (launch_y - self._subap_y) * range_delta
-        field_angle_opd = self._field_x * angle_x + self._field_y * angle_y
-        total_opd = internal + field_angle_opd
-        illuminated = self.lenslet_mask > 0
-        illuminated_weight = self.backend.astype(illuminated, total_opd.dtype)
-        illuminated_count = self.backend.sum(illuminated_weight)
-        piston = self.backend.sum(total_opd * illuminated_weight) / self.backend.where(
-            illuminated_count > 0,
-            illuminated_count,
-            1.0,
-        )
-        # Removing only the weighted global piston is a numerical stabilization:
+        total_opd = internal + self._field_angle_opd[state_index]
+        piston = total_opd[self._piston_index]
+        # Removing only a fixed global piston is a numerical stabilization:
         # it makes the exact physical piston invariance survive finite precision
         # in exp(i*phase) and has no effect on the intensity.
         relative_opd = total_opd - piston
@@ -232,34 +247,28 @@ class ShackHartmannEngine(SensorEngine):
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
-        self.wavefront.validate_finite_inside(internal, self.pupil)
+        internal = self._sample_to_lenslet_grid(internal)
         states = self.source_states
         photon_rate = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
-        wavelengths = tuple(dict.fromkeys(state.wavelength_m for state in states))
-        wavelength_index = {wavelength: index for index, wavelength in enumerate(wavelengths)}
-        spectral_photon_rate = self.backend.zeros(
-            (len(wavelengths), *self.output_shape), dtype=self._rate_dtype
+        spectral_photon_rate = (
+            None
+            if len(self._wavelengths) == 1
+            else self.backend.zeros(
+                (len(self._wavelengths), *self.output_shape), dtype=self._rate_dtype
+            )
         )
-        total_field_flux: Any | None = None
-        captured: Any | None = None
+        captured: Any = 0.0
         s = self.samples_per_lenslet
         n = self.n_lenslets
-        base_shape = n * self.settings.pixels_per_subaperture
         margin = self.settings.detector_margin_pixels
-        for state in states:
-            field = self._field(internal, state)
-            if total_field_flux is None:
-                total_field_flux = self.backend.asarray(
-                    self.backend.sum(self.backend.abs(field) ** 2),
-                    dtype=self._rate_dtype,
-                )
+        for state_index, state in enumerate(states):
+            field = self._field(internal, state, state_index)
             subapertures = field.reshape(n, s, n, s).transpose(0, 2, 1, 3).reshape(n * n, s, s)
-            sampling = self._spot_sampling(state.wavelength_m)
             spots = spot_intensity(
                 subapertures,
                 pixels=self.settings.pixels_per_subaperture,
                 samples_per_lenslet=s,
-                sampling=sampling,
+                sampling=self._state_spot_sampling[state_index],
                 oversampling=self.config.numerics.fft_oversampling,
                 workers=self.config.numerics.fft_workers,
                 field_stop_radius_lambda_over_d=self.settings.field_stop_radius_lambda_over_d,
@@ -275,28 +284,31 @@ class ShackHartmannEngine(SensorEngine):
                     self.settings.pixels_per_subaperture,
                 )
                 .transpose(0, 2, 1, 3)
-                .reshape((base_shape, base_shape))
+                .reshape((self._base_shape, self._base_shape))
             )
-            mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
-            mosaic[margin : margin + base_shape, margin : margin + base_shape] = base_mosaic
+            if margin:
+                mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
+                mosaic[
+                    margin : margin + self._base_shape,
+                    margin : margin + self._base_shape,
+                ] = base_mosaic
+            else:
+                mosaic = base_mosaic
             cropped_flux = self.backend.sum(mosaic)
-            normalizer = self.backend.where(total_field_flux > 0, total_field_flux, 1.0)
-            contribution = mosaic * (self.source_rate * state.weight / normalizer)
+            contribution = mosaic * (self.source_rate * state.weight / self._total_field_flux)
             photon_rate += contribution
-            spectral_photon_rate[wavelength_index[state.wavelength_m]] += contribution
-            captured = (0.0 if captured is None else captured) + (
-                self.source_rate * state.weight * cropped_flux / normalizer
-            )
-        if total_field_flux is None or self.backend.scalar(total_field_flux) <= 0:
-            raise ValueError("pupil has no illuminated pixels")
-        assert captured is not None
+            if spectral_photon_rate is not None:
+                spectral_photon_rate[self._state_wavelength_indices[state_index]] += contribution
+            captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
+        if spectral_photon_rate is None:
+            spectral_photon_rate = photon_rate[None, ...]
         return OpticalResult(
             photon_rate,
             self.source_rate,
-            self.backend.scalar(captured),
+            captured,
             wavefront,
             spectral_photon_rate,
-            wavelengths,
+            self._wavelengths,
         )
 
 

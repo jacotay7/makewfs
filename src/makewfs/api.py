@@ -64,9 +64,9 @@ class WavefrontSensor:
     def _render(self, wavefront: ArrayLike) -> OpticalResult:
         return self.engine.render(cast(NDArray[np.float64], wavefront))
 
-    def _opd_rms(self, opd: Any) -> float:
-        """Reduce OPD RMS on the optical backend before detector handoff."""
-        return self.backend.scalar(self.backend.sqrt(self.backend.mean(opd**2)))
+    def _opd_rms(self, opd: Any) -> Any:
+        """Reduce OPD RMS on-device before the batched metadata crossing."""
+        return self.backend.sqrt(self.backend.mean(opd**2))
 
     def _frame_metadata(
         self,
@@ -94,18 +94,22 @@ class WavefrontSensor:
 
     def reference(self) -> Any:
         """Return the ideal image for a zero dynamic OPD."""
-        return self.photon_rate(self.backend.zeros(self.config.input.shape, dtype=np.float64))
+        dtype = np.dtype(self.config.numerics.dtype)
+        return self.photon_rate(self.backend.zeros(self.config.input.shape, dtype=dtype))
 
     def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
         """Render one wavefront and expose it through the configured detector."""
         total_start = perf_counter()
         optical_start = total_start
         result = self._render(wavefront)
+        captured_rate, opd_rms = self.backend.scalars(
+            result.captured_rate_per_s, self._opd_rms(result.opd_m)
+        )
         optical_elapsed = perf_counter() - optical_start
         frame_metadata = self._frame_metadata(
             launched_rate=result.launched_rate_per_s,
-            captured_rate=result.captured_rate_per_s,
-            opd_rms_m=self._opd_rms(result.opd_m),
+            captured_rate=captured_rate,
+            opd_rms_m=opd_rms,
             seed=seed,
         )
         detector_start = perf_counter()
@@ -142,7 +146,7 @@ class WavefrontSensor:
         rates: list[Any] = []
         opds: list[Any] = []
         launched = 0.0
-        captured = 0.0
+        captured: Any = 0.0
         for sample in iter_phase_samples(
             phase_samples,
             self.config.input.shape,
@@ -157,10 +161,13 @@ class WavefrontSensor:
             raise ValueError("phase_samples must contain at least one sample")
         average_rate = self.backend.mean(self.backend.stack(rates), axis=0)
         average_opd = self.backend.mean(self.backend.stack(opds), axis=0)
+        captured_rate, opd_rms = self.backend.scalars(
+            captured / len(rates), self._opd_rms(average_opd)
+        )
         frame_metadata = self._frame_metadata(
             launched_rate=launched,
-            captured_rate=captured / len(rates),
-            opd_rms_m=self._opd_rms(average_opd),
+            captured_rate=captured_rate,
+            opd_rms_m=opd_rms,
             seed=seed,
         )
         frame_metadata["wfs_temporal_samples"] = len(rates)

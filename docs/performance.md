@@ -44,18 +44,26 @@ cases.
 
 | Configuration | Sensor | Output | Work samples | CPU (frames/s) | GPU (frames/s) | Speedup |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `shack_hartmann_20x20_float32.toml` | SH | 160x160 | 1 | 82.9 | 1,068.5 | 12.89x |
-| `shack_hartmann_60x60_float64.toml` | SH | 360x360 | 1 | 16.7 | 665.6 | 39.90x |
-| `shack_hartmann_broadband_lgs.toml` | SH | 64x64 | 9 | 74.0 | 215.6 | 2.91x |
-| `pyramid_40_float32.toml` | pyramid | 54x54 | 1 | 2,872.0 | 874.8 | 0.30x |
-| `pyramid_60_mod8_float32.toml` | pyramid | 80x80 | 8 | 441.5 | 815.4 | 1.85x |
-| `pyramid_80_mod32_float64.toml` | pyramid | 108x108 | 32 | 28.1 | 603.5 | 21.47x |
+| `shack_hartmann_20x20_float32.toml` | SH | 160x160 | 1 | 143.4 | 2,011.2 | 14.03x |
+| `shack_hartmann_60x60_float64.toml` | SH | 360x360 | 1 | 26.3 | 945.2 | 35.94x |
+| `shack_hartmann_broadband_lgs.toml` | SH | 64x64 | 9 | 99.8 | 557.1 | 5.58x |
+| `pyramid_40_float32.toml` | pyramid | 54x54 | 1 | 3,569.8 | 1,541.1 | 0.43x |
+| `pyramid_60_mod8_float32.toml` | pyramid | 80x80 | 8 | 668.5 | 1,579.4 | 2.36x |
+| `pyramid_80_mod32_float64.toml` | pyramid | 108x108 | 32 | 33.3 | 903.9 | 27.18x |
 
-Higher frames/s is better. SH gains grow from 12.9x to 39.9x as the lenslet grid
-grows. Pyramid behavior shows the GPU crossover particularly clearly: launch
-overhead makes the tiny unmodulated case slower, eight modulation points provide
-a 1.85x gain, and the 32-point float64 case reaches 21.5x. The broadband LGS
-case has nine incoherent source states but a small 64x64 detector and gains 2.91x.
+Higher frames/s is better. Relative to the first end-to-end GPU snapshot on the
+same machine, these kernels are 1.19x–1.73x faster on CPU and 1.42x–2.58x faster
+on GPU. Static source/range geometry, modulation phasors, interpolation grids,
+normalizers, and monochromatic spectral views are cached. SH uses an
+intensity-only centered FFT that removes an irrelevant input permutation; both
+sensors use native orthonormal FFT scaling, a fixed illuminated piston reference,
+and batched metadata scalar transfers. The GPU detector improvements described
+in `getframes` are included in every end-to-end row.
+
+Pyramid behavior still shows the GPU crossover clearly: launch overhead makes
+the tiny unmodulated case slower, eight modulation points provide a 2.36x gain,
+and the 32-point float64 case reaches 27.2x. The broadband LGS case has nine
+incoherent source states but a small 64x64 detector and gains 5.58x.
 
 The [rendered snapshot](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.md)
 and [raw JSON](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.json)

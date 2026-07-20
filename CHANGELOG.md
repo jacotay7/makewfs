@@ -14,6 +14,13 @@ All notable changes to `makewfs` are documented here.
 - Added a paired CPU/GPU bulk-throughput artifact and rendered comparison for
   representative SH, broadband LGS, and modulated pyramid workflows, with
   README and performance-guide results plus exact reproduction commands.
+- Optimized persistent SH/PWFS execution by caching source/range geometry,
+  modulation phasors, resampling grids, flux normalization, and monochromatic
+  spectral views; using native orthonormal FFT scaling and an intensity-only SH
+  transform; removing redundant validations/resampling; and batching GPU
+  metadata scalar transfers. On the RTX 5090 reference matrix this improves CPU
+  throughput by 1.19x–1.73x and GPU throughput by 1.42x–2.58x over the initial
+  end-to-end implementation while retaining the physics/parity gates.
 
 - Expanded optical verification with a direct-DFT pyramid reference,
   multi-amplitude HCIPy SH response curves, HCIPy low-order pyramid response

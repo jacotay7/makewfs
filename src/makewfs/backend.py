@@ -144,6 +144,10 @@ class ArrayBackend:
         """Backend peak-to-peak reduction."""
         return self.xp.ptp(value)
 
+    def argmax(self, value: Any) -> Any:
+        """Return the flat index of a backend array maximum."""
+        return self.xp.argmax(value)
+
     def fftfreq(self, value: int) -> Any:
         """Return backend FFT frequency bins."""
         return self.xp.fft.fftfreq(value)
@@ -167,17 +171,56 @@ class ArrayBackend:
                     fft.ifftshift(array, axes=axes),
                     axes=axes,
                     workers=workers,
+                    norm="ortho",
+                    overwrite_x=True,
                 ),
                 axes=axes,
             )
         else:  # pragma: no cover - reserved for a future device backend
             transformed = self.fftshift(
-                self.xp.fft.fft2(self.ifftshift(array, axes=axes), axes=axes),
+                self.xp.fft.fft2(self.ifftshift(array, axes=axes), axes=axes, norm="ortho"),
                 axes=axes,
             )
+        return transformed
+
+    def centered_fft_intensity(
+        self, array: Any, *, workers: int = 1, overwrite_input: bool = False
+    ) -> Any:
+        """Return centered unitary FFT intensity without an irrelevant input roll.
+
+        Translating an entrance field changes only Fourier phase, so an input
+        ``ifftshift`` cannot affect intensity. Shack-Hartmann propagation uses
+        this identity to avoid one detector-batch-sized array permutation.
+        """
+        axes = (-2, -1)
         height, width = array.shape[-2:]
-        scale = self.sqrt(self.asarray(height * width, dtype=transformed.real.dtype))
-        return transformed / scale
+        if height % 2 == 0 and width % 2 == 0:
+            working = array if overwrite_input else self.xp.array(array, copy=True)
+            working[..., ::2, 1::2] *= -1
+            working[..., 1::2, ::2] *= -1
+            if self.is_cpu:
+                from scipy import fft
+
+                transformed = fft.fft2(
+                    working,
+                    axes=axes,
+                    workers=workers,
+                    norm="ortho",
+                    overwrite_x=overwrite_input,
+                )
+            else:  # pragma: no cover - GPU optional
+                transformed = self.xp.fft.fft2(working, axes=axes, norm="ortho")
+            return self.abs(transformed) ** 2
+        if self.is_cpu:
+            from scipy import fft
+
+            transformed = fft.fftshift(
+                fft.fft2(array, axes=axes, workers=workers, norm="ortho"),
+                axes=axes,
+            )
+        else:  # pragma: no cover - GPU optional
+            transformed = self.fftshift(self.xp.fft.fft2(array, axes=axes, norm="ortho"), axes=axes)
+        return self.abs(transformed) ** 2
 
     def centered_ifft2(self, array: Any, *, workers: int = 1) -> Any:
         """Perform a centered, unitary two-dimensional inverse FFT."""
@@ -190,17 +233,17 @@ class ArrayBackend:
                     fft.ifftshift(array, axes=axes),
                     axes=axes,
                     workers=workers,
+                    norm="ortho",
+                    overwrite_x=True,
                 ),
                 axes=axes,
             )
         else:  # pragma: no cover - reserved for a future device backend
             transformed = self.fftshift(
-                self.xp.fft.ifft2(self.ifftshift(array, axes=axes), axes=axes),
+                self.xp.fft.ifft2(self.ifftshift(array, axes=axes), axes=axes, norm="ortho"),
                 axes=axes,
             )
-        height, width = array.shape[-2:]
-        scale = self.sqrt(self.asarray(height * width, dtype=transformed.real.dtype))
-        return transformed * scale
+        return transformed
 
     def map_coordinates(self, array: Any, coordinates: Any, *, order: int, mode: str) -> Any:
         """Interpolate coordinates, using SciPy only for the CPU backend."""
@@ -250,6 +293,13 @@ class ArrayBackend:
         """Extract one host scalar at an explicit metadata/geometry boundary."""
         item = value.item() if hasattr(value, "item") else value
         return float(item)
+
+    def scalars(self, *values: Any) -> tuple[float, ...]:
+        """Extract several scalars with one device synchronization."""
+        if self.is_cpu:
+            return tuple(self.scalar(value) for value in values)
+        packed = self.xp.stack([self.xp.asarray(value) for value in values])
+        return tuple(float(value) for value in self.xp.asnumpy(packed))
 
     def to_host(self, value: Any) -> NDArray[Any]:
         """Copy an array to host NumPy storage at an explicit boundary."""
@@ -312,6 +362,22 @@ def centered_ifft2(
     return cast(NDArray[Any], (backend or cpu_backend()).centered_ifft2(array, workers=workers))
 
 
+def centered_fft_intensity(
+    array: NDArray[Any],
+    *,
+    workers: int = 1,
+    backend: ArrayBackend | None = None,
+    overwrite_input: bool = False,
+) -> NDArray[Any]:
+    """Return centered unitary FFT intensity without shifting the input field."""
+    return cast(
+        NDArray[Any],
+        (backend or cpu_backend()).centered_fft_intensity(
+            array, workers=workers, overwrite_input=overwrite_input
+        ),
+    )
+
+
 def next_fast_length(value: int) -> int:
     """Return a convenient CPU FFT length."""
     return cpu_backend().next_fast_length(value)
@@ -320,6 +386,7 @@ def next_fast_length(value: int) -> int:
 __all__ = [
     "ArrayBackend",
     "centered_fft2",
+    "centered_fft_intensity",
     "centered_ifft2",
     "complex_dtype",
     "cpu_backend",

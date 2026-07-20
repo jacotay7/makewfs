@@ -9,7 +9,7 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from .backend import ArrayBackend, centered_fft2, cpu_backend, next_fast_length
+from .backend import ArrayBackend, centered_fft_intensity, cpu_backend, next_fast_length
 
 
 def load_blur_kernel(path: str) -> NDArray[np.float64]:
@@ -115,12 +115,12 @@ def spot_intensity(
             pixels * oversampling,
         )
     )
-    transformed = centered_fft2(
+    intensity = centered_fft_intensity(
         pad_center(field, (nfft, nfft), backend=resolved),
         workers=workers,
         backend=resolved,
+        overwrite_input=True,
     )
-    intensity = resolved.abs(transformed) ** 2
     high_resolution_pixels = pixels * oversampling
     cropped = crop_center(intensity, (high_resolution_pixels, high_resolution_pixels))
     if field_stop_radius_lambda_over_d is not None:

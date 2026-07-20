@@ -6,7 +6,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from makewfs.backend import centered_fft2, centered_ifft2, complex_dtype, real_dtype
+from makewfs.backend import (
+    centered_fft2,
+    centered_fft_intensity,
+    centered_ifft2,
+    complex_dtype,
+    real_dtype,
+)
 from makewfs.config import SourceConfig, SpiderConfig, TelescopeConfig
 from makewfs.pupil import make_pupil
 from makewfs.radiometry import source_rate_per_s
@@ -19,6 +25,15 @@ def test_centered_fft_roundtrip_and_dtype() -> None:
     transformed = centered_fft2(array)
     assert transformed.dtype == np.complex64
     assert np.allclose(centered_ifft2(transformed), array, atol=1e-6)
+
+
+def test_centered_fft_intensity_omits_only_irrelevant_fourier_phase() -> None:
+    rng = np.random.default_rng(4)
+    field = (rng.normal(size=(3, 8, 8)) + 1j * rng.normal(size=(3, 8, 8))).astype(np.complex64)
+    expected = np.abs(centered_fft2(field)) ** 2
+    actual = centered_fft_intensity(field)
+    assert actual.dtype == np.float32
+    assert np.allclose(actual, expected, rtol=2e-6, atol=2e-6)
 
 
 def test_fft_worker_count_is_deterministic() -> None:

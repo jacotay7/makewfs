@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -17,7 +18,7 @@ class OpticalResult:
 
     photon_rate: NDArray[np.float64]
     launched_rate_per_s: float
-    captured_rate_per_s: float
+    captured_rate_per_s: Any
     opd_m: NDArray[np.float64]
     spectral_photon_rate: NDArray[np.float64] | None = None
     spectral_wavelengths_m: tuple[float, ...] | None = None

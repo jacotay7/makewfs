@@ -55,14 +55,14 @@ input/output and no host transfers:
 
 | Workflow | Output | Work samples | CPU (frames/s) | GPU (frames/s) | Speedup |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 20x20 SH, float32 | 160x160 | 1 | 82.9 | 1,068.5 | 12.89x |
-| 60x60 SH, float64 | 360x360 | 1 | 16.7 | 665.6 | 39.90x |
-| Broadband/range-sampled SH | 64x64 | 9 | 74.0 | 215.6 | 2.91x |
-| Pyramid, 8-point modulation, float32 | 80x80 | 8 | 441.5 | 815.4 | 1.85x |
-| Pyramid, 32-point modulation, float64 | 108x108 | 32 | 28.1 | 603.5 | 21.47x |
+| 20x20 SH, float32 | 160x160 | 1 | 143.4 | 2,011.2 | 14.03x |
+| 60x60 SH, float64 | 360x360 | 1 | 26.3 | 945.2 | 35.94x |
+| Broadband/range-sampled SH | 64x64 | 9 | 99.8 | 557.1 | 5.58x |
+| Pyramid, 8-point modulation, float32 | 80x80 | 8 | 668.5 | 1,579.4 | 2.36x |
+| Pyramid, 32-point modulation, float64 | 108x108 | 32 | 33.3 | 903.9 | 27.18x |
 
 Higher is better. A tiny unmodulated 54x54 pyramid case remains CPU-faster
-(2,872 versus 875 frames/s) because GPU launch overhead dominates its small
+(3,570 versus 1,541 frames/s) because GPU launch overhead dominates its small
 optical workload. See the [full snapshot](benchmarks/device-results.md),
 [raw JSON](benchmarks/device-results.json), and
 [benchmark methodology](docs/performance.md#cpu-versus-gpu-reference-throughput).
