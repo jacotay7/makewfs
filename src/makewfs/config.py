@@ -19,7 +19,7 @@ from typing import Any, cast
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover - exercised on Python 3.10
-    import tomli as tomllib  # type: ignore[import-not-found]
+    import tomli as tomllib
 
 
 class ConfigError(ValueError):

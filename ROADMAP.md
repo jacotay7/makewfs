@@ -99,17 +99,30 @@ for time_s, opd_m in atmosphere.frames(dt=config.exposure_s, steps=1000):
     frame = wfs.expose(opd_m)
 ```
 
-### getframes 2.0.0 (`/home/donkeykong/getframes`)
+### getframes 2.1.0 (`/home/donkeykong/getframes`)
+
+The installed/released sibling is now `getframes 2.1.0` (the audit baseline was
+2.0.0). The scalar dependency constraint remains `getframes>=2.0`.
 
 - `Camera.expose(photon_rate, exposure, ...)` accepts a scalar or native-pixel
   photon-rate map and returns an array-like `Frame` in ADU with noise-free truth.
+  Its 2.1.0 signature adds `binning`/`binning_mode`, which makewfs uses.
 - CCD, CMOS, sCMOS, EMCCD, and eAPD noise paths, fixed detector structure,
   binning, time-series state, calibration, FITS output, and seeded
   reproducibility already exist.
 - AO-relevant presets already include OCAM2K/CCD220, SAPHIRA/eAPD, NUVU cameras,
-  and the Keck Little Joe CCD39.
+  and the Keck Little Joe CCD39. Note that the SAPHIRA/eAPD presets are near-IR
+  (their QE curve is zero at visible sensing wavelengths), so visible-band WFS
+  examples use CCD/EMCCD/sCMOS/CMOS presets instead.
 - Broadband photometry, QE curves, SEDs, transmission products, sky, and thermal
-  radiometry already exist.
+  radiometry already exist (`getframes.QE`, `SED`, `Bandpass`, `Spectrum`).
+- **Wavelength-resolved cube exposure** (`Camera.expose_spectral` + spectral
+  `FrameTruth`) is implemented on getframes `main` and slated for the **2.1.1**
+  release. It is present in this workspace's editable getframes checkout (so the
+  makewfs spectral test passes locally), but released 2.1.0 does not include it.
+  The section 13 gate stays open until 2.1.1 is released and pinned; against a
+  getframes without it, makewfs uses the documented QE-weighted integrated
+  fallback.
 
 The detector handoff must call this public API. No detector-noise functions are
 to be copied into `makewfs`.
@@ -134,10 +147,18 @@ must not be implemented until its acceptance test demonstrates the need.
   extent, and a documented Shack–Hartmann sodium-range elongation model.
 - [x] Executable validation metrics, benchmark runners, LGS elongation and
   detector-choice examples, and closed-loop injection example.
-- [ ] Broader independent validation, public GPU support, and release completion
-  remain staged; the private CuPy optical path now has CPU parity evidence, and
-  the versioned documentation gallery and relative benchmark regression
-  envelopes are in place.
+- [x] Pyramid propagation now honors `numerics.fft_oversampling` for its FFT
+  grid, so the diffraction halo no longer wraps onto the pupil rims; cropped
+  flux is reported as captured rate and HCIPy parity improved (~0.55 -> >0.90).
+- [x] The shipped example TOMLs are representative (separated pyramid pupils,
+  bright-guide-star photon rates), and all worked examples were reworked for
+  legibility: colorbars with units, real named getframes presets, a GIF for the
+  moving-atmosphere example, and a verified LGS-elongation figure.
+- [ ] Broader independent validation, public GPU support, the wavelength-resolved
+  detector-QE gate (implemented on getframes `main`, awaiting the getframes 2.1.1
+  release before it can be pinned), and release completion remain staged. The
+  private CuPy optical path now has CPU parity evidence, and the versioned
+  documentation gallery and relative benchmark regression envelopes are in place.
 
 ## 4. End-state user experience
 
@@ -568,9 +589,12 @@ Shack–Hartmann frame through `getframes`.
   `pyturb.Atmosphere(..., lgs_altitude=mean_range)` supplies cone-effect OPD;
   `makewfs` supplies detector-plane sodium elongation.
 - [ ] Resolve the wavelength-resolved detector-QE gate in section 13: the
-  broadband SH spectrum varies materially across pixels and a local
-  `getframes 2.1.0.dev0` cube prototype exists; release/pin that sibling API
-  before claiming the full gate.
+  broadband SH spectrum varies materially across pixels, and the
+  `Camera.expose_spectral` cube API is implemented on getframes `main` (slated
+  for the 2.1.1 release) and already exercised by the makewfs spectral test
+  against the local editable checkout. Released `getframes 2.1.0` does not carry
+  it, so pin `getframes>=2.1.1` once it releases before claiming the full gate;
+  until then makewfs uses the QE-weighted integrated fallback.
 - [x] Cross-validate selected monochromatic SH cases against an independent
   Fourier-optics calculation; the small-grid direct DFT reference is frozen in
   the core test suite, while optional package references remain validation-only.
@@ -706,8 +730,11 @@ a real GPU backend without an architectural rewrite.
   document stability, and record intentional future extension points.
 - [x] Verify clean-room installation using non-editable versioned `pyturb` and
   `getframes` wheels, not editable sibling checkouts; record minimum compatible
-  scalar versions (`pyturb>=1.0`, `getframes>=2.0`). The optional spectral-QE
-  path is exercised separately against the unreleased 2.1.0 development wheel.
+  scalar versions (`pyturb>=1.0`, `getframes>=2.0`). Released `getframes 2.1.0`
+  provides binning but not the spectral cube; that cube lands in getframes 2.1.1
+  (already on `main`), so the optional spectral-QE full-truth path passes against
+  the local editable checkout but stays behind a version guard until 2.1.1
+  releases and can be pinned.
 - [x] Build and inspect sdist/wheel contents and run package metadata checks.
 - [ ] Tag `1.0.0`, publish docs, and cut a reproducible release.
 
@@ -806,8 +833,11 @@ saved plots. It uses `matplotlib` only through the examples extra.
 9. **Closed-loop injection** — external residual OPD enters a persistent sensor
    object each iteration. Show how an external reconstructor/controller consumes
    the returned frame, while keeping those algorithms outside the package.
-10. **Detector choice** — reuse identical ideal WFS photon-rate maps with CCD,
-    EMCCD, sCMOS, and eAPD `getframes` presets to isolate detector consequences.
+10. **Detector choice** — reuse identical ideal WFS photon-rate maps across real
+    `getframes` presets to isolate detector consequences at a faint magnitude
+    where noise character differs. The shipped example uses visible-band CCD,
+    EMCCD, sCMOS, and CMOS presets; eAPD/SAPHIRA presets are near-IR (zero QE at
+    the visible sensing wavelength) and so are not used in this visible example.
 11. **CPU precision and throughput** — float32/float64 accuracy, warm latency,
     batch/chunk choices, and a clear future-GPU boundary.
 
@@ -886,7 +916,10 @@ repository only if the preceding phase proves the need.
   semantics. Apply QE/PRNU/noise exactly once and test equivalence to scalar
   monochromatic exposure.
 - [ ] Release and pin the first `getframes` version with that contract before
-  using it from `makewfs`.
+  using it from `makewfs`. The contract (`Camera.expose_spectral` + spectral
+  `FrameTruth`) is implemented on getframes `main` and slated for **2.1.1**;
+  released 2.1.0 did not include it. This stays open until 2.1.1 is released and
+  makewfs pins `getframes>=2.1.1` for the spectral path.
 
 The current compatibility path precomputes a QE-weighted electron rate and calls
 `Camera.expose(..., quantum_efficiency=1.0)` only when the released camera lacks

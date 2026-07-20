@@ -21,6 +21,7 @@ keeps one optical photon-rate map per wavelength and calls
 `getframes`; `FrameTruth.photon_rate` remains the integrated incident map while
 `FrameTruth.spectral_photon_rate` and `wavelengths_nm` preserve the cube. Without
 a QE curve, the existing scalar path is retained for compatibility. With a
-released getframes 2.0 camera, makewfs applies the same QE-weighted electron
-map through a compatibility fallback and records that integrated-only mode in
-metadata; full cube truth requires the upcoming getframes 2.1 API.
+released getframes camera that lacks `Camera.expose_spectral` (including 2.1.0),
+makewfs applies the same QE-weighted electron map through a compatibility
+fallback and records that integrated-only mode in metadata; full cube truth
+requires the `Camera.expose_spectral` API landing in getframes 2.1.1.

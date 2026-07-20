@@ -51,6 +51,7 @@ The clean-room smoke check has also been run from non-editable wheels for
 Python 3.13 environment. It imports the installed packages, builds a small SH
 configuration, renders an ideal rate map, and exposes one seeded detector frame.
 The scalar package constraint remains `getframes>=2.0` and `pyturb>=1.0`. Full
-spectral cube truth uses the upcoming `getframes>=2.1.0` API; released 2.0
-cameras use a documented QE-weighted integrated-signal fallback until that
-minor release is available.
+spectral cube truth needs the `Camera.expose_spectral` API arriving in
+getframes 2.1.1 (already on `main`); released `getframes 2.1.0` does not provide
+it, so those releases use the documented QE-weighted integrated-signal fallback
+until 2.1.1 ships and can be pinned.
