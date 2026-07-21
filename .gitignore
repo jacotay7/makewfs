@@ -225,7 +225,11 @@ __marimo__/
 *.fits
 *.fit
 *.png
+!examples/keck_haka/real_vs_simulation.png
+!examples/keck_haka/secondary_fit.png
 validation-metrics.json
 benchmark-results.json
 *.gif
+!examples/keck_haka/keck_haka.gif
+!examples/keck_haka/real_vs_simulation.gif
 .vscode

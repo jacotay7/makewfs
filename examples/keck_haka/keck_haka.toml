@@ -1,0 +1,62 @@
+schema_version = 1
+
+[input]
+quantity = "opd"
+unit = "m"
+shape = [228, 228]
+# The on-sky pupil spans about 54 of the 57 lenslets, leaving partially and
+# unilluminated edge cells in the 228-pixel RTC region.
+grid_extent_m = 11.558333333333334
+
+[telescope]
+pupil_diameter_m = 10.95
+# simulate.py replaces the analytic aperture with its generated, hashed Keck
+# 36-segment mask before constructing WavefrontSensor.
+
+[source]
+kind = "ngs"
+normalization = "magnitude"
+magnitude = 10.0
+magnitude_system = "vega"
+band = "R"
+# No atmosphere/telescope/HAKA transmission loss is applied. This deliberately
+# predicts more photons than the real instrument; comparison code reports the
+# observed ratio but never renormalizes the simulation to it.
+throughput = 1.0
+
+[sensor]
+kind = "shack_hartmann"
+# Representative HAKA guide-star wavelength from the supplied Keck II header.
+wavelength_m = 6.73e-7
+
+[shack_hartmann]
+lenslets_across_pupil = 57
+pixels_per_subaperture = 4
+# HAKA's 57x0.75 arcsec/pixel scale at 673 nm and a 10.95/54 m subaperture
+# correspond to approximately 0.91 detector pixel per lambda/D.
+spot_sampling_pixels_per_lambda_over_d = 0.91
+minimum_illuminated_fraction = 0.05
+
+[detector]
+preset = "andor_ocam2k"
+# Placeholder values are replaced from camera_modes.csv before construction.
+exposure_s = 0.001
+temperature_c = -45.0
+binning = 1
+binning_mode = "digital"
+precision = "float32"
+include_truth = true
+
+[numerics]
+dtype = "float32"
+fft_oversampling = 2
+fft_workers = 1
+pupil_samples_per_lenslet = 4
+pupil_supersampling = 1
+
+[metadata]
+instrument = "Keck II HAKA natural-guide-star Shack-Hartmann"
+detector_roi = "228x228 native OCAM2K pixels"
+pupil_model = "54-lenslet-wide Keck pupil, live-fitted circle-plus-hexagon secondary shadow, six 26 mm support arms"
+camera_mode_table = "camera_modes.csv"
+sensing_wavelength_basis = "representative Keck II GUIDWAVE=0.673 um"

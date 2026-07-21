@@ -55,6 +55,22 @@ def test_spot_integration_preserves_float32_batch_precision() -> None:
     assert spots.dtype == np.float32
 
 
+def test_even_quadcell_is_centered_on_four_pixels_for_flat_wavefront() -> None:
+    field = np.ones((1, 8, 8), dtype=np.complex128)
+    spot = spot_intensity(
+        field,
+        pixels=4,
+        samples_per_lenslet=8,
+        sampling=0.91,
+        oversampling=2,
+        workers=1,
+    )[0]
+    yy, xx = np.indices(spot.shape, dtype=np.float64)
+    assert np.sum(spot * xx) / np.sum(spot) == pytest.approx(1.5, abs=1e-12)
+    assert np.sum(spot * yy) / np.sum(spot) == pytest.approx(1.5, abs=1e-12)
+    np.testing.assert_allclose(spot[1:3, 1:3], spot[1, 1], rtol=1e-12, atol=1e-12)
+
+
 def test_backend_rejects_unknown_dtype() -> None:
     with pytest.raises(ValueError, match="unsupported dtype"):
         real_dtype("float16")

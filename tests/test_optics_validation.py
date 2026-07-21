@@ -15,15 +15,23 @@ SH_CONFIG = Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann
 PYRAMID_CONFIG = Path(__file__).parents[1] / "examples" / "configs" / "pyramid_minimal.toml"
 
 
-def _direct_centered_dft(array: np.ndarray) -> np.ndarray:
+def _direct_centered_dft(array: np.ndarray, *, frequency_offset: float = 0.0) -> np.ndarray:
     """Small independent unitary DFT used only for a reference assertion."""
-    shifted = np.fft.ifftshift(array)
+    shifted = array if frequency_offset else np.fft.ifftshift(array)
     height, width = shifted.shape
     result = np.zeros_like(shifted, dtype=np.complex128)
     for output_y in range(height):
-        frequency_y = (output_y - height // 2) % height
+        frequency_y = (
+            output_y - height // 2 + frequency_offset
+            if frequency_offset
+            else (output_y - height // 2) % height
+        )
         for output_x in range(width):
-            frequency_x = (output_x - width // 2) % width
+            frequency_x = (
+                output_x - width // 2 + frequency_offset
+                if frequency_offset
+                else (output_x - width // 2) % width
+            )
             total = 0j
             for input_y in range(height):
                 for input_x in range(width):
@@ -75,7 +83,9 @@ def test_batched_shack_spots_match_direct_random_small_grid() -> None:
         oversampling=1,
         workers=1,
     )
-    expected = np.stack([np.abs(_direct_centered_dft(field)) ** 2 for field in fields])
+    expected = np.stack(
+        [np.abs(_direct_centered_dft(field, frequency_offset=0.5)) ** 2 for field in fields]
+    )
     assert np.allclose(spots, expected, atol=1e-12, rtol=1e-12)
 
 
@@ -108,7 +118,9 @@ def test_small_shack_mosaic_matches_independent_random_phase_reference() -> None
     pupil = (np.hypot(xx, yy) <= config.telescope.pupil_diameter_m / 2).astype(float)
     field = pupil * np.exp(2j * np.pi * opd / config.sensor.wavelength_m)
     subapertures = field.reshape(2, 4, 2, 4).transpose(0, 2, 1, 3).reshape(4, 4, 4)
-    direct_spots = np.stack([np.abs(_direct_centered_dft(subap)) ** 2 for subap in subapertures])
+    direct_spots = np.stack(
+        [np.abs(_direct_centered_dft(subap, frequency_offset=0.5)) ** 2 for subap in subapertures]
+    )
     expected = direct_spots.reshape(2, 2, 4, 4).transpose(0, 2, 1, 3).reshape(8, 8)
     expected /= np.sum(pupil)
     assert np.allclose(actual, expected, atol=1e-12, rtol=1e-12)

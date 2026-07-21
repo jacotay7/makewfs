@@ -16,6 +16,12 @@ The most complete current workflows are:
 - `closed_loop_injection.py`: external residual update at the closed-loop API
   boundary;
 - `detector_choices.py`: identical ideal maps through several getframes presets.
+- `keck_haka/`: Keck II HAKA open-loop video across guide-star magnitudes 5--15,
+  with a 57x57 Shack-Hartmann, 4x4 pixels per subaperture, OCAM2K mode lookup,
+  `pyturb` Maunakea turbulence, a live-data-fitted circle-plus-hexagon secondary
+  shadow, and an unscaled, side-by-side animated comparison to the V=10.16
+  eng519 open-loop RTC cube including the detector's eight relative amplifier
+  responses.
 - `sh_design_trade.py`, `pyramid_modulation.py`, `realistic_broadband.py`, and
   `precision_throughput.py` cover the optical design, modulation, broadband
   pupil, and CPU precision trade studies.

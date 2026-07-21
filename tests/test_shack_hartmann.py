@@ -114,6 +114,22 @@ def test_wavelength_resolved_qe_applies_per_pixel_spectral_weights(tmp_path: Pat
     )
     np.testing.assert_allclose(frame.truth.mean_photoelectrons, expected_electrons, rtol=1e-6)
 
+    integrated = sensor.expose_integrated(
+        np.stack([np.zeros(config.input.shape), np.zeros(config.input.shape)]), seed=18
+    )
+    assert integrated.truth is not None
+    assert integrated.metadata["spectral"] is True
+    np.testing.assert_allclose(
+        integrated.truth.spectral_photon_rate,
+        spectral_photon_rate,
+        rtol=1e-6,
+    )
+    np.testing.assert_allclose(
+        integrated.truth.mean_photoelectrons,
+        expected_electrons,
+        rtol=1e-6,
+    )
+
 
 def test_temporal_integration_averages_ideal_maps() -> None:
     sensor = _sensor()

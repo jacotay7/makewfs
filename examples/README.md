@@ -36,6 +36,11 @@ script accepts `--help` for output and resolution controls.
 - `spectral_qe.py`: wavelength-resolved versus scalar detector QE, shown as a
   blue guide star and a red one on a real CMOS preset whose QE rolls off in the
   red; only the spectral path penalizes the red star.
+- `keck_haka/`: a Keck II HAKA 57x57 Shack-Hartmann simulation using a 228x228
+  OCAM2K ROI, the supplied magnitude-dependent EM-gain/frame-rate table, and
+  open-loop `pyturb` Maunakea turbulence. It writes a GIF or MP4 plus a JSON
+  provenance manifest and includes an unscaled real-RTC comparison with the
+  measured eight-output OCAM response structure and a fitted secondary shadow.
 - `configs/precision_throughput.toml` is the representative 20x20 lenslet
   configuration used by that precision example.
 - `configs/shack_hartmann_extended_source.toml` plus its kernel file show a

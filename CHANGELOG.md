@@ -4,6 +4,27 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Fixed temporal integration to average and forward wavelength-resolved photon
+  cubes to the detector, preserving configured spectral QE instead of silently
+  falling back to scalar QE.
+- Fixed even-sized Shack-Hartmann focal-plane registration: zero slope now lies
+  at the intersection of the central four detector pixels, using half-integer
+  Fourier samples rather than an asymmetric integer-grid crop.
+- Added a Keck II HAKA open-loop worked example with a generated 36-segment
+  Keck pupil including a live-data-fitted circle-plus-hexagon secondary shadow
+  and six 26 mm support arms, exact
+  57x57-by-4x4 (228x228) Shack-Hartmann/OCAM2K geometry,
+  magnitude-dependent EM gain and frame rate, temporally integrated `pyturb`
+  Maunakea OPD, exposure-matched master-dark subtraction, GIF/MP4 output, and a
+  reproducibility manifest with per-frame photon/electron/count flux auditing.
+  The supplied real eng519 V=10.16 RTC cube constrains the roughly 54-lenslet pupil
+  diameter, compact quadcell sampling, and the eight-output 4x2 OCAM geometry,
+  pedestal offsets, and relative conversion gains. A separate comparison script
+  reports real and simulated flux/morphology without global rescaling. The
+  eng519 comparison now simulates V=10.16 at 750 fps, retains every tenth
+  generated phase-screen exposure like the telemetry, and writes a side-by-side
+  GIF. The magnitude showcase advances frozen flow by a visible minimum cadence
+  at every magnitude without changing the physical detector exposure.
 - Added public end-to-end GPU execution through `numerics.device = "gpu"`.
   CuPy OPD, SH/PWFS optics, wavelength-resolved photon maps, the `getframes`
   detector chain, truth, and ADU remain device-resident. The runtime reports an

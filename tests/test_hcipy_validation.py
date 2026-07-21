@@ -167,7 +167,7 @@ def test_shack_hartmann_tilt_response_curves_track_hcipy() -> None:
         "detector": {"preset": "generic_cmos", "exposure_s": 0.0},
         "numerics": {
             "dtype": "float64",
-            "fft_oversampling": 1,
+            "fft_oversampling": 2,
             "fft_workers": 1,
             "pupil_samples_per_lenslet": 16,
         },
@@ -242,7 +242,7 @@ def test_shack_hartmann_tilt_response_curves_track_hcipy() -> None:
         gains.append(
             float(np.vdot(hcipy_values, ours_values) / np.vdot(hcipy_values, hcipy_values))
         )
-    # Pixel-area integration and HCIPy's Fresnel sampling produce a modest gain
-    # difference; the analytic makewfs displacement test fixes the absolute scale.
-    assert all(0.55 < gain < 0.9 for gain in gains)
+    # Both paths integrate a two-times-finer focal grid onto centered detector
+    # cells, so their tilt-response gain should now agree quantitatively.
+    assert all(0.98 < gain < 1.03 for gain in gains), gains
     assert np.isclose(gains[0], gains[1], rtol=0.01)

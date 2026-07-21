@@ -10,6 +10,12 @@ subapertures are retained and their illumination is recorded rather than
 discarded. Finite detector windows can crop diffraction wings; the lost flux is
 reported in metadata and is not silently renormalized.
 
+Detector pixels use centered cell coordinates. For an even-sized subaperture
+window, zero wavefront slope lies on the boundary shared by the central four
+pixels. The Fourier propagation is evaluated at half-integer samples before
+flux-conserving pixel-area integration, so a symmetric flat-wavefront spot gives
+equal signal in those four pixels rather than being assigned to one of them.
+
 Set `numerics.pupil_supersampling` above one when edge-area convergence matters;
 this averages analytic sub-pixels rather than interpolating a binary mask.
 

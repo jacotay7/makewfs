@@ -1,0 +1,506 @@
+{
+  "comparison_image": "real_vs_simulation.png",
+  "comparison_animation": "real_vs_simulation.gif",
+  "comparison_animation_frames": 150,
+  "reference": {
+    "path": "ocam_20260720/ocam_k2_20260720T113551_raw.npz",
+    "sha256": "86c81d50bc4f43ef483793cf9bf0b1ecd4b99b742e1e67c5c74d7649b55d93c1",
+    "raw_frames": 750,
+    "raw_dtype": "uint16",
+    "raw_min_counts": 332,
+    "raw_max_counts": 2187,
+    "telemetry_cadence_hz": 74.99425356532056,
+    "frame_counter_step": 10,
+    "background_method": "integer histogram mode outside the pupil, independently for each amplifier and global position in the repeated 4x4 cell",
+    "amplifier_diagnostics": {
+      "layout_rows_columns": [
+        4,
+        2
+      ],
+      "roi_boundaries_y_px": [
+        54,
+        114,
+        174
+      ],
+      "roi_boundaries_x_px": [
+        114
+      ],
+      "raw_pedestal_modes_adu": [
+        [
+          404,
+          407
+        ],
+        [
+          409,
+          408
+        ],
+        [
+          413,
+          408
+        ],
+        [
+          405,
+          404
+        ]
+      ],
+      "outside_pupil_temporal_rms_adu": [
+        [
+          12.453116058061756,
+          13.53709136656271
+        ],
+        [
+          10.001262231449699,
+          9.607992580529011
+        ],
+        [
+          11.37432837737639,
+          9.103350884884826
+        ],
+        [
+          14.035491773832982,
+          13.266112149215216
+        ]
+      ],
+      "phase_pedestal_modes_adu": [
+        [
+          [
+            [
+              404,
+              406,
+              404,
+              405
+            ],
+            [
+              404,
+              404,
+              404,
+              402
+            ],
+            [
+              404,
+              406,
+              405,
+              403
+            ],
+            [
+              404,
+              403,
+              401,
+              403
+            ]
+          ],
+          [
+            [
+              407,
+              408,
+              408,
+              407
+            ],
+            [
+              400,
+              407,
+              408,
+              407
+            ],
+            [
+              408,
+              407,
+              408,
+              408
+            ],
+            [
+              400,
+              401,
+              400,
+              402
+            ]
+          ]
+        ],
+        [
+          [
+            [
+              407,
+              407,
+              407,
+              407
+            ],
+            [
+              412,
+              412,
+              411,
+              410
+            ],
+            [
+              407,
+              409,
+              409,
+              408
+            ],
+            [
+              410,
+              411,
+              411,
+              411
+            ]
+          ],
+          [
+            [
+              408,
+              408,
+              406,
+              408
+            ],
+            [
+              411,
+              410,
+              410,
+              411
+            ],
+            [
+              408,
+              408,
+              408,
+              405
+            ],
+            [
+              411,
+              411,
+              412,
+              412
+            ]
+          ]
+        ],
+        [
+          [
+            [
+              413,
+              413,
+              413,
+              413
+            ],
+            [
+              410,
+              409,
+              410,
+              409
+            ],
+            [
+              413,
+              413,
+              413,
+              413
+            ],
+            [
+              409,
+              409,
+              409,
+              410
+            ]
+          ],
+          [
+            [
+              408,
+              407,
+              410,
+              408
+            ],
+            [
+              406,
+              407,
+              406,
+              406
+            ],
+            [
+              409,
+              409,
+              409,
+              408
+            ],
+            [
+              406,
+              406,
+              406,
+              408
+            ]
+          ]
+        ],
+        [
+          [
+            [
+              406,
+              405,
+              403,
+              404
+            ],
+            [
+              406,
+              405,
+              405,
+              405
+            ],
+            [
+              404,
+              406,
+              405,
+              403
+            ],
+            [
+              405,
+              407,
+              405,
+              405
+            ]
+          ],
+          [
+            [
+              402,
+              399,
+              401,
+              400
+            ],
+            [
+              400,
+              404,
+              403,
+              403
+            ],
+            [
+              399,
+              404,
+              402,
+              399
+            ],
+            [
+              404,
+              405,
+              404,
+              404
+            ]
+          ]
+        ]
+      ],
+      "configured_offsets_adu": [
+        -4.0,
+        -1.0,
+        1.0,
+        0.0,
+        5.0,
+        0.0,
+        -3.0,
+        -4.0
+      ],
+      "relative_response_fit": {
+        "method": "median dark-subtracted signal in >=98%-illuminated 4x4 cells wholly inside one amplifier; ADU/e- responses normalized to arithmetic mean one",
+        "row_major_cell_counts": [
+          102,
+          102,
+          244,
+          243,
+          245,
+          244,
+          102,
+          102
+        ],
+        "row_major_median_signal_adu": [
+          400.5686666666666,
+          455.9286666666667,
+          583.37,
+          624.8720000000001,
+          926.6973333333334,
+          353.58799999999997,
+          871.5980000000001,
+          327.80999999999995
+        ],
+        "row_major_relative_adu_response": [
+          0.7051593825646589,
+          0.802614891862556,
+          1.0269620747672354,
+          1.1000220196169703,
+          1.631354056810025,
+          0.6224548161420662,
+          1.534357424007016,
+          0.5770753342294724
+        ],
+        "row_major_relative_e_per_adu": [
+          1.4181191156572408,
+          1.2459275427588818,
+          0.9737457931215752,
+          0.909072711424633,
+          0.6129877176726525,
+          1.606542312899005,
+          0.6517386264462898,
+          1.7328760054096382
+        ],
+        "configured_relative_e_per_adu": [
+          1.418347124837523,
+          1.2461278664937352,
+          0.9739023547091326,
+          0.9092188746922037,
+          0.612603260486708,
+          1.606800617290934,
+          0.6518434148158517,
+          1.7331546220879985
+        ]
+      }
+    },
+    "matched_dark_available": false
+  },
+  "simulation": {
+    "throughput": 1.0,
+    "atmosphere_profile": "mauna-kea",
+    "pyturb_engine": "extrude",
+    "wavefront_source": "seeded generated pyturb phase screens evolved by frozen flow",
+    "seeing_arcsec_at_500_nm": 0.65,
+    "sensing_wavelength_nm": 673.0,
+    "magnitude_system": "Vega V",
+    "magnitude": 10.16,
+    "target": {
+      "name": "eng519",
+      "ra_icrs": "21 27 41.910",
+      "dec_icrs": "+15 18 23.00",
+      "epoch": 2000.0,
+      "v_magnitude": 10.16,
+      "b_minus_v": 0.46,
+      "lgs_flag": 1
+    },
+    "em_gain": 600.0,
+    "frame_rate_hz": 750.0,
+    "exposure_s": 0.0013333333333333333,
+    "telemetry_decimation": 10,
+    "master_dark_frames": 32,
+    "image_full_well_e": 270000.0,
+    "output_full_well_e": 100000.0,
+    "gain_e_per_adu": 10.0,
+    "amplifier_layout_rows_columns": [
+      4,
+      2
+    ],
+    "amplifier_boundaries_y_px": [
+      54,
+      114,
+      174
+    ],
+    "amplifier_boundaries_x_px": [
+      114
+    ],
+    "amplifier_gain_factors_relative_e_per_adu": [
+      1.418347124837523,
+      1.2461278664937352,
+      0.9739023547091326,
+      0.9092188746922037,
+      0.612603260486708,
+      1.606800617290934,
+      0.6518434148158517,
+      1.7331546220879985
+    ],
+    "amplifier_offsets_adu": [
+      -4.0,
+      -1.0,
+      1.0,
+      0.0,
+      5.0,
+      0.0,
+      -3.0,
+      -4.0
+    ],
+    "launched_photons_per_s": 71190529.95039754,
+    "captured_photons_per_s": 71190528.15826152,
+    "expected_photoelectrons_last_frame": 90311.3515625
+  },
+  "real_metrics": {
+    "frames": 750,
+    "mean_signal_counts_per_frame": 1014923.8106666667,
+    "std_signal_counts_per_frame": 24722.168231585583,
+    "median_peak_counts": 1201.0,
+    "peak_count_percentiles_10_50_90": [
+      1071.9,
+      1201.0,
+      1401.0
+    ],
+    "lower_quartile_pixel_temporal_rms_counts": 13.19484316773703,
+    "mean_spot_centroid_xy_pixels": [
+      1.1980695924607052,
+      1.4646578695046395
+    ],
+    "mean_spot_central_2x2_fraction": 0.9402082778218273,
+    "mean_spot_normalized": [
+      [
+        0.0,
+        0.013819775414447231,
+        0.0,
+        0.0
+      ],
+      [
+        0.01907656169660709,
+        0.3810104271328975,
+        0.12038106643717052,
+        0.0
+      ],
+      [
+        0.013927320479351813,
+        0.3285295540273811,
+        0.11028723022437806,
+        0.00020258898755771908
+      ],
+      [
+        0.0,
+        0.012765475600208964,
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "simulated_metrics": {
+    "frames": 750,
+    "mean_signal_counts_per_frame": 5642480.854666667,
+    "std_signal_counts_per_frame": 30156.723664077716,
+    "median_peak_counts": 4808.25,
+    "peak_count_percentiles_10_50_90": [
+      4353.85,
+      4808.25,
+      5413.6
+    ],
+    "lower_quartile_pixel_temporal_rms_counts": 19.88475071772107,
+    "mean_spot_centroid_xy_pixels": [
+      1.4930004900359641,
+      1.5047261244574957
+    ],
+    "mean_spot_central_2x2_fraction": 0.9289958058675871,
+    "mean_spot_normalized": [
+      [
+        0.0,
+        0.008824966225133842,
+        0.008255561235038684,
+        0.0
+      ],
+      [
+        0.009105776370165523,
+        0.23395086191888229,
+        0.2276081878579971,
+        0.008484979783207272
+      ],
+      [
+        0.009374915252915195,
+        0.23542234573485982,
+        0.23201441035584786,
+        0.008921009957859686
+      ],
+      [
+        0.0,
+        0.009245942580065546,
+        0.008791042728027264,
+        0.0
+      ]
+    ]
+  },
+  "diagnostics_not_applied_to_simulation": {
+    "real_to_simulated_total_signal_ratio": 0.17987191038978262,
+    "interpretation": "This ratio combines unmodeled instrument transmission, photometric-band and detector-calibration uncertainty; it is reported but never used as a scale factor."
+  },
+  "known_limitations": [
+    "No matched real OCAM dark was supplied; an outside-pupil, per-output, repeated-4x4 phase-mode pedestal is used.",
+    "The real pupil has static illumination/vignetting structure absent from phase-only pyturb.",
+    "No image registration, spot shift, pupil rotation, or flux normalization is fitted.",
+    "The catalog V=10.16 sets the photon budget while the morphology is monochromatic at 673 nm; B-V=0.46 is recorded but is not used to invent an unmeasured open-filter throughput curve."
+  ]
+}

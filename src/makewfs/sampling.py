@@ -115,14 +115,30 @@ def spot_intensity(
             pixels * oversampling,
         )
     )
+    padded = pad_center(field, (nfft, nfft), backend=resolved)
+    high_resolution_pixels = pixels * oversampling
+    if high_resolution_pixels % 2 == 0:
+        # An even detector has its optical axis on the boundary shared by its
+        # central four pixels. Evaluate the Fourier transform at half-integer
+        # frequency samples so equal-area integration is exactly symmetric
+        # around that boundary. The pupil-plane phase ramp performs the
+        # half-sample Fourier shift without interpolating intensity or changing
+        # flux. Its sign only selects the equivalent half-pixel sampling branch.
+        coordinate = resolved.arange(nfft, dtype=np.float64)
+        half_sample = resolved.exp(-1j * math.pi * coordinate / nfft)
+        padded *= half_sample[None, :, None] * half_sample[None, None, :]
     intensity = centered_fft_intensity(
-        pad_center(field, (nfft, nfft), backend=resolved),
+        padded,
         workers=workers,
         backend=resolved,
         overwrite_input=True,
     )
-    high_resolution_pixels = pixels * oversampling
-    cropped = crop_center(intensity, (high_resolution_pixels, high_resolution_pixels))
+    # ``fftshift`` puts zero frequency at ``nfft // 2``. This start index is
+    # symmetric for odd grids; even grids become symmetric after the half-sample
+    # evaluation above.
+    crop_start = nfft // 2 - high_resolution_pixels // 2
+    crop_stop = crop_start + high_resolution_pixels
+    cropped = intensity[..., crop_start:crop_stop, crop_start:crop_stop]
     if field_stop_radius_lambda_over_d is not None:
         coordinates = resolved.arange(high_resolution_pixels, dtype=np.float64)
         y, x = resolved.meshgrid(coordinates, coordinates, indexing="ij")

@@ -144,6 +144,8 @@ class WavefrontSensor:
         total_start = perf_counter()
         optical_start = total_start
         rates: list[Any] = []
+        spectral_rates: list[Any] = []
+        spectral_wavelengths_m: tuple[float, ...] | None = None
         opds: list[Any] = []
         launched = 0.0
         captured: Any = 0.0
@@ -154,12 +156,23 @@ class WavefrontSensor:
         ):
             result = self._render(sample)
             rates.append(result.photon_rate)
+            if result.spectral_photon_rate is not None:
+                spectral_rates.append(result.spectral_photon_rate)
+                if spectral_wavelengths_m is None:
+                    spectral_wavelengths_m = result.spectral_wavelengths_m
+                elif spectral_wavelengths_m != result.spectral_wavelengths_m:
+                    raise RuntimeError("spectral wavelength nodes changed within one exposure")
             opds.append(result.opd_m)
             launched = result.launched_rate_per_s
             captured += result.captured_rate_per_s
         if not rates:
             raise ValueError("phase_samples must contain at least one sample")
         average_rate = self.backend.mean(self.backend.stack(rates), axis=0)
+        average_spectral_rate = (
+            None
+            if not spectral_rates
+            else self.backend.mean(self.backend.stack(spectral_rates), axis=0)
+        )
         average_opd = self.backend.mean(self.backend.stack(opds), axis=0)
         captured_rate, opd_rms = self.backend.scalars(
             captured / len(rates), self._opd_rms(average_opd)
@@ -177,6 +190,8 @@ class WavefrontSensor:
             average_rate,
             metadata=frame_metadata,
             seed=seed,
+            spectral_photon_rate=average_spectral_rate,
+            spectral_wavelengths_m=spectral_wavelengths_m,
         )
         frame.metadata["wfs_optical_render_s"] = optical_elapsed
         frame.metadata["wfs_detector_expose_s"] = perf_counter() - detector_start
