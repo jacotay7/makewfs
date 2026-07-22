@@ -1,10 +1,9 @@
-"""Compare the real Keck II HAKA OCAM2K cube with an unscaled simulation.
+"""Compare estimated-dark-subtracted Keck HAKA data with an unscaled simulation.
 
-The real cube is raw RTC telemetry without a matched dark. Its bias is estimated
-outside the pupil for each of the eight outputs and each position of the repeated
-4x4 lenslet cell. Relative amplifier response is inferred from fully illuminated
-non-seam subapertures. The simulation uses source throughput 1.0 and is never
-globally rescaled to the observation.
+No matched dark cube was supplied. The real RTC dark/bias is estimated only from
+pixels outside the pupil, preserving a static eight-output/repeated-4x4 template
+plus a robust per-frame drift for each output. The simulation uses source
+throughput 1.0 and is never globally rescaled to the observation.
 """
 
 from __future__ import annotations
@@ -13,21 +12,26 @@ import argparse
 import hashlib
 import json
 import tempfile
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 from simulate import (
+    HAKA_BAND_MAX_NM,
+    HAKA_BAND_MIN_NM,
+    HAKA_REFERENCE_AIRMASS,
+    HAKA_SOURCE_TEMPERATURE_K,
     KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX,
     KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX,
     KECK_OCAM_AMPLIFIER_GAIN_FACTORS,
     KECK_OCAM_AMPLIFIER_LAYOUT,
     KECK_OCAM_AMPLIFIER_OFFSETS_ADU,
+    MAUNA_KEA_EXTINCTION_PATH,
     CameraMode,
     configured_sensor,
     make_keck_pupil,
+    pupil_collecting_area_m2,
 )
 
 import makewfs
@@ -65,6 +69,8 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--master-dark-frames", type=int, default=32)
     parser.add_argument("--seeing", type=float, default=0.65)
     parser.add_argument("--seed", type=int, default=57)
+    parser.add_argument("--source-temperature-k", type=float, default=HAKA_SOURCE_TEMPERATURE_K)
+    parser.add_argument("--airmass", type=float, default=HAKA_REFERENCE_AIRMASS)
     parser.add_argument("--atmosphere-engine", choices=("extrude", "spectral"), default="extrude")
     parser.add_argument("--playback-fps", type=int, default=25)
     parser.add_argument(
@@ -89,7 +95,7 @@ def _amplifier_edges() -> tuple[tuple[int, ...], tuple[int, ...]]:
 def _amplifier_background(
     images: NDArray[np.uint16], pupil: NDArray[np.float32]
 ) -> tuple[NDArray[np.float64], dict[str, Any]]:
-    """Estimate each output's pedestal without using illuminated pixels.
+    """Estimate a static output/4x4-phase dark template outside the pupil.
 
     A separate histogram mode is measured for every amplifier and global 4x4
     lenslet phase. This captures the visible output offsets without letting the
@@ -143,6 +149,31 @@ def _amplifier_background(
     }
 
 
+def _subtract_estimated_dark(
+    images: NDArray[np.uint16], pupil: NDArray[np.float32]
+) -> tuple[NDArray[np.float32], dict[str, Any]]:
+    """Subtract the strongest dark/bias estimate available without a dark cube."""
+    background, diagnostics = _amplifier_background(images, pupil)
+    reduced = images.astype(np.float32) - background.astype(np.float32)
+    outside_pupil = pupil < 0.01
+    y_edges, x_edges = _amplifier_edges()
+    drift_percentiles: list[list[list[float]]] = []
+    for row in range(KECK_OCAM_AMPLIFIER_LAYOUT[0]):
+        row_percentiles: list[list[float]] = []
+        for column in range(KECK_OCAM_AMPLIFIER_LAYOUT[1]):
+            y0, y1 = y_edges[row : row + 2]
+            x0, x1 = x_edges[column : column + 2]
+            dark_pixels = outside_pupil[y0:y1, x0:x1]
+            drift = np.median(reduced[:, y0:y1, x0:x1][:, dark_pixels], axis=1)
+            reduced[:, y0:y1, x0:x1] -= drift[:, None, None]
+            row_percentiles.append(
+                [float(value) for value in np.percentile(drift, [10.0, 50.0, 90.0])]
+            )
+        drift_percentiles.append(row_percentiles)
+    diagnostics["per_frame_output_drift_adu_percentiles_10_50_90"] = drift_percentiles
+    return reduced, diagnostics
+
+
 def _amplifier_response(
     mean_image: NDArray[np.float64], pupil: NDArray[np.float32]
 ) -> dict[str, Any]:
@@ -179,8 +210,9 @@ def _amplifier_response(
     conversion_gain_factors = 1.0 / response
     return {
         "method": (
-            "median dark-subtracted signal in >=98%-illuminated 4x4 cells wholly "
-            "inside one amplifier; ADU/e- responses normalized to arithmetic mean one"
+            "median estimated-dark-subtracted signal in >=98%-illuminated 4x4 "
+            "cells wholly inside one amplifier; ADU/e- responses normalized to "
+            "arithmetic mean one"
         ),
         "row_major_cell_counts": cell_counts,
         "row_major_median_signal_adu": medians,
@@ -217,9 +249,23 @@ def _centroid(image: NDArray[np.float64]) -> tuple[float, float]:
     return (float(np.sum(xx * image) / total), float(np.sum(yy * image) / total))
 
 
-def _cube_metrics(cube: NDArray[np.float32]) -> dict[str, Any]:
+def _lenslet_signal_sums(
+    cube: NDArray[np.float32] | NDArray[np.uint16],
+) -> NDArray[np.float64]:
+    """Return pedestal-insensitive source signal for every frame."""
+    cells = cube.reshape(-1, 57, 4, 57, 4).transpose(0, 1, 3, 2, 4)
+    border = np.ones((4, 4), dtype=np.bool_)
+    border[1:3, 1:3] = False
+    lenslet_signal = np.sum(cells[..., 1:3, 1:3], axis=(-1, -2)) - 4.0 * np.mean(
+        cells[..., border], axis=-1
+    )
+    return np.sum(lenslet_signal, axis=(1, 2), dtype=np.float64)
+
+
+def _cube_metrics(cube: NDArray[np.float32] | NDArray[np.uint16]) -> dict[str, Any]:
     mean_image = np.mean(cube, axis=0, dtype=np.float64)
-    sums = np.sum(cube, axis=(1, 2), dtype=np.float64)
+    frame_sums = np.sum(cube, axis=(1, 2), dtype=np.float64)
+    source_signal_sums = _lenslet_signal_sums(cube)
     peaks = np.max(cube, axis=(1, 2))
     temporal_rms = np.std(cube, axis=0, dtype=np.float64)
     low_signal = mean_image <= np.percentile(mean_image, 25.0)
@@ -228,8 +274,9 @@ def _cube_metrics(cube: NDArray[np.float32]) -> dict[str, Any]:
     normalized_spot = spot / np.sum(spot)
     return {
         "frames": int(cube.shape[0]),
-        "mean_signal_counts_per_frame": float(np.mean(sums)),
-        "std_signal_counts_per_frame": float(np.std(sums)),
+        "mean_estimated_dark_subtracted_frame_sum_counts": float(np.mean(frame_sums)),
+        "mean_lenslet_core_minus_border_counts_per_frame": float(np.mean(source_signal_sums)),
+        "std_lenslet_core_minus_border_counts_per_frame": float(np.std(source_signal_sums)),
         "median_peak_counts": float(np.median(peaks)),
         "peak_count_percentiles_10_50_90": [
             float(value) for value in np.percentile(peaks, [10.0, 50.0, 90.0])
@@ -251,8 +298,7 @@ def _load_real(path: Path) -> tuple[NDArray[np.float32], dict[str, Any]]:
     if len(images) < 2 or not np.all(np.diff(counters) == 10):
         raise ValueError("reference cube must contain every tenth OCAM frame")
     pupil = make_keck_pupil()
-    background, amplifier_diagnostics = _amplifier_background(images, pupil)
-    reduced = images.astype(np.float32) - background.astype(np.float32)
+    reduced, amplifier_diagnostics = _subtract_estimated_dark(images, pupil)
     amplifier_diagnostics["configured_offsets_adu"] = list(KECK_OCAM_AMPLIFIER_OFFSETS_ADU)
     amplifier_diagnostics["relative_response_fit"] = _amplifier_response(
         np.mean(reduced, axis=0, dtype=np.float64), pupil
@@ -271,9 +317,9 @@ def _load_real(path: Path) -> tuple[NDArray[np.float32], dict[str, Any]]:
         "raw_max_counts": int(images.max()),
         "telemetry_cadence_hz": float(1e9 / np.median(np.diff(timestamps))),
         "frame_counter_step": 10,
-        "background_method": (
-            "integer histogram mode outside the pupil, independently for each "
-            "amplifier and global position in the repeated 4x4 cell"
+        "dark_subtraction_method": (
+            "outside-pupil histogram-mode template for every amplifier and global "
+            "4x4 phase, plus per-frame per-output median residual drift"
         ),
         "amplifier_diagnostics": amplifier_diagnostics,
         "matched_dark_available": False,
@@ -289,15 +335,6 @@ def _simulate(args: argparse.Namespace) -> tuple[NDArray[np.float32], dict[str, 
         raise SystemExit("install makewfs[examples,interop] to run this comparison") from exc
 
     base = makewfs.load_config(HERE / "keck_haka.toml")
-    base = replace(
-        base,
-        source=replace(
-            base.source,
-            magnitude=args.magnitude,
-            magnitude_system="vega",
-            band="V",
-        ),
-    )
     if base.source.throughput != 1.0:
         raise ValueError("comparison requires source.throughput = 1.0; no flux scaling is allowed")
     mode = CameraMode(
@@ -311,6 +348,7 @@ def _simulate(args: argparse.Namespace) -> tuple[NDArray[np.float32], dict[str, 
         background_mode=1,
     )
     pupil = make_keck_pupil()
+    collecting_area_m2 = pupil_collecting_area_m2(pupil)
     exposure_s = 1.0 / args.frame_rate
     atmosphere = pyturb.Atmosphere.from_profile(
         "mauna-kea",
@@ -330,6 +368,9 @@ def _simulate(args: argparse.Namespace) -> tuple[NDArray[np.float32], dict[str, 
             mode=mode,
             frame_rate_column="WSFRRT1",
             pupil_path=pupil_path,
+            collecting_area_m2=collecting_area_m2,
+            source_temperature_k=args.source_temperature_k,
+            airmass=args.airmass,
         )
         master_dark = sensor.detector.camera.master_dark(
             exposure_s,
@@ -359,7 +400,23 @@ def _simulate(args: argparse.Namespace) -> tuple[NDArray[np.float32], dict[str, 
             "pyturb_engine": args.atmosphere_engine,
             "wavefront_source": ("seeded generated pyturb phase screens evolved by frozen flow"),
             "seeing_arcsec_at_500_nm": args.seeing,
-            "sensing_wavelength_nm": 673.0,
+            "bandpass_nm": [HAKA_BAND_MIN_NM, HAKA_BAND_MAX_NM],
+            "spectral_wavelengths_nm": [
+                wavelength_m * 1e9 for wavelength_m in sensor.config.source.wavelengths_m
+            ],
+            "source_temperature_k": args.source_temperature_k,
+            "airmass": args.airmass,
+            "atmospheric_extinction_curve": MAUNA_KEA_EXTINCTION_PATH.name,
+            "photon_weighted_atmospheric_transmission": sensor.config.metadata[
+                "photon_weighted_atmospheric_transmission"
+            ],
+            "clear_collecting_area_m2": collecting_area_m2,
+            "above_atmosphere_photons_per_s_m2": sensor.config.metadata[
+                "above_atmosphere_photons_per_s_m2"
+            ],
+            "after_atmosphere_photons_per_s_m2": sensor.config.metadata[
+                "after_atmosphere_photons_per_s_m2"
+            ],
             "magnitude_system": "Vega V",
             "magnitude": args.magnitude,
             "target": {
@@ -399,6 +456,12 @@ def _plot(
     simulated: NDArray[np.float32],
     real_metrics: dict[str, Any],
     simulated_metrics: dict[str, Any],
+    *,
+    magnitude_v: float,
+    source_temperature_k: float,
+    airmass: float,
+    em_gain: float,
+    frame_rate_hz: float,
 ) -> None:
     import matplotlib
 
@@ -415,18 +478,18 @@ def _plot(
 
     figure, axes = plt.subplots(2, 3, figsize=(15.5, 9.2), constrained_layout=True)
     for axis, image, title in (
-        (axes[0, 0], real_mean, "Real RTC mean: per-output phase-mode bias subtracted"),
+        (axes[0, 0], real_mean, "Real RTC mean: estimated dark/bias subtracted"),
         (axes[0, 1], simulated_mean, "Simulation mean: master-dark subtracted"),
     ):
         artist = axis.imshow(image, origin="lower", norm=norm, interpolation="nearest")
-        figure.colorbar(artist, ax=axis, label="dark/bias-subtracted count (shared scale)")
+        figure.colorbar(artist, ax=axis, label="dark-subtracted count (shared, unscaled)")
         axis.set_title(title)
 
-    real_sums = np.sum(real, axis=(1, 2), dtype=np.float64) / 1e6
-    simulated_sums = np.sum(simulated, axis=(1, 2), dtype=np.float64) / 1e6
+    real_sums = _lenslet_signal_sums(real) / 1e6
+    simulated_sums = _lenslet_signal_sums(simulated) / 1e6
     axes[0, 2].hist(real_sums, bins=30, alpha=0.7, label="real")
     axes[0, 2].hist(simulated_sums, bins=30, alpha=0.7, label="simulation")
-    axes[0, 2].set_xlabel("signed signal sum (million count / frame)")
+    axes[0, 2].set_xlabel("lenslet core-minus-border signal (million count / frame)")
     axes[0, 2].set_ylabel("frames")
     axes[0, 2].legend()
     axes[0, 2].set_title("No flux rescaling")
@@ -462,12 +525,13 @@ def _plot(
     axes[1, 2].set_title("Mean lenslet spot (no registration fit)")
 
     ratio = (
-        real_metrics["mean_signal_counts_per_frame"]
-        / simulated_metrics["mean_signal_counts_per_frame"]
+        real_metrics["mean_lenslet_core_minus_border_counts_per_frame"]
+        / simulated_metrics["mean_lenslet_core_minus_border_counts_per_frame"]
     )
     figure.suptitle(
-        "Keck II HAKA on eng519: V=10.16, B-V=0.46, EM x600, 750 Hz, open loop | "
-        f"real/simulation total signal = {ratio:.3f} (reported, not applied)",
+        f"Keck II HAKA on eng519: V={magnitude_v:g}, {source_temperature_k:g} K, "
+        f"400-950 nm, X={airmass:g}, EM x{em_gain:g}, {frame_rate_hz:g} Hz | "
+        f"real/simulation lenslet signal = {ratio:.3f} (reported, not applied)",
         fontsize=13,
     )
     for axis in axes.flat[:2]:
@@ -490,6 +554,8 @@ def _animate_comparison(
     telemetry_decimation: int,
     playback_fps: int,
     animation_frames: int,
+    magnitude_v: float,
+    airmass: float,
 ) -> None:
     """Write an unscaled, shared-color-scale real/simulation comparison GIF."""
     import matplotlib
@@ -513,12 +579,12 @@ def _animate_comparison(
         axes[0].imshow(real[0], origin="lower", norm=norm, interpolation="nearest"),
         axes[1].imshow(simulated[0], origin="lower", norm=norm, interpolation="nearest"),
     ]
-    axes[0].set_title("Real RTC (bias subtracted)", fontsize=10)
+    axes[0].set_title("Real RTC (estimated dark subtracted)", fontsize=10)
     axes[1].set_title("Simulation (dark subtracted)", fontsize=10)
     for axis in axes:
         axis.set_xlabel("x (native OCAM2K pixel)")
         axis.set_ylabel("y (native OCAM2K pixel)")
-    figure.colorbar(artists[1], ax=axes, label="dark/bias-subtracted count (shared, unscaled)")
+    figure.colorbar(artists[1], ax=axes, label="dark-subtracted count (shared, unscaled)")
     title = figure.suptitle("")
 
     def update(index: int) -> tuple[Any, ...]:
@@ -526,8 +592,9 @@ def _animate_comparison(
         artists[1].set_data(simulated[index])
         elapsed_s = index * telemetry_decimation / frame_rate_hz
         title.set_text(
-            f"eng519 | V={TARGET_V_MAG:.2f}, B-V={TARGET_B_MINUS_V:.2f} | "
-            f"750 Hz, every 10th frame | t={elapsed_s:.3f} s"
+            f"eng519 | V={magnitude_v:.2f}, 400-950 nm, X={airmass:g} | "
+            f"{frame_rate_hz:g} Hz, every {telemetry_decimation}th frame | "
+            f"t={elapsed_s:.3f} s"
         )
         return (*artists, title)
 
@@ -553,6 +620,8 @@ def main() -> None:
         or args.frame_rate <= 0
         or args.playback_fps < 1
         or args.animation_frames < 1
+        or args.source_temperature_k <= 0
+        or args.airmass <= 0
         or not 1 <= args.em_gain <= 600
     ):
         raise SystemExit("invalid positive frame/sample counts, frame rate, or EM gain")
@@ -562,12 +631,23 @@ def main() -> None:
     real_metrics = _cube_metrics(real)
     simulated_metrics = _cube_metrics(simulated)
     flux_ratio = (
-        real_metrics["mean_signal_counts_per_frame"]
-        / simulated_metrics["mean_signal_counts_per_frame"]
+        real_metrics["mean_lenslet_core_minus_border_counts_per_frame"]
+        / simulated_metrics["mean_lenslet_core_minus_border_counts_per_frame"]
     )
 
     output = Path(args.output).resolve()
-    _plot(output, real, simulated, real_metrics, simulated_metrics)
+    _plot(
+        output,
+        real,
+        simulated,
+        real_metrics,
+        simulated_metrics,
+        magnitude_v=args.magnitude,
+        source_temperature_k=args.source_temperature_k,
+        airmass=args.airmass,
+        em_gain=args.em_gain,
+        frame_rate_hz=args.frame_rate,
+    )
     animation_output: Path | None = None
     if not args.skip_animation:
         animation_output = Path(args.comparison_gif).resolve()
@@ -579,6 +659,8 @@ def main() -> None:
             telemetry_decimation=args.telemetry_decimation,
             playback_fps=args.playback_fps,
             animation_frames=args.animation_frames,
+            magnitude_v=args.magnitude,
+            airmass=args.airmass,
         )
     manifest = Path(args.manifest).resolve() if args.manifest else output.with_suffix(".json")
     payload = {
@@ -594,16 +676,22 @@ def main() -> None:
         "real_metrics": real_metrics,
         "simulated_metrics": simulated_metrics,
         "diagnostics_not_applied_to_simulation": {
-            "real_to_simulated_total_signal_ratio": flux_ratio,
+            "real_to_simulated_lenslet_signal_ratio": flux_ratio,
+            "signal_estimator": (
+                "sum over 57x57 lenslets of central-2x2 counts minus four times "
+                "the surrounding 12-pixel border mean"
+            ),
             "interpretation": (
-                "This ratio combines unmodeled instrument transmission, photometric-band and "
-                "detector-calibration uncertainty; it is reported but never used as a scale factor."
+                "With atmospheric extinction already modeled, this is an estimate of the "
+                "downstream telescope-plus-HAKA end-to-end throughput convolved with detector-"
+                "calibration uncertainty; it is reported but never used as a scale factor."
             ),
         },
         "known_limitations": [
             (
-                "No matched real OCAM dark was supplied; an outside-pupil, per-output, "
-                "repeated-4x4 phase-mode pedestal is used."
+                "No matched OCAM2K dark cube was supplied. The real dark/bias estimate uses "
+                "only outside-pupil pixels, with a static per-output/repeated-4x4 template "
+                "and a per-frame drift for each output."
             ),
             (
                 "The real pupil has static illumination/vignetting structure absent "
@@ -611,9 +699,10 @@ def main() -> None:
             ),
             "No image registration, spot shift, pupil rotation, or flux normalization is fitted.",
             (
-                "The catalog V=10.16 sets the photon budget while the morphology is "
-                "monochromatic at 673 nm; B-V=0.46 is recorded but is not used to "
-                "invent an unmeasured open-filter throughput curve."
+                "The catalog V=10.16 normalizes a 6600 K Planck spectrum over the "
+                "approximate 400--950 nm top-hat HAKA band. The measured Mauna Kea "
+                "extinction curve is applied at the frame-header airmass of 1.01; "
+                "the exact HAKA instrumental transmission curve remains unknown."
             ),
         ],
     }
@@ -621,7 +710,7 @@ def main() -> None:
     print(
         f"wrote {output}, {manifest}"
         + (f", and {animation_output}" if animation_output is not None else "")
-        + f"; real/simulation signal ratio={flux_ratio:.3f} "
+        + f"; real/simulation lenslet-signal ratio={flux_ratio:.3f} "
         "(diagnostic only)"
     )
 

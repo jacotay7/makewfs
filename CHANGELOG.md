@@ -19,12 +19,18 @@ All notable changes to `makewfs` are documented here.
   reproducibility manifest with per-frame photon/electron/count flux auditing.
   The supplied real eng519 V=10.16 RTC cube constrains the roughly 54-lenslet pupil
   diameter, compact quadcell sampling, and the eight-output 4x2 OCAM geometry,
-  pedestal offsets, and relative conversion gains. A separate comparison script
-  reports real and simulated flux/morphology without global rescaling. The
+  outside-pupil dark/bias levels, and relative conversion gains. With no matched
+  dark cube, the RTC comparison subtracts a per-output/repeated-4x4 template and
+  per-frame output drift inferred outside the pupil, then reports real and
+  simulated lenslet signal/morphology without global rescaling. The
   eng519 comparison now simulates V=10.16 at 750 fps, retains every tenth
   generated phase-screen exposure like the telemetry, and writes a side-by-side
   GIF. The magnitude showcase advances frozen flow by a visible minimum cadence
-  at every magnitude without changing the physical detector exposure.
+  at every magnitude without changing the physical detector exposure. HAKA NGS
+  photon formation now integrates a V-normalized 6600 K spectrum over the full
+  400--950 nm band, applies measured Mauna Kea extinction at the observed
+  airmass, uses the sampled clear-pupil collecting area, and passes the resolved
+  spectral cube through OCAM2K's wavelength-dependent QE.
 - Added public end-to-end GPU execution through `numerics.device = "gpu"`.
   CuPy OPD, SH/PWFS optics, wavelength-resolved photon maps, the `getframes`
   detector chain, truth, and ADU remain device-resident. The runtime reports an

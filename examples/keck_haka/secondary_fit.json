@@ -7,25 +7,25 @@
   "method": "amplifier-response-corrected 4x4 core-minus-border illumination; robust least-squares fit within 10 lenslets of pupil center",
   "geometry": "union of circle and pointy-top segment-aligned regular hexagon",
   "samples_per_subaperture": 8,
-  "objective": 0.014676649673845969,
+  "objective": 0.014555450342205121,
   "optimizer_success": true,
   "optimizer_message": "Optimization terminated successfully.",
   "fitted": {
-    "circle_radius_m": 1.2832692787918016,
-    "circle_diameter_m": 2.5665385575836033,
-    "hex_circumradius_m": 1.4598141307978847,
-    "hex_flat_to_flat_m": 2.5284722441489347,
-    "hex_corner_to_corner_m": 2.9196282615957694,
-    "offset_x_m": 0.03522716944963441,
-    "offset_y_m": -0.02497734908543188,
+    "circle_radius_m": 1.2832730274061606,
+    "circle_diameter_m": 2.566546054812321,
+    "hex_circumradius_m": 1.4620156552414303,
+    "hex_flat_to_flat_m": 2.5322853963392604,
+    "hex_corner_to_corner_m": 2.9240313104828606,
+    "offset_x_m": 0.037589960343722195,
+    "offset_y_m": -0.02544440807975979,
     "rotation_deg": 0.0
   },
   "configured_model": {
-    "circle_radius_m": 1.283471884106635,
-    "hex_circumradius_m": 1.459923328140809,
-    "offset_x_m": 0.03506092287606458,
-    "offset_y_m": -0.02480203024318493
+    "circle_radius_m": 1.2832730274061606,
+    "hex_circumradius_m": 1.4620156552414303,
+    "offset_x_m": 0.037589960343722195,
+    "offset_y_m": -0.02544440807975979
   },
-  "configured_parameter_max_abs_difference_m": 0.00020260531483340394,
+  "configured_parameter_max_abs_difference_m": 0.0,
   "fit_does_not_scale_simulated_flux": true
 }

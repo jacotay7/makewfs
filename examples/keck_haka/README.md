@@ -5,7 +5,14 @@ natural-guide-star Shack-Hartmann model. It uses the repository boundaries
 directly:
 
 ```text
-pyturb Maunakea OPD -> makewfs HAKA optics -> getframes OCAM2K ADU
+V-normalized F6 V spectrum x Maunakea extinction
+                       + pyturb Maunakea OPD
+                                      |
+                                      v
+                        makewfs HAKA broadband optics
+                                      |
+                                      v
+                         getframes spectral OCAM2K ADU
 ```
 
 The exact eight-output geometry, measured amplifier responses, and separate
@@ -29,8 +36,8 @@ maintained `make_keck_aperture`, whose documentation cites validation against
 Keck internal simulation efforts. The supplied RTC pupil further constrains the
 secondary shadow. After correcting the eight relative amplifier responses, a
 fit to the 4x4 core-minus-border subaperture illumination favors the union of a
-2.567 m diameter circle and a segment-aligned regular hexagon measuring 2.529 m
-flat-to-flat (2.920 m corner-to-corner), offset by (+0.035, -0.025) m in pupil
+2.567 m diameter circle and a segment-aligned regular hexagon measuring 2.532 m
+flat-to-flat (2.924 m corner-to-corner), offset by (+0.038, -0.025) m in pupil
 (x, y). This captures the circular secondary mirror between the hexagonal
 segment/baffle limits. The support pattern is rotated by 30 degrees so it has a
 vertical rather than horizontal arm, as in the RTC image. Reproduce the fit and
@@ -44,17 +51,23 @@ The detector starts from the public `getframes` `andor_ocam2k` preset and change
 the ROI and lookup-table EM gain. OCAM2K's eight outputs are modeled as four rows
 by two columns. The full 240-pixel detector has 60-row by 120-column regions; the
 centered 228-pixel RTC crop therefore splits at y=[54, 114, 174] and x=[114].
-Per-output bias offsets and relative conversion gains are measured directly from
-the supplied eng519 V=10.16 open-loop cube. The gain fit uses the median signal in
-subapertures that are at least 98% illuminated and do not cross an output seam.
-Relative ADU/electron responses are normalized to arithmetic mean one, so this
-models the visible seams without applying a global flux correction.
+Per-output dark/bias levels and relative conversion gains are inferred directly
+from the supplied eng519 V=10.16 open-loop cube. The gain fit uses the total
+estimated-dark-subtracted signal in subapertures that are at least 98%
+illuminated and do not cross an output seam. Relative ADU/electron responses are
+normalized to arithmetic mean one, so this models the visible seams without
+applying a global flux correction.
 
-Every science frame is reduced with a reproducible, exposure-matched 32-frame
-median master dark for its WATAO mode. The resulting panels are bias/dark-subtracted
-floating-point counts, so read noise can produce negative pixels. The manufacturer
-specifies 2067 fps full-frame maximum speed and about 0.4 input-referred electrons
-of mean read noise at 2000 fps and multiplication gain near 600: [Andor OCAM2K
+No matched dark cube accompanies the RTC data. Its best available dark/bias
+estimate is built exclusively from pixels outside the fitted pupil: an integer
+histogram-mode template for each of the eight outputs and each phase of the
+repeated 4x4 pattern, followed by a robust per-frame median drift correction for
+each output. Every simulated science frame instead uses a reproducible,
+exposure-matched 32-frame median master dark for its WATAO mode. Both panels are
+therefore dark-subtracted floating-point counts and can contain negative values.
+The manufacturer specifies 2067 fps full-frame maximum speed and about 0.4
+input-referred electrons of mean read noise at 2000 fps and multiplication gain
+near 600: [Andor OCAM2K
 specifications](https://andor.oxinst.com/products/ocam-emccd-camera-series/ocam).
 The preset keeps the detector's two saturation domains separate: Andor's
 published 270,000-electron image-area well is applied before EM multiplication,
@@ -63,14 +76,24 @@ and the Keck-observed 10,000 dark-subtracted count ceiling is represented as a
 unphysical 25-count post-EM clip that results from treating a single small
 input-referred number as the output well.
 
+The source is a 6600 K Planck photon spectrum normalized to the catalog Johnson
+V magnitude and integrated from 400 to 950 nm with eight-point Gauss-Legendre
+quadrature. Atmospheric attenuation uses the mean Mauna Kea extinction curve
+in magnitudes per airmass published in CFHT Bulletin 19 and reproduced by the
+[W. M. Keck Observatory](https://www2.keck.hawaii.edu/inst/common/exts.html).
+The eng519 header supplies `AIRMASS=1.01`; the same value is the showcase default.
+The curve is applied before the telescope and the absolute photon budget uses
+the 72.04 m² clear area measured from the same sampled segmented pupil used by
+the optical propagation. Downstream HAKA throughput remains exactly one.
+
 The JSON manifest contains a `frame_flux_audit` for every rendered exposure. It
 records launched and optically captured photons, expected photoelectrons,
 expected pre-saturation counts, and the noisy measured dark-subtracted count sum.
 The spot sampling is 0.91 pixel per lambda/D, corresponding to the HAKA
-57x0.75-arcsec/pixel scale at 673 nm and a 10.95/54 m illuminated subaperture.
-This keeps most of the diffraction core in the central four quadcell pixels, as
-seen in the reference cube. Any remaining finite-window crop loss is reported in
-the manifest and is never renormalized away.
+57x0.75-arcsec/pixel scale at the 673 nm reference wavelength and a 10.95/54 m
+illuminated subaperture. Each wavelength's spot then scales physically across
+400--950 nm before incoherent intensity summation. Any remaining finite-window
+crop loss is reported in the manifest and is never renormalized away.
 
 Run the full 5--15 magnitude sweep:
 
@@ -114,25 +137,31 @@ the RTC telemetry decimation. The default GIF shows 150 paired retained frames
 Metrics always use every simulated and reference frame. The report contains the raw-cube hash, target,
 generated-phase-screen settings, per-output pedestal/noise measurements,
 relative-gain derivation, real and simulated 4x4 spot morphology, and the
-unmodified real/simulated total signal ratio. Because no matched real dark was
-supplied, the real pedestal is estimated from pixels outside the pupil
-independently for each output and each global 4x4 lenslet phase. The simulation
-uses its normal exposure-matched master dark.
+unmodified real/simulated lenslet-signal ratio. Source signal is measured
+identically in both dark-subtracted cubes as the central 2x2 sum minus four
+times the surrounding 12-pixel border mean in every lenslet, making the flux
+comparison insensitive to small residual offsets. The simulation uses its
+normal exposure-matched master dark.
 
-The catalog V magnitude sets the comparison photon budget. B-V is preserved in
-the manifest but is not used to synthesize an unknown HAKA open-filter throughput
-curve; image morphology remains monochromatic at the measured 673 nm guide
-wavelength. Source throughput is one, so the simulation is expected to be
-brighter than the instrument. The measured real/simulation ratio is reported and
-never fed back as a scale factor.
+The catalog V magnitude sets the absolute normalization of the 6600 K spectrum;
+B-V=0.46 is retained as supporting evidence for the F5--F7 classification. The
+400--950 nm passband is currently a top hat because a measured HAKA instrumental
+curve was not supplied. Atmospheric transmission and detector QE are both
+wavelength resolved. Source instrument throughput is one, so the simulation is
+expected to be brighter than the instrument. The measured real/simulation ratio
+is reported and never fed back as a scale factor.
 
-For the checked-in deterministic run, the real and simulated central-2x2 spot
-fractions are 94.0% and 92.9%. Mean signed signal is 1.015 million count/frame
-in the real cube and 5.642 million count/frame in the throughput-unity
-simulation: a real/simulation ratio of 0.180, reported but not applied. The
-simulation launches 71.19 million photons/s. Thus no missing-flux correction is
-hidden here—the no-throughput simulation is 5.56 times brighter than the real
-instrument at this catalog V magnitude.
+For the checked-in deterministic run, the photon-weighted atmospheric
+transmission is 90.62%. The 72.04 m² clear pupil receives 270.44 million
+photons/s after atmospheric extinction and the finite SH windows capture 267.01
+million photons/s. The real and simulated central-2x2 spot fractions are 94.1%
+and 92.4%, respectively. The pedestal-insensitive lenslet signal is 0.848
+million count/frame in the real cube and 12.149 million count/frame in the
+throughput-unity simulation: a real/simulation ratio of 0.0698, reported but not
+applied. Because atmospheric extinction is already included, this is an
+approximate 6.98% end-to-end telescope-plus-HAKA throughput diagnostic, still
+convolved with the estimated real dark, absolute detector calibration, and the
+unknown instrumental band shape.
 
 `WSFRRT1` is the default rate column; select `--frame-rate-column WSFRRT2` to
 render the alternate rates. Magnitude bins are lower-inclusive and
@@ -142,11 +171,11 @@ uses the physical inverse lookup-table frame rate.
 
 ## Explicit assumptions
 
-- The user-supplied magnitudes are interpreted as Vega R magnitudes because the
-  lookup did not identify a photometric system. The sensing morphology is
-  monochromatic at 673 nm (matching `GUIDWAVE=0.673 um` in the supplied Keck II
-  header). Source throughput is exactly 1.0: no instrument transmission loss is
-  modeled, so the predicted flux should exceed a real OCAM2K frame.
+- Magnitudes are interpreted as catalog Vega V. Every showcase star uses a
+  6600 K F6 V spectrum over a top-hat 400--950 nm band. The eng519 exposure uses
+  its header airmass of 1.01 and the mean measured Mauna Kea extinction curve.
+  Downstream instrument throughput is exactly 1.0, so the predicted flux should
+  exceed a real OCAM2K frame.
 - Seeing defaults to 0.65 arcsec at 500 nm. `pyturb` supplies its traceable
   `mauna-kea` profile and all wavefronts are open loop: no residual scaling,
   reconstructor, DM, or controller is applied.
@@ -167,8 +196,8 @@ uses the physical inverse lookup-table frame rate.
   illuminated subapertures in the supplied star cube. This is a detector flat
   model even though the operational system does not apply a flat. Their global
   response normalization is fixed to one; it is not fitted to the simulation's
-  total flux. A matched dark and uniform flat would improve the absolute detector
-  calibration.
+  total flux. A matched dark cube and uniform flat would improve the absolute
+  detector calibration.
 - The OCAM2K preset is calibrated around its 2000 fps, gain-near-600 operating
   point. Its QE, output read noise, CIC, bias, ADC, image-area well, and output
   register limit are held fixed while the supplied EM gain changes; this is a

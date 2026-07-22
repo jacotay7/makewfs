@@ -26,10 +26,10 @@ HERE = Path(__file__).resolve().parent
 KECK_DIAMETER_M = 10.95
 # Fit to the amplifier-corrected live pupil. The shadow is the union of a
 # circular secondary and a slightly larger pointy-top hexagonal component.
-KECK_SECONDARY_CIRCLE_RADIUS_M = 1.283471884106635
-KECK_SECONDARY_HEX_CIRCUMRADIUS_M = 1.459923328140809
-KECK_SECONDARY_OFFSET_X_M = 0.03506092287606458
-KECK_SECONDARY_OFFSET_Y_M = -0.02480203024318493
+KECK_SECONDARY_CIRCLE_RADIUS_M = 1.2832730274061606
+KECK_SECONDARY_HEX_CIRCUMRADIUS_M = 1.4620156552414303
+KECK_SECONDARY_OFFSET_X_M = 0.037589960343722195
+KECK_SECONDARY_OFFSET_Y_M = -0.02544440807975979
 KECK_CENTRAL_OBSCURATION_DIAMETER_M = 2.0 * KECK_SECONDARY_CIRCLE_RADIUS_M
 KECK_SPIDER_WIDTH_M = 0.026
 HAKA_ILLUMINATED_LENSLETS_ACROSS = 54.0
@@ -42,21 +42,31 @@ KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX = (114,)
 # Raw modes measured outside the generated pupil are [404, 407], [409, 408],
 # [413, 408], [405, 404] ADU. These are offsets around the 408 ADU pedestal.
 KECK_OCAM_AMPLIFIER_OFFSETS_ADU = (-4.0, -1.0, 1.0, 0.0, 5.0, 0.0, -3.0, -4.0)
-# Relative e-/ADU factors inferred from the median signal of fully illuminated,
-# non-seam subapertures in the supplied eng519 V=10.16 cube. Their reciprocal ADU
-# responses have arithmetic mean one, so this is not a global flux adjustment.
+# Relative e-/ADU factors inferred from estimated-dark-subtracted flux in fully
+# illuminated, non-seam subapertures in the supplied eng519 V=10.16 cube. The
+# corresponding ADU responses have arithmetic mean one, so this is not a global
+# flux adjustment.
 KECK_OCAM_AMPLIFIER_GAIN_FACTORS = (
-    1.418347124837523,
-    1.2461278664937352,
-    0.9739023547091326,
-    0.9092188746922037,
-    0.612603260486708,
-    1.606800617290934,
-    0.6518434148158517,
-    1.7331546220879985,
+    1.3862224707711355,
+    1.2023941960165427,
+    0.9756623546347103,
+    0.8999189270422476,
+    0.6255148659644185,
+    1.6243649181651014,
+    0.6628431913249156,
+    1.7011882405009537,
 )
 OCAM2K_MAX_EM_GAIN = 600.0
 OCAM2K_MAX_FRAME_RATE_HZ = 2067.0
+HAKA_BAND_MIN_NM = 400.0
+HAKA_BAND_MAX_NM = 950.0
+HAKA_SPECTRAL_QUADRATURE_ORDER = 8
+HAKA_SOURCE_TEMPERATURE_K = 6600.0
+HAKA_REFERENCE_AIRMASS = 1.01
+MAUNA_KEA_EXTINCTION_PATH = HERE / "mauna_kea_extinction.csv"
+_H_PLANCK_J_S = 6.62607015e-34
+_C_LIGHT_M_S = 299792458.0
+_K_BOLTZMANN_J_K = 1.380649e-23
 
 
 @dataclass(frozen=True)
@@ -99,6 +109,19 @@ class RenderedFrame:
     image_full_well_e: float
     output_full_well_e: float | None
     gain_e_per_adu: float
+
+
+@dataclass(frozen=True)
+class BroadbandBudget:
+    """Absolute photon budget and quadrature for one catalog V magnitude."""
+
+    wavelengths_m: tuple[float, ...]
+    wavelength_weights: tuple[float, ...]
+    collecting_area_m2: float
+    above_atmosphere_photons_per_s_m2: float
+    after_atmosphere_photons_per_s_m2: float
+    detector_surface_photons_per_s: float
+    photon_weighted_atmospheric_transmission: float
 
 
 def load_camera_modes(path: Path = HERE / "camera_modes.csv") -> tuple[CameraMode, ...]:
@@ -247,6 +270,101 @@ def make_keck_pupil(
     return mask.astype(np.float32)
 
 
+def pupil_collecting_area_m2(pupil: NDArray[np.float32]) -> float:
+    """Return clear collecting area represented by a sampled pupil mask."""
+    if pupil.ndim != 2 or pupil.shape[0] <= 0 or pupil.shape[1] <= 0:
+        raise ValueError("pupil must be a non-empty two-dimensional array")
+    pixel_area_m2 = (HAKA_GRID_EXTENT_M / pupil.shape[0]) * (HAKA_GRID_EXTENT_M / pupil.shape[1])
+    return float(np.sum(pupil, dtype=np.float64) * pixel_area_m2)
+
+
+def _blackbody_photon_shape(
+    wavelength_nm: NDArray[np.float64], temperature_k: float
+) -> NDArray[np.float64]:
+    """Return a dimensionless Planck photon-density shape referenced at 550 nm."""
+    if temperature_k <= 0:
+        raise ValueError("source temperature must be positive")
+    wavelength_m = wavelength_nm * 1e-9
+    reference_m = 550e-9
+    scale = _H_PLANCK_J_S * _C_LIGHT_M_S / (_K_BOLTZMANN_J_K * temperature_k)
+    shape = wavelength_m**-4 / np.expm1(scale / wavelength_m)
+    reference = reference_m**-4 / math.expm1(scale / reference_m)
+    return np.asarray(shape / reference, dtype=np.float64)
+
+
+def _gauss_legendre_interval(
+    minimum: float, maximum: float, order: int
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    nodes, weights = np.polynomial.legendre.leggauss(order)
+    half_width = 0.5 * (maximum - minimum)
+    return half_width * nodes + 0.5 * (minimum + maximum), half_width * weights
+
+
+def broadband_budget(
+    magnitude_v: float,
+    collecting_area_m2: float,
+    *,
+    temperature_k: float = HAKA_SOURCE_TEMPERATURE_K,
+    airmass: float = HAKA_REFERENCE_AIRMASS,
+    throughput: float = 1.0,
+) -> BroadbandBudget:
+    """Build a V-normalized 400--950 nm F-star photon quadrature.
+
+    The catalog V magnitude fixes the above-atmosphere normalization. The source
+    is a blackbody photon spectrum and the tabulated Mauna Kea extinction in
+    mag/airmass is applied at the observed frame's airmass. ``throughput`` is an
+    optional wavelength-independent instrument term and remains one here.
+    """
+    try:
+        import getframes
+    except ImportError as exc:  # pragma: no cover - required makewfs dependency
+        raise ImportError("makewfs requires getframes") from exc
+    if collecting_area_m2 <= 0 or airmass <= 0 or not 0 <= throughput <= 1:
+        raise ValueError("collecting area and airmass must be positive; throughput in [0, 1]")
+
+    v_band = getframes.Bandpass.johnson("V")
+    if v_band.response is None:
+        raise AssertionError("getframes Johnson V must carry a spectral response")
+    response = v_band.response.response
+    v_nodes, v_quadrature = _gauss_legendre_interval(
+        float(response.wavelength_nm[0]),
+        float(response.wavelength_nm[-1]),
+        32,
+    )
+    v_response = np.interp(v_nodes, response.wavelength_nm, response.value)
+    v_shape_integral = float(
+        np.sum(v_quadrature * _blackbody_photon_shape(v_nodes, temperature_k) * v_response)
+    )
+    density_scale = v_band.photon_flux(magnitude_v) / v_shape_integral
+
+    wavelengths_nm, quadrature = _gauss_legendre_interval(
+        HAKA_BAND_MIN_NM,
+        HAKA_BAND_MAX_NM,
+        HAKA_SPECTRAL_QUADRATURE_ORDER,
+    )
+    extinction = np.loadtxt(MAUNA_KEA_EXTINCTION_PATH, delimiter=",", comments="#")
+    extinction_mag_per_airmass = np.interp(
+        wavelengths_nm,
+        extinction[:, 0],
+        extinction[:, 1],
+    )
+    atmospheric_transmission = 10.0 ** (-0.4 * airmass * extinction_mag_per_airmass)
+    above_density = density_scale * _blackbody_photon_shape(wavelengths_nm, temperature_k)
+    above_contributions = quadrature * above_density
+    transmitted_contributions = above_contributions * atmospheric_transmission
+    above_flux = float(np.sum(above_contributions))
+    transmitted_flux = float(np.sum(transmitted_contributions))
+    return BroadbandBudget(
+        wavelengths_m=tuple((wavelengths_nm * 1e-9).tolist()),
+        wavelength_weights=tuple(transmitted_contributions.tolist()),
+        collecting_area_m2=collecting_area_m2,
+        above_atmosphere_photons_per_s_m2=above_flux,
+        after_atmosphere_photons_per_s_m2=transmitted_flux,
+        detector_surface_photons_per_s=(transmitted_flux * collecting_area_m2 * throughput),
+        photon_weighted_atmospheric_transmission=transmitted_flux / above_flux,
+    )
+
+
 def configured_sensor(
     base: makewfs.Config,
     *,
@@ -254,6 +372,9 @@ def configured_sensor(
     mode: CameraMode,
     frame_rate_column: str,
     pupil_path: Path,
+    collecting_area_m2: float,
+    source_temperature_k: float = HAKA_SOURCE_TEMPERATURE_K,
+    airmass: float = HAKA_REFERENCE_AIRMASS,
 ) -> makewfs.WavefrontSensor:
     """Build one magnitude/camera-mode configuration from public sibling APIs."""
     try:
@@ -277,6 +398,13 @@ def configured_sensor(
         inline=camera.to_dict(),
         exposure_s=1.0 / frame_rate_hz,
     )
+    budget = broadband_budget(
+        magnitude,
+        collecting_area_m2,
+        temperature_k=source_temperature_k,
+        airmass=airmass,
+        throughput=base.source.throughput,
+    )
     metadata = {
         **base.metadata,
         "watao": mode.watao,
@@ -285,11 +413,32 @@ def configured_sensor(
         "frame_rate_column": frame_rate_column,
         "obwnname": mode.filter_name,
         "bkgnd": mode.background_mode,
+        "catalog_v_magnitude": magnitude,
+        "source_temperature_k": source_temperature_k,
+        "airmass": airmass,
+        "bandpass_nm": [HAKA_BAND_MIN_NM, HAKA_BAND_MAX_NM],
+        "spectral_quadrature_order": HAKA_SPECTRAL_QUADRATURE_ORDER,
+        "clear_collecting_area_m2": collecting_area_m2,
+        "above_atmosphere_photons_per_s_m2": budget.above_atmosphere_photons_per_s_m2,
+        "after_atmosphere_photons_per_s_m2": budget.after_atmosphere_photons_per_s_m2,
+        "photon_weighted_atmospheric_transmission": (
+            budget.photon_weighted_atmospheric_transmission
+        ),
     }
     config = replace(
         base,
         telescope=replace(base.telescope, custom_mask_path=str(pupil_path)),
-        source=replace(base.source, magnitude=magnitude),
+        source=replace(
+            base.source,
+            normalization="detector_photon_rate",
+            detector_photon_rate_per_s=budget.detector_surface_photons_per_s,
+            magnitude=None,
+            band=None,
+            wavelengths_m=budget.wavelengths_m,
+            wavelength_weights=budget.wavelength_weights,
+            sed_path=None,
+            transmission_path=None,
+        ),
         detector=detector,
         metadata=metadata,
     )
@@ -305,7 +454,7 @@ def _parse_arguments() -> argparse.Namespace:
         nargs="+",
         type=float,
         default=[value / 2.0 for value in range(10, 31)],
-        help="Vega R magnitudes to animate (default: 5 to 15 in 0.5-mag steps)",
+        help="Vega V magnitudes to animate (default: 5 to 15 in 0.5-mag steps)",
     )
     parser.add_argument("--frames-per-magnitude", type=int, default=1)
     parser.add_argument("--samples-per-exposure", type=int, default=3)
@@ -326,6 +475,8 @@ def _parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--seeing", type=float, default=0.65, help="500 nm seeing (arcsec)")
     parser.add_argument("--profile", choices=["mauna-kea", "keck"], default="mauna-kea")
+    parser.add_argument("--source-temperature-k", type=float, default=HAKA_SOURCE_TEMPERATURE_K)
+    parser.add_argument("--airmass", type=float, default=HAKA_REFERENCE_AIRMASS)
     parser.add_argument("--atmosphere-engine", choices=["spectral", "extrude"], default="extrude")
     parser.add_argument("--seed", type=int, default=57)
     parser.add_argument("--playback-fps", type=int, default=6)
@@ -340,8 +491,17 @@ def _validate_arguments(args: argparse.Namespace, modes: tuple[CameraMode, ...])
         or args.master_dark_frames < 1
     ):
         raise SystemExit("frame and exposure sample counts must be >= 1")
-    if args.playback_fps < 1 or args.seeing <= 0 or args.atmosphere_step_s <= 0:
-        raise SystemExit("--playback-fps, --seeing, and --atmosphere-step-s must be positive")
+    if (
+        args.playback_fps < 1
+        or args.seeing <= 0
+        or args.atmosphere_step_s <= 0
+        or args.source_temperature_k <= 0
+        or args.airmass <= 0
+    ):
+        raise SystemExit(
+            "--playback-fps, --seeing, --atmosphere-step-s, source temperature, "
+            "and airmass must be positive"
+        )
     for magnitude in args.magnitudes:
         select_camera_mode(magnitude, modes)
 
@@ -363,6 +523,7 @@ def _render_frames(
     except ImportError as exc:
         raise SystemExit("install makewfs[examples,interop] to run this example") from exc
     base = makewfs.load_config(HERE / "keck_haka.toml")
+    collecting_area_m2 = pupil_collecting_area_m2(pupil)
     atmosphere = pyturb.Atmosphere.from_profile(
         args.profile,
         seeing=args.seeing,
@@ -383,6 +544,9 @@ def _render_frames(
             mode=mode,
             frame_rate_column=args.frame_rate_column,
             pupil_path=pupil_path,
+            collecting_area_m2=collecting_area_m2,
+            source_temperature_k=args.source_temperature_k,
+            airmass=args.airmass,
         )
         exposure_s = sensor.config.detector.exposure_s
         if mode.watao not in master_darks:
@@ -499,7 +663,8 @@ def _save_animation(
         opd_artist.set_data(np.ma.masked_where(~illuminated, frame.opd_m * 1e9))
         frame_artist.set_data(frame.counts)
         title.set_text(
-            f"Keck II HAKA open loop | assumed R={frame.magnitude:g} mag | "
+            f"Keck II HAKA open loop | V={frame.magnitude:g} | 400-950 nm, "
+            f"X={args.airmass:g} | "
             f"WATAO {frame.mode.watao} | EM x{frame.mode.em_gain:g} | {rate:g} Hz "
             f"({1e3 / rate:.2f} ms) | t={1e3 * frame.time_s:.1f} ms | "
             f"peak={frame.peak_counts:.0f} count"
@@ -529,16 +694,47 @@ def _write_manifest(
     output = Path(args.output).resolve()
     manifest = Path(args.manifest).resolve() if args.manifest else output.with_suffix(".json")
     used_modes = {frame.mode.watao: frame.mode for frame in rendered}
+    collecting_area_m2 = pupil_collecting_area_m2(pupil)
+    spectral_budget = broadband_budget(
+        0.0,
+        collecting_area_m2,
+        temperature_k=args.source_temperature_k,
+        airmass=args.airmass,
+    )
+    spectral_weights = np.asarray(spectral_budget.wavelength_weights, dtype=np.float64)
+    spectral_weights /= np.sum(spectral_weights)
     payload = {
         "output": output.name,
         "seed": args.seed,
         "atmosphere_profile": args.profile,
         "atmosphere_engine": args.atmosphere_engine,
         "seeing_arcsec_at_500_nm": args.seeing,
-        "magnitudes_vega_r": args.magnitudes,
+        "magnitudes_vega_v": args.magnitudes,
         "frames_per_magnitude": args.frames_per_magnitude,
         "samples_per_exposure": args.samples_per_exposure,
         "minimum_atmosphere_step_between_displayed_frames_s": args.atmosphere_step_s,
+        "source_spectrum": {
+            "model": "Planck photon spectrum normalized to catalog Johnson V magnitude",
+            "temperature_k": args.source_temperature_k,
+            "bandpass_nm": [HAKA_BAND_MIN_NM, HAKA_BAND_MAX_NM],
+            "quadrature_order": HAKA_SPECTRAL_QUADRATURE_ORDER,
+            "wavelengths_nm": [
+                wavelength_m * 1e9 for wavelength_m in spectral_budget.wavelengths_m
+            ],
+            "normalized_post_atmosphere_photon_weights": spectral_weights.tolist(),
+        },
+        "atmospheric_extinction": {
+            "site": "Mauna Kea",
+            "airmass": args.airmass,
+            "curve": MAUNA_KEA_EXTINCTION_PATH.name,
+            "curve_sha256": hashlib.sha256(MAUNA_KEA_EXTINCTION_PATH.read_bytes()).hexdigest(),
+            "units": "magnitude per airmass",
+            "photon_weighted_transmission": (
+                spectral_budget.photon_weighted_atmospheric_transmission
+            ),
+            "reference": "CFHT Bulletin 19 (1988), reproduced by W. M. Keck Observatory",
+        },
+        "clear_collecting_area_m2": collecting_area_m2,
         "master_dark_frames_per_mode": args.master_dark_frames,
         "master_dark_combine": "median",
         "frame_rate_column": args.frame_rate_column,
@@ -556,7 +752,7 @@ def _write_manifest(
                 "reciprocal ADU/e- responses have arithmetic mean one; no global flux scaling"
             ),
         },
-        "sensing_wavelength_nm": 673.0,
+        "fallback_reference_wavelength_nm": 673.0,
         "dark_subtracted": True,
         "detector_saturation": {
             "image_area_full_well_e": rendered[0].image_full_well_e,
@@ -592,8 +788,14 @@ def _write_manifest(
         ],
         "camera_modes": [asdict(used_modes[index]) for index in sorted(used_modes)],
         "assumptions": [
-            "Guide-star magnitudes are treated as Vega R magnitudes.",
-            "Instrument throughput is not modeled; source throughput is unity.",
+            (
+                "Guide-star magnitudes are catalog Vega V magnitudes; all showcase "
+                "stars use the eng519-like 6600 K spectral shape."
+            ),
+            (
+                "Mauna Kea atmospheric extinction is modeled across 400--950 nm at "
+                f"airmass {args.airmass:g}; downstream instrument throughput is unity."
+            ),
             "Exposure equals the inverse selected frame rate (100% duty cycle).",
             (
                 "The pupil has 36 segments, 3 mm gaps, a live-data-fitted circular-plus-"

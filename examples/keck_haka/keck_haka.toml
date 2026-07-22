@@ -18,15 +18,16 @@ kind = "ngs"
 normalization = "magnitude"
 magnitude = 10.0
 magnitude_system = "vega"
-band = "R"
-# No atmosphere/telescope/HAKA transmission loss is applied. This deliberately
-# predicts more photons than the real instrument; comparison code reports the
-# observed ratio but never renormalizes the simulation to it.
+band = "V"
+# simulate.py replaces this scalar placeholder with a V-normalized 6600 K
+# 400--950 nm photon quadrature, applies measured Mauna Kea extinction at the
+# requested airmass, and uses the clear sampled pupil collecting area. Downstream
+# HAKA instrument throughput remains unity and is never fitted to the live cube.
 throughput = 1.0
 
 [sensor]
 kind = "shack_hartmann"
-# Representative HAKA guide-star wavelength from the supplied Keck II header.
+# Reference wavelength used only when no configured spectral quadrature exists.
 wavelength_m = 6.73e-7
 
 [shack_hartmann]
@@ -59,4 +60,4 @@ instrument = "Keck II HAKA natural-guide-star Shack-Hartmann"
 detector_roi = "228x228 native OCAM2K pixels"
 pupil_model = "54-lenslet-wide Keck pupil, live-fitted circle-plus-hexagon secondary shadow, six 26 mm support arms"
 camera_mode_table = "camera_modes.csv"
-sensing_wavelength_basis = "representative Keck II GUIDWAVE=0.673 um"
+sensing_wavelength_basis = "V-normalized 6600 K spectrum over 400-950 nm; 673 nm is the fallback reference"

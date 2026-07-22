@@ -24,6 +24,18 @@ def _module() -> ModuleType:
     return module
 
 
+def _comparison_module(simulate: ModuleType) -> ModuleType:
+    sys.modules["simulate"] = simulate
+    spec = importlib.util.spec_from_file_location(
+        "keck_haka_compare_real", EXAMPLE / "compare_real.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_camera_lookup_boundaries_and_limits() -> None:
     example = _module()
     modes = example.load_camera_modes()
@@ -49,9 +61,9 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert np.all((pupil >= 0) & (pupil <= 1))
     assert len(example._keck_segment_centres(1.0)) == 36
     assert pupil[114, 114] == 0.0  # the Keck primary has no central segment
-    assert pytest.approx(1.2835, abs=1e-4) == example.KECK_SECONDARY_CIRCLE_RADIUS_M
+    assert pytest.approx(1.2833, abs=1e-4) == example.KECK_SECONDARY_CIRCLE_RADIUS_M
     assert np.sqrt(3.0) * example.KECK_SECONDARY_HEX_CIRCUMRADIUS_M == pytest.approx(
-        2.5287, abs=1e-4
+        2.5323, abs=1e-4
     )
     # Each component adds a distinct part of the union: the circle extends
     # beyond a hex flat and the hex extends beyond the circle at a vertex.
@@ -87,6 +99,41 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert config.input.shape == (228, 228)
     assert config.input.grid_extent_m == pytest.approx(10.95 * 57 / 54)
     assert config.source.throughput == 1.0
+    collecting_area_m2 = example.pupil_collecting_area_m2(pupil)
+    assert collecting_area_m2 == pytest.approx(72.0, abs=0.2)
+    budget = example.broadband_budget(10.16, collecting_area_m2)
+    assert len(budget.wavelengths_m) == example.HAKA_SPECTRAL_QUADRATURE_ORDER
+    assert budget.wavelengths_m[0] > 400e-9
+    assert budget.wavelengths_m[-1] < 950e-9
+    assert 0.85 < budget.photon_weighted_atmospheric_transmission < 0.95
+    assert budget.detector_surface_photons_per_s > 2.5e8
+    dense_wavelength_nm = np.linspace(example.HAKA_BAND_MIN_NM, example.HAKA_BAND_MAX_NM, 20_001)
+    extinction = np.loadtxt(example.MAUNA_KEA_EXTINCTION_PATH, delimiter=",", comments="#")
+    dense_shape = example._blackbody_photon_shape(
+        dense_wavelength_nm, example.HAKA_SOURCE_TEMPERATURE_K
+    )
+    dense_transmission = 10.0 ** (
+        -0.4
+        * example.HAKA_REFERENCE_AIRMASS
+        * np.interp(dense_wavelength_nm, extinction[:, 0], extinction[:, 1])
+    )
+    wavelength_steps_nm = np.diff(dense_wavelength_nm)
+    transmitted_integral = np.sum(
+        0.5
+        * (dense_shape[:-1] * dense_transmission[:-1] + dense_shape[1:] * dense_transmission[1:])
+        * wavelength_steps_nm
+    )
+    above_atmosphere_integral = np.sum(
+        0.5 * (dense_shape[:-1] + dense_shape[1:]) * wavelength_steps_nm
+    )
+    dense_weighted_transmission = transmitted_integral / above_atmosphere_integral
+    assert budget.photon_weighted_atmospheric_transmission == pytest.approx(
+        dense_weighted_transmission, abs=6e-4
+    )
+    brighter = example.broadband_budget(9.16, collecting_area_m2)
+    assert brighter.detector_surface_photons_per_s / budget.detector_surface_photons_per_s == (
+        pytest.approx(10**0.4)
+    )
     assert example._atmosphere_display_gap_s(1.0 / 2000.0, 1.0 / 30.0) == pytest.approx(
         1.0 / 30.0 - 1.0 / 2000.0
     )
@@ -113,6 +160,7 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
         mode=mode,
         frame_rate_column="WSFRRT1",
         pupil_path=pupil_path,
+        collecting_area_m2=collecting_area_m2,
     )
     assert sensor.engine.output_shape == (228, 228)
     assert sensor.config.detector.exposure_s == 1.0 / 2000.0
@@ -121,3 +169,33 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert sensor.detector.camera.config.amplifier_boundaries_y_px == (54, 114, 174)
     assert sensor.detector.camera.config.amplifier_boundaries_x_px == (114,)
     assert len(sensor.detector.camera.config.amplifier_gain_factors) == 8
+    assert sensor.config.source.normalization == "detector_photon_rate"
+    assert len(sensor.config.source.wavelengths_m) == example.HAKA_SPECTRAL_QUADRATURE_ORDER
+
+
+def test_real_comparison_estimates_dark_from_outside_pupil(tmp_path: Path) -> None:
+    example = _module()
+    comparison = _comparison_module(example)
+    images = np.full((2, 228, 228), 400, dtype=np.uint16)
+    cells = images.reshape(2, 57, 4, 57, 4)
+    pupil = example.make_keck_pupil()
+    pupil_cells = pupil.reshape(57, 4, 57, 4).transpose(0, 2, 1, 3)
+    illuminated = np.mean(pupil_cells, axis=(-1, -2)) >= 0.98
+    for subaperture_y, subaperture_x in np.argwhere(illuminated):
+        cells[:, subaperture_y, 1:3, subaperture_x, 1:3] += 20
+    path = tmp_path / "raw-rtc.npz"
+    np.savez(
+        path,
+        images=images,
+        timestamps=np.asarray([0, 133_333_333], dtype=np.int64),
+        frame_counters=np.asarray([1, 11], dtype=np.int64),
+    )
+
+    loaded, metadata = comparison._load_real(path)
+
+    assert loaded.dtype == np.float32
+    assert np.all(loaded[:, 0:4, 0:4] == 0.0)
+    loaded_cells = loaded.reshape(2, 57, 4, 57, 4).transpose(0, 1, 3, 2, 4)
+    assert np.all(loaded_cells[:, illuminated, 1:3, 1:3] == 20.0)
+    assert "outside-pupil" in metadata["dark_subtraction_method"]
+    assert metadata["matched_dark_available"] is False
