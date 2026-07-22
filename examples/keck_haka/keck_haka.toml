@@ -23,8 +23,9 @@ band = "V"
 # 400--950 nm photon quadrature, applies measured Mauna Kea extinction at the
 # requested airmass, applies 0.88 reflectivity for each of the primary, secondary,
 # and tertiary, and uses the clear sampled pupil collecting area. This field is
-# the remaining downstream HAKA throughput and is never fitted to the live cube.
-throughput = 1.0
+# the independently measured downstream HAKA throughput. Team and independent
+# measurements agree with the former simulation diagnostic at about 28.7%.
+throughput = 0.287
 
 [sensor]
 kind = "shack_hartmann"

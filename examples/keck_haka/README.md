@@ -98,7 +98,9 @@ coatings](https://keckobservatory.org/a_mirrors_perfect_reflection/), and
 place broadband visible/NIR reflectivity in roughly the 85--92% range. Thus
 0.88 is a defensible conservative band average,
 but not a measured reflectivity curve for these three mirrors. Downstream HAKA
-throughput remains exactly one and is never fitted to the RTC data.
+bench throughput is fixed at 0.287 after team-confirmed independent measurements
+agreed with the earlier 28.7% simulation diagnostic. It is applied before
+detector QE and is never fitted to an individual RTC frame set.
 
 The JSON manifest contains a `frame_flux_audit` for every rendered exposure. It
 records launched and optically captured photons, expected photoelectrons,
@@ -134,7 +136,7 @@ python examples/keck_haka/simulate.py \
   --samples-per-exposure 1 --output /tmp/keck_haka.gif
 ```
 
-Compare the supplied 750-frame RTC cube to an unscaled simulation of eng519
+Compare the supplied 750-frame RTC cube to the physical simulation of eng519
 (ICRS 21:27:41.910 +15:18:23.00, epoch 2000.0, V=10.16, B-V=0.46) at its
 EM x600, 750 Hz operating point:
 
@@ -143,7 +145,8 @@ python examples/keck_haka/compare_real.py
 ```
 
 This writes `real_vs_simulation.gif`, `real_vs_simulation.png`, and a JSON report.
-Both GIF panels use the same unscaled color normalization. The simulation runs
+Both GIF panels use the same shared color normalization without a fitted display
+scale. The simulation runs
 every 1/750 s exposure and evolves the generated `pyturb` phase screen through
 the nine intervening exposures before retaining every tenth frame, exactly like
 the RTC telemetry decimation. The default GIF shows 150 paired retained frames
@@ -161,26 +164,26 @@ The catalog V magnitude sets the absolute normalization of the 6600 K spectrum;
 B-V=0.46 is retained as supporting evidence for the F5--F7 classification. The
 400--950 nm passband is currently a top hat because a measured HAKA instrumental
 curve was not supplied. Atmospheric transmission and detector QE are both
-wavelength resolved. Downstream HAKA throughput is one, so the simulation is
-expected to be brighter than the instrument after the three modeled telescope
-reflections. The measured real/simulation ratio is reported and never fed back
-as a scale factor.
+wavelength resolved; the independently confirmed 0.287 downstream HAKA term is
+a scalar applied after the three modeled telescope reflections. The measured
+real/simulation ratio therefore validates the adopted absolute budget and is
+never fed back as a fitted scale factor.
 
 For the checked-in deterministic run, the photon-weighted atmospheric
 transmission is 90.53%. The 72.04 m² clear pupil receives 270.16 million
 photons/s after atmospheric extinction; the three mirror reflections reduce
-this to 184.11 million photons/s, and the finite SH windows capture 181.77
+this to 184.11 million photons/s. The confirmed HAKA bench throughput reduces
+that to 52.84 million photons/s, and the finite SH windows capture 52.17
 million photons/s. The real and simulated central-2x2 spot fractions are 94.1%
 and 92.4%, respectively. The pedestal-insensitive lenslet signal is 0.848
-million count/frame in the real cube and 2.956 million count/frame in the
-simulation: a real/simulation ratio of 0.2870, reported but not applied. Because
-atmospheric extinction and telescope-mirror losses are already included, this
-is an approximate 28.70% remaining downstream HAKA-throughput diagnostic. With
-the three modeled mirror reflections included, the inferred post-atmosphere
-telescope-plus-HAKA throughput is 19.56%; including atmospheric extinction gives
-17.71% from above the atmosphere to the detector entrance. These estimates are
-still convolved with the estimated real dark, absolute detector calibration,
-and the unknown instrumental band shape.
+million count/frame in the real cube and 0.848 million count/frame in the
+simulation: a real/simulation ratio of 1.00029, or a +0.029% validation residual.
+The adopted telescope-mirror-plus-HAKA throughput is 19.56%; including
+atmospheric extinction gives 17.71% from above the atmosphere to the detector
+entrance. Agreement this close should not be interpreted as a similarly precise
+throughput measurement: the original diagnostic used this RTC cube, while the
+decision to adopt 28.7% is supported by the independent measurements. The exact
+instrumental band shape and matched RTC dark remain unknown.
 
 `WSFRRT1` is the default rate column; select `--frame-rate-column WSFRRT2` to
 render the alternate rates. Magnitude bins are lower-inclusive and
@@ -205,9 +208,9 @@ quadrature, pupil/sensor/atmosphere construction, warm-up, host copies,
 calibration, plotting, and file output are excluded. GPU work is synchronized
 after every five-frame timing batch.
 
-The July 2026 run on an AMD Ryzen 9 9950X3D and NVIDIA RTX 5090 measures 28.3
-CPU frames/s and 401.1 GPU frames/s, a 14.2x speedup. Relative to the 750 Hz RTC
-cadence these are 0.038x and 0.535x real time. The generated
+The July 2026 run on an AMD Ryzen 9 9950X3D and NVIDIA RTX 5090 measures 28.7
+CPU frames/s and 396.6 GPU frames/s, a 13.8x speedup. Relative to the 750 Hz RTC
+cadence these are 0.038x and 0.529x real time. The generated
 `haka_cpu_gpu_benchmark.gif` shows the two OCAM2K streams over equal wall-clock
 playback: atmosphere clocks and displayed frame counters advance at the measured
 device rates, so the GPU stream visibly evolves faster. Intermediate detector
@@ -244,9 +247,9 @@ does not explain the gap.
 - Magnitudes are interpreted as catalog Vega V. Every showcase star uses a
   6600 K F6 V spectrum over a top-hat 400--950 nm band. The eng519 exposure uses
   its header airmass of 1.01 and the mean measured Mauna Kea extinction curve.
-  Primary, secondary, and tertiary reflections transmit 0.88 each; downstream
-  HAKA throughput is exactly 1.0, so the predicted flux should still exceed a
-  real OCAM2K frame.
+  Primary, secondary, and tertiary reflections transmit 0.88 each; independently
+  confirmed downstream HAKA bench throughput is 0.287. Both terms are applied
+  before the wavelength-dependent OCAM2K QE.
 - Seeing defaults to 0.65 arcsec at 500 nm. `pyturb` supplies its traceable
   `mauna-kea` profile and all wavefronts are open loop: no residual scaling,
   reconstructor, DM, or controller is applied.

@@ -33,8 +33,11 @@ All notable changes to `makewfs` are documented here.
   tertiary, uses the sampled clear-pupil collecting area, and passes the
   resolved spectral cube through OCAM2K's wavelength-dependent QE. The reference
   renders now use the Keck-characterized approximately 28 output e-/ADU OCAM2K
-  conversion; the unscaled eng519 comparison estimates 28.70% downstream HAKA
-  throughput after the already-modeled atmosphere and telescope mirrors.
+  conversion. Team-confirmed independent bench measurements now establish the
+  downstream HAKA throughput as 28.7%; it is applied as physical radiometry after
+  the telescope mirrors rather than inferred or fitted by the RTC comparison.
+  The regenerated eng519 comparison has a real/simulation signal ratio of
+  1.00029.
 - Added a reproducible warm HAKA CPU/GPU benchmark. It times non-periodic Mauna
   Kea atmosphere evolution, the full eight-wavelength 57x57 Shack--Hartmann
   propagation, and noisy OCAM2K exposure while excluding static setup and

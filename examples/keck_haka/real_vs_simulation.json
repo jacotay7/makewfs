@@ -396,7 +396,7 @@
     "matched_dark_available": false
   },
   "simulation": {
-    "throughput": 1.0,
+    "throughput": 0.287,
     "atmosphere_profile": "mauna-kea",
     "pyturb_engine": "extrude",
     "wavefront_source": "seeded generated pyturb phase screens evolved by frozen flow",
@@ -435,7 +435,7 @@
       "combined_throughput": 0.681472,
       "combined_loss_fraction": 0.31852800000000003
     },
-    "downstream_haka_throughput": 1.0,
+    "downstream_haka_throughput": 0.287,
     "magnitude_system": "Vega V",
     "magnitude": 10.16,
     "target": {
@@ -487,9 +487,9 @@
       -3.0,
       -4.0
     ],
-    "launched_photons_per_s": 184107126.97319162,
-    "captured_photons_per_s": 181773380.0895989,
-    "expected_photoelectrons_last_frame": 196382.109375
+    "launched_photons_per_s": 52838745.44130599,
+    "captured_photons_per_s": 52168959.59712795,
+    "expected_photoelectrons_last_frame": 56361.6640625
   },
   "real_metrics": {
     "frames": 750,
@@ -537,52 +537,55 @@
   },
   "simulated_metrics": {
     "frames": 750,
-    "mean_estimated_dark_subtracted_frame_sum_counts": 4358936.445333334,
-    "mean_lenslet_core_minus_border_counts_per_frame": 2955844.233726037,
-    "std_lenslet_core_minus_border_counts_per_frame": 33456.156050099475,
-    "median_peak_counts": 2969.0,
+    "mean_estimated_dark_subtracted_frame_sum_counts": 1254610.0533333332,
+    "mean_lenslet_core_minus_border_counts_per_frame": 848143.3670710071,
+    "std_lenslet_core_minus_border_counts_per_frame": 11293.783133002262,
+    "median_peak_counts": 1154.0,
     "peak_count_percentiles_10_50_90": [
-      2749.95,
-      2969.0,
-      3288.2
+      1024.5,
+      1154.0,
+      1310.65
     ],
-    "lower_quartile_pixel_temporal_rms_counts": 6.551975647020326,
+    "lower_quartile_pixel_temporal_rms_counts": 6.599560389399685,
     "mean_spot_centroid_xy_pixels": [
-      1.4930765691574277,
-      1.5045617467034187
+      1.493479114873688,
+      1.5045952925687491
     ],
-    "mean_spot_central_2x2_fraction": 0.9238258355318136,
+    "mean_spot_central_2x2_fraction": 0.9239295669579747,
     "mean_spot_normalized": [
       [
         0.0,
-        0.009443027966495706,
-        0.008794640994106553,
+        0.009438237865386556,
+        0.008684706034977709,
         0.0
       ],
       [
-        0.009904527667040705,
-        0.23259366902393824,
-        0.226614009757113,
-        0.009056924677816106
+        0.009850323587989826,
+        0.23255224984055164,
+        0.22668671294138099,
+        0.00912861400787093
       ],
       [
-        0.010016229388772366,
-        0.23406878033821216,
-        0.2305493764125503,
-        0.009752598023423372
+        0.010011324507960693,
+        0.23415344107131875,
+        0.23053716310472327,
+        0.00989814629056856
       ],
       [
         0.0,
-        0.009785962103539627,
-        0.009420253646991877,
+        0.009680420455593662,
+        0.009378660291677431,
         0.0
       ]
     ]
   },
-  "diagnostics_not_applied_to_simulation": {
-    "real_to_simulated_lenslet_signal_ratio": 0.2870217199937841,
+  "independent_throughput_validation": {
+    "adopted_downstream_haka_throughput": 0.287,
+    "throughput_basis": "team-confirmed independent bench measurements",
+    "real_to_simulated_lenslet_signal_ratio": 1.0002925554055864,
+    "fractional_signal_residual": 0.00029255540558636994,
     "signal_estimator": "sum over 57x57 lenslets of central-2x2 counts minus four times the surrounding 12-pixel border mean",
-    "interpretation": "With atmospheric extinction and three telescope reflections already modeled, this estimates the remaining downstream HAKA throughput convolved with detector-calibration uncertainty; it is never used as a scale factor."
+    "interpretation": "The independently measured downstream HAKA throughput is already applied before image formation. This residual tests the absolute simulation and is never fed back as a fitted scale factor."
   },
   "known_limitations": [
     "No matched OCAM2K dark cube was supplied. The real dark/bias estimate uses only outside-pupil pixels, with a static per-output/repeated-4x4 template and a per-frame drift for each output.",

@@ -26,6 +26,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 from simulate import (
+    HAKA_DOWNSTREAM_THROUGHPUT,
     HAKA_REFERENCE_AIRMASS,
     HAKA_SOURCE_TEMPERATURE_K,
     OCAM2K_MAX_FRAME_RATE_HZ,
@@ -502,6 +503,7 @@ def main() -> int:
             "pixels_per_subaperture": [4, 4],
             "spectral_samples": 8,
             "numerics_dtype": "float32",
+            "downstream_haka_throughput": HAKA_DOWNSTREAM_THROUGHPUT,
         },
         "methodology": {
             "target_wall_time_per_device_s": args.seconds,

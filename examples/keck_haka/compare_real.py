@@ -1,9 +1,10 @@
-"""Compare estimated-dark-subtracted Keck HAKA data with an unscaled simulation.
+"""Compare estimated-dark-subtracted Keck HAKA data with a physical simulation.
 
 No matched dark cube was supplied. The real RTC dark/bias is estimated only from
 pixels outside the pupil, preserving a static eight-output/repeated-4x4 template
-plus a robust per-frame drift for each output. The simulation uses source
-throughput 1.0 and is never globally rescaled to the observation.
+plus a robust per-frame drift for each output. The independently confirmed
+downstream HAKA throughput is applied before image formation and is never fitted
+to this observation.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from numpy.typing import NDArray
 from simulate import (
     HAKA_BAND_MAX_NM,
     HAKA_BAND_MIN_NM,
+    HAKA_DOWNSTREAM_THROUGHPUT,
     HAKA_REFERENCE_AIRMASS,
     HAKA_SOURCE_TEMPERATURE_K,
     KECK_ALUMINUM_MIRROR_REFLECTIVITY,
@@ -337,8 +339,11 @@ def _simulate(args: argparse.Namespace) -> tuple[NDArray[np.float32], dict[str, 
         raise SystemExit("install makewfs[examples,interop] to run this comparison") from exc
 
     base = makewfs.load_config(HERE / "keck_haka.toml")
-    if base.source.throughput != 1.0:
-        raise ValueError("comparison requires source.throughput = 1.0; no flux scaling is allowed")
+    if not np.isclose(base.source.throughput, HAKA_DOWNSTREAM_THROUGHPUT):
+        raise ValueError(
+            "comparison requires the independently measured downstream HAKA "
+            f"throughput {HAKA_DOWNSTREAM_THROUGHPUT:g}"
+        )
     mode = CameraMode(
         watao=10,
         min_magnitude=args.magnitude,
@@ -508,7 +513,7 @@ def _plot(
     axes[0, 2].set_xlabel("lenslet core-minus-border signal (million count / frame)")
     axes[0, 2].set_ylabel("frames")
     axes[0, 2].legend()
-    axes[0, 2].set_title("No flux rescaling")
+    axes[0, 2].set_title("Independent 28.7% throughput; no fitted scaling")
 
     for axis, contrast, title in (
         (axes[1, 0], real_contrast, "Real 57x57 pupil contrast"),
@@ -547,7 +552,7 @@ def _plot(
     figure.suptitle(
         f"Keck II HAKA on eng519: V={magnitude_v:g}, {source_temperature_k:g} K, "
         f"400-950 nm, X={airmass:g}, EM x{em_gain:g}, {frame_rate_hz:g} Hz | "
-        f"real/simulation lenslet signal = {ratio:.3f} (reported, not applied)",
+        f"real/simulation lenslet signal = {ratio:.3f} (validation residual)",
         fontsize=13,
     )
     for axis in axes.flat[:2]:
@@ -691,16 +696,19 @@ def main() -> None:
         "simulation": simulation_metadata,
         "real_metrics": real_metrics,
         "simulated_metrics": simulated_metrics,
-        "diagnostics_not_applied_to_simulation": {
+        "independent_throughput_validation": {
+            "adopted_downstream_haka_throughput": HAKA_DOWNSTREAM_THROUGHPUT,
+            "throughput_basis": "team-confirmed independent bench measurements",
             "real_to_simulated_lenslet_signal_ratio": flux_ratio,
+            "fractional_signal_residual": flux_ratio - 1.0,
             "signal_estimator": (
                 "sum over 57x57 lenslets of central-2x2 counts minus four times "
                 "the surrounding 12-pixel border mean"
             ),
             "interpretation": (
-                "With atmospheric extinction and three telescope reflections already "
-                "modeled, this estimates the remaining downstream HAKA throughput convolved "
-                "with detector-calibration uncertainty; it is never used as a scale factor."
+                "The independently measured downstream HAKA throughput is already applied "
+                "before image formation. This residual tests the absolute simulation and "
+                "is never fed back as a fitted scale factor."
             ),
         },
         "known_limitations": [
@@ -728,7 +736,7 @@ def main() -> None:
         f"wrote {output}, {manifest}"
         + (f", and {animation_output}" if animation_output is not None else "")
         + f"; real/simulation lenslet-signal ratio={flux_ratio:.3f} "
-        "(diagnostic only)"
+        "(independent-throughput validation)"
     )
 
 

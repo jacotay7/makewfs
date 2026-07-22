@@ -63,6 +63,10 @@ HAKA_BAND_MAX_NM = 950.0
 HAKA_SPECTRAL_QUADRATURE_ORDER = 8
 HAKA_SOURCE_TEMPERATURE_K = 6600.0
 HAKA_REFERENCE_AIRMASS = 1.01
+# Independently confirmed downstream HAKA bench throughput, after the telescope
+# mirrors and before the OCAM2K detector QE. This is physical input, not a fit
+# performed by the simulation or real-data comparison.
+HAKA_DOWNSTREAM_THROUGHPUT = 0.287
 KECK_ALUMINUM_MIRROR_REFLECTIVITY = 0.88
 KECK_TELESCOPE_MIRROR_COUNT = 3
 MAUNA_KEA_EXTINCTION_PATH = HERE / "mauna_kea_extinction.csv"
@@ -312,7 +316,7 @@ def broadband_budget(
     airmass: float = HAKA_REFERENCE_AIRMASS,
     mirror_reflectivity: float = KECK_ALUMINUM_MIRROR_REFLECTIVITY,
     mirror_count: int = KECK_TELESCOPE_MIRROR_COUNT,
-    throughput: float = 1.0,
+    throughput: float = HAKA_DOWNSTREAM_THROUGHPUT,
 ) -> BroadbandBudget:
     """Build a V-normalized 400--950 nm F-star photon quadrature.
 
@@ -320,8 +324,8 @@ def broadband_budget(
     is a blackbody photon spectrum and the tabulated Mauna Kea extinction in
     mag/airmass is applied at the observed frame's airmass. The primary,
     secondary, and tertiary are assigned the same band-averaged aluminum
-    reflectivity. ``throughput`` is the remaining downstream HAKA term and stays
-    one here.
+    reflectivity. ``throughput`` is the independently measured remaining
+    downstream HAKA bench term.
     """
     try:
         import getframes
@@ -403,6 +407,16 @@ def configured_sensor(
     except ImportError as exc:  # pragma: no cover - dependency is required by makewfs
         raise ImportError("makewfs requires getframes") from exc
     frame_rate_hz = mode.frame_rate_hz(frame_rate_column)
+    if not math.isclose(
+        base.source.throughput,
+        HAKA_DOWNSTREAM_THROUGHPUT,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise ValueError(
+            "Keck HAKA config must use the independently measured downstream "
+            f"throughput {HAKA_DOWNSTREAM_THROUGHPUT:g}"
+        )
     camera = getframes.load_preset("andor_ocam2k").replace(
         resolution=(228, 228),
         em_gain=mode.em_gain,
@@ -451,6 +465,7 @@ def configured_sensor(
         "aluminum_mirror_reflectivity_each": KECK_ALUMINUM_MIRROR_REFLECTIVITY,
         "telescope_mirror_count": KECK_TELESCOPE_MIRROR_COUNT,
         "telescope_mirror_throughput": budget.telescope_mirror_throughput,
+        "downstream_haka_throughput": base.source.throughput,
     }
     config = replace(
         base,
@@ -771,7 +786,8 @@ def _write_manifest(
             "reflectivity_each": KECK_ALUMINUM_MIRROR_REFLECTIVITY,
             "combined_throughput": spectral_budget.telescope_mirror_throughput,
             "combined_loss_fraction": 1.0 - spectral_budget.telescope_mirror_throughput,
-            "downstream_haka_throughput": 1.0,
+            "downstream_haka_throughput": HAKA_DOWNSTREAM_THROUGHPUT,
+            "downstream_haka_throughput_basis": ("team-confirmed independent bench measurements"),
         },
         "clear_collecting_area_m2": collecting_area_m2,
         "master_dark_frames_per_mode": args.master_dark_frames,
@@ -835,7 +851,8 @@ def _write_manifest(
                 "Mauna Kea atmospheric extinction is modeled across 400--950 nm at "
                 f"airmass {args.airmass:g}. Three aluminum telescope reflections use "
                 f"R={KECK_ALUMINUM_MIRROR_REFLECTIVITY:g} each; downstream HAKA "
-                "throughput is unity."
+                f"throughput is {HAKA_DOWNSTREAM_THROUGHPUT:g} from independent "
+                "bench measurements."
             ),
             "Exposure equals the inverse selected frame rate (100% duty cycle).",
             (

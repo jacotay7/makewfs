@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from dataclasses import fields
 from pathlib import Path
@@ -85,6 +86,17 @@ def test_haka_benchmark_display_advances_at_measured_throughput() -> None:
     assert benchmark._display_state(result, 5, 5) == (25, pytest.approx(25.0 / 750.0))
 
 
+def test_checked_haka_artifacts_use_independently_confirmed_throughput() -> None:
+    showcase = json.loads((EXAMPLE / "keck_haka.json").read_text(encoding="utf-8"))
+    comparison = json.loads((EXAMPLE / "real_vs_simulation.json").read_text(encoding="utf-8"))
+
+    assert showcase["telescope_mirrors"]["downstream_haka_throughput"] == 0.287
+    assert comparison["simulation"]["downstream_haka_throughput"] == 0.287
+    validation = comparison["independent_throughput_validation"]
+    assert validation["adopted_downstream_haka_throughput"] == 0.287
+    assert validation["real_to_simulated_lenslet_signal_ratio"] == pytest.approx(1.0, abs=0.02)
+
+
 def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     example = _module()
     pupil = example.make_keck_pupil(supersampling=2)
@@ -130,7 +142,7 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     )
     assert config.input.shape == (228, 228)
     assert config.input.grid_extent_m == pytest.approx(10.95 * 57 / 54)
-    assert config.source.throughput == 1.0
+    assert config.source.throughput == example.HAKA_DOWNSTREAM_THROUGHPUT
     collecting_area_m2 = example.pupil_collecting_area_m2(pupil)
     assert collecting_area_m2 == pytest.approx(72.0, abs=0.2)
     budget = example.broadband_budget(10.16, collecting_area_m2)
@@ -142,7 +154,12 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert budget.after_telescope_mirrors_photons_per_s_m2 == pytest.approx(
         budget.after_atmosphere_photons_per_s_m2 * 0.88**3
     )
-    assert budget.detector_surface_photons_per_s > 1.7e8
+    assert budget.detector_surface_photons_per_s > 5.0e7
+    assert budget.detector_surface_photons_per_s == pytest.approx(
+        budget.after_telescope_mirrors_photons_per_s_m2
+        * collecting_area_m2
+        * example.HAKA_DOWNSTREAM_THROUGHPUT
+    )
     dense_wavelength_nm = np.linspace(example.HAKA_BAND_MIN_NM, example.HAKA_BAND_MAX_NM, 20_001)
     extinction = np.loadtxt(example.MAUNA_KEA_EXTINCTION_PATH, delimiter=",", comments="#")
     dense_shape = example._blackbody_photon_shape(
