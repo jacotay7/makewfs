@@ -453,8 +453,8 @@
     "telemetry_decimation": 10,
     "master_dark_frames": 32,
     "image_full_well_e": 270000.0,
-    "output_full_well_e": 100000.0,
-    "gain_e_per_adu": 10.0,
+    "output_full_well_e": 280000.0,
+    "gain_e_per_adu": 28.0,
     "amplifier_layout_rows_columns": [
       4,
       2
@@ -537,50 +537,50 @@
   },
   "simulated_metrics": {
     "frames": 750,
-    "mean_estimated_dark_subtracted_frame_sum_counts": 12206441.061333334,
-    "mean_lenslet_core_minus_border_counts_per_frame": 8271657.582209752,
-    "std_lenslet_core_minus_border_counts_per_frame": 93662.44417091469,
-    "median_peak_counts": 8354.75,
+    "mean_estimated_dark_subtracted_frame_sum_counts": 4358936.445333334,
+    "mean_lenslet_core_minus_border_counts_per_frame": 2955844.233726037,
+    "std_lenslet_core_minus_border_counts_per_frame": 33456.156050099475,
+    "median_peak_counts": 2969.0,
     "peak_count_percentiles_10_50_90": [
-      7727.3,
-      8354.75,
-      9121.7
+      2749.95,
+      2969.0,
+      3288.2
     ],
-    "lower_quartile_pixel_temporal_rms_counts": 20.558876791090654,
+    "lower_quartile_pixel_temporal_rms_counts": 6.551975647020326,
     "mean_spot_centroid_xy_pixels": [
-      1.492814500621194,
-      1.504727542324092
+      1.4930765691574277,
+      1.5045617467034187
     ],
-    "mean_spot_central_2x2_fraction": 0.923714523533755,
+    "mean_spot_central_2x2_fraction": 0.9238258355318136,
     "mean_spot_normalized": [
       [
         0.0,
-        0.009414975466542125,
-        0.008773348918152199,
+        0.009443027966495706,
+        0.008794640994106553,
         0.0
       ],
       [
-        0.009939580079961083,
-        0.23251921800568484,
-        0.22659632315440173,
-        0.009111967735291514
+        0.009904527667040705,
+        0.23259366902393824,
+        0.226614009757113,
+        0.009056924677816106
       ],
       [
-        0.010132492384097231,
-        0.23398828790142298,
-        0.23061069447224544,
-        0.009641831813380844
+        0.010016229388772366,
+        0.23406878033821216,
+        0.2305493764125503,
+        0.009752598023423372
       ],
       [
         0.0,
-        0.009872672625711756,
-        0.009398607443108184,
+        0.009785962103539627,
+        0.009420253646991877,
         0.0
       ]
     ]
   },
   "diagnostics_not_applied_to_simulation": {
-    "real_to_simulated_lenslet_signal_ratio": 0.10256608032499218,
+    "real_to_simulated_lenslet_signal_ratio": 0.2870217199937841,
     "signal_estimator": "sum over 57x57 lenslets of central-2x2 counts minus four times the surrounding 12-pixel border mean",
     "interpretation": "With atmospheric extinction and three telescope reflections already modeled, this estimates the remaining downstream HAKA throughput convolved with detector-calibration uncertainty; it is never used as a scale factor."
   },

@@ -31,7 +31,10 @@ All notable changes to `makewfs` are documented here.
   400--950 nm band, applies measured Mauna Kea extinction at the observed
   airmass, applies 0.88 reflectivity to the aluminum primary, secondary, and
   tertiary, uses the sampled clear-pupil collecting area, and passes the
-  resolved spectral cube through OCAM2K's wavelength-dependent QE.
+  resolved spectral cube through OCAM2K's wavelength-dependent QE. The reference
+  renders now use the Keck-characterized approximately 28 output e-/ADU OCAM2K
+  conversion; the unscaled eng519 comparison estimates 28.70% downstream HAKA
+  throughput after the already-modeled atmosphere and telescope mirrors.
 - Added public end-to-end GPU execution through `numerics.device = "gpu"`.
   CuPy OPD, SH/PWFS optics, wavelength-resolved photon maps, the `getframes`
   detector chain, truth, and ADU remain device-resident. The runtime reports an

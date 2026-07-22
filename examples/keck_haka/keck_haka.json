@@ -135,8 +135,8 @@
   "dark_subtracted": true,
   "detector_saturation": {
     "image_area_full_well_e": 270000.0,
-    "output_full_well_e": 100000.0,
-    "gain_e_per_adu": 10.0,
+    "output_full_well_e": 280000.0,
+    "gain_e_per_adu": 28.0,
     "dark_subtracted_output_ceiling_counts": 10000.0
   },
   "frame_flux_audit": [
@@ -149,9 +149,9 @@
       "optical_capture_fraction": 0.9879762612530186,
       "incident_photons_per_exposure": 10538701.770030864,
       "expected_photoelectrons": 8538869.0,
-      "expected_unclipped_signal_counts": 6831095.2,
-      "measured_dark_subtracted_signal_counts": 7054913.0,
-      "peak_dark_subtracted_counts": 3698.0
+      "expected_unclipped_signal_counts": 2439676.8571428573,
+      "measured_dark_subtracted_signal_counts": 2526038.5,
+      "peak_dark_subtracted_counts": 1367.0
     },
     {
       "magnitude": 5.5,
@@ -162,9 +162,9 @@
       "optical_capture_fraction": 0.9876322856981014,
       "incident_photons_per_exposure": 6647156.191455925,
       "expected_photoelectrons": 5385852.0,
-      "expected_unclipped_signal_counts": 4308681.6,
-      "measured_dark_subtracted_signal_counts": 4451499.0,
-      "peak_dark_subtracted_counts": 2555.5
+      "expected_unclipped_signal_counts": 1538814.857142857,
+      "measured_dark_subtracted_signal_counts": 1592935.5,
+      "peak_dark_subtracted_counts": 892.5
     },
     {
       "magnitude": 6.0,
@@ -175,9 +175,9 @@
       "optical_capture_fraction": 0.9879324896848662,
       "incident_photons_per_exposure": 4195346.86295392,
       "expected_photoelectrons": 3399247.0,
-      "expected_unclipped_signal_counts": 10197741.0,
-      "measured_dark_subtracted_signal_counts": 10562601.5,
-      "peak_dark_subtracted_counts": 5594.0
+      "expected_unclipped_signal_counts": 3642050.3571428573,
+      "measured_dark_subtracted_signal_counts": 3766843.0,
+      "peak_dark_subtracted_counts": 1983.5
     },
     {
       "magnitude": 6.5,
@@ -188,9 +188,9 @@
       "optical_capture_fraction": 0.9878402261068616,
       "incident_photons_per_exposure": 2646837.7030544695,
       "expected_photoelectrons": 2144594.75,
-      "expected_unclipped_signal_counts": 6433784.25,
-      "measured_dark_subtracted_signal_counts": 6669966.5,
-      "peak_dark_subtracted_counts": 3546.0
+      "expected_unclipped_signal_counts": 2297780.089285714,
+      "measured_dark_subtracted_signal_counts": 2379266.0,
+      "peak_dark_subtracted_counts": 1288.5
     },
     {
       "magnitude": 7.0,
@@ -201,9 +201,9 @@
       "optical_capture_fraction": 0.9876856131217819,
       "incident_photons_per_exposure": 1669780.2998329087,
       "expected_photoelectrons": 1352951.625,
-      "expected_unclipped_signal_counts": 9470661.375,
-      "measured_dark_subtracted_signal_counts": 9802394.0,
-      "peak_dark_subtracted_counts": 5452.0
+      "expected_unclipped_signal_counts": 3382379.0625,
+      "measured_dark_subtracted_signal_counts": 3500941.0,
+      "peak_dark_subtracted_counts": 1875.0
     },
     {
       "magnitude": 7.5,
@@ -214,9 +214,9 @@
       "optical_capture_fraction": 0.9880314237803103,
       "incident_photons_per_exposure": 1053929.0186419806,
       "expected_photoelectrons": 853936.0,
-      "expected_unclipped_signal_counts": 5977552.0,
-      "measured_dark_subtracted_signal_counts": 6184175.0,
-      "peak_dark_subtracted_counts": 3504.0
+      "expected_unclipped_signal_counts": 2134840.0,
+      "measured_dark_subtracted_signal_counts": 2209224.0,
+      "peak_dark_subtracted_counts": 1246.0
     },
     {
       "magnitude": 8.0,
@@ -227,9 +227,9 @@
       "optical_capture_fraction": 0.9878000786922115,
       "incident_photons_per_exposure": 886438.067295921,
       "expected_photoelectrons": 718245.375,
-      "expected_unclipped_signal_counts": 14364907.5,
-      "measured_dark_subtracted_signal_counts": 14880111.0,
-      "peak_dark_subtracted_counts": 9520.0
+      "expected_unclipped_signal_counts": 5130324.107142857,
+      "measured_dark_subtracted_signal_counts": 5312560.0,
+      "peak_dark_subtracted_counts": 3074.5
     },
     {
       "magnitude": 8.5,
@@ -240,9 +240,9 @@
       "optical_capture_fraction": 0.9879684098931565,
       "incident_photons_per_exposure": 559399.9201929235,
       "expected_photoelectrons": 453250.90625,
-      "expected_unclipped_signal_counts": 9065018.125,
-      "measured_dark_subtracted_signal_counts": 9430998.0,
-      "peak_dark_subtracted_counts": 5958.0
+      "expected_unclipped_signal_counts": 3237506.473214286,
+      "measured_dark_subtracted_signal_counts": 3359525.0,
+      "peak_dark_subtracted_counts": 2149.5
     },
     {
       "magnitude": 9.0,
@@ -253,9 +253,9 @@
       "optical_capture_fraction": 0.9874361096128365,
       "incident_photons_per_exposure": 352767.32076143817,
       "expected_photoelectrons": 285829.03125,
-      "expected_unclipped_signal_counts": 11433161.25,
-      "measured_dark_subtracted_signal_counts": 11883966.5,
-      "peak_dark_subtracted_counts": 7152.0
+      "expected_unclipped_signal_counts": 4083271.875,
+      "measured_dark_subtracted_signal_counts": 4232836.5,
+      "peak_dark_subtracted_counts": 2817.0
     },
     {
       "magnitude": 9.5,
@@ -266,9 +266,9 @@
       "optical_capture_fraction": 0.9872014888592754,
       "incident_photons_per_exposure": 222528.24531250042,
       "expected_photoelectrons": 180301.609375,
-      "expected_unclipped_signal_counts": 7212064.375,
-      "measured_dark_subtracted_signal_counts": 7465544.5,
-      "peak_dark_subtracted_counts": 5405.0
+      "expected_unclipped_signal_counts": 2575737.276785714,
+      "measured_dark_subtracted_signal_counts": 2663938.5,
+      "peak_dark_subtracted_counts": 1975.5
     },
     {
       "magnitude": 10.0,
@@ -279,9 +279,9 @@
       "optical_capture_fraction": 0.9874598056605441,
       "incident_photons_per_exposure": 210663.8551932578,
       "expected_photoelectrons": 170689.109375,
-      "expected_unclipped_signal_counts": 10241346.5625,
-      "measured_dark_subtracted_signal_counts": 10593603.5,
-      "peak_dark_subtracted_counts": 8543.5
+      "expected_unclipped_signal_counts": 3657623.7723214286,
+      "measured_dark_subtracted_signal_counts": 3794944.0,
+      "peak_dark_subtracted_counts": 2656.0
     },
     {
       "magnitude": 10.5,
@@ -292,9 +292,9 @@
       "optical_capture_fraction": 0.9873312793951815,
       "incident_photons_per_exposure": 166128.25749744519,
       "expected_photoelectrons": 134607.3125,
-      "expected_unclipped_signal_counts": 8076438.75,
-      "measured_dark_subtracted_signal_counts": 8479338.5,
-      "peak_dark_subtracted_counts": 5778.0
+      "expected_unclipped_signal_counts": 2884442.410714286,
+      "measured_dark_subtracted_signal_counts": 2972212.0,
+      "peak_dark_subtracted_counts": 2286.0
     },
     {
       "magnitude": 11.0,
@@ -305,9 +305,9 @@
       "optical_capture_fraction": 0.987515386439984,
       "incident_photons_per_exposure": 119816.44558211963,
       "expected_photoelectrons": 97079.9453125,
-      "expected_unclipped_signal_counts": 5824796.71875,
-      "measured_dark_subtracted_signal_counts": 6029163.5,
-      "peak_dark_subtracted_counts": 4812.0
+      "expected_unclipped_signal_counts": 2080284.5424107143,
+      "measured_dark_subtracted_signal_counts": 2156205.5,
+      "peak_dark_subtracted_counts": 1714.5
     },
     {
       "magnitude": 11.5,
@@ -318,9 +318,9 @@
       "optical_capture_fraction": 0.98744671181532,
       "incident_photons_per_exposure": 105831.33253807036,
       "expected_photoelectrons": 85750.75,
-      "expected_unclipped_signal_counts": 5145045.0,
-      "measured_dark_subtracted_signal_counts": 5285295.5,
-      "peak_dark_subtracted_counts": 4110.5
+      "expected_unclipped_signal_counts": 1837516.0714285714,
+      "measured_dark_subtracted_signal_counts": 1913916.0,
+      "peak_dark_subtracted_counts": 1707.0
     },
     {
       "magnitude": 12.0,
@@ -331,9 +331,9 @@
       "optical_capture_fraction": 0.9873961140343617,
       "incident_photons_per_exposure": 83464.54364840758,
       "expected_photoelectrons": 67627.703125,
-      "expected_unclipped_signal_counts": 4057662.1875,
-      "measured_dark_subtracted_signal_counts": 4249187.0,
-      "peak_dark_subtracted_counts": 4382.5
+      "expected_unclipped_signal_counts": 1449165.0669642857,
+      "measured_dark_subtracted_signal_counts": 1520851.0,
+      "peak_dark_subtracted_counts": 1287.0
     },
     {
       "magnitude": 12.5,
@@ -344,9 +344,9 @@
       "optical_capture_fraction": 0.98740276813612,
       "incident_photons_per_exposure": 70217.22895171573,
       "expected_photoelectrons": 56893.08984375,
-      "expected_unclipped_signal_counts": 3413585.390625,
-      "measured_dark_subtracted_signal_counts": 3566914.0,
-      "peak_dark_subtracted_counts": 3189.0
+      "expected_unclipped_signal_counts": 1219137.6395089286,
+      "measured_dark_subtracted_signal_counts": 1278212.0,
+      "peak_dark_subtracted_counts": 1178.5
     },
     {
       "magnitude": 13.0,
@@ -357,9 +357,9 @@
       "optical_capture_fraction": 0.9871262477963045,
       "incident_photons_per_exposure": 88583.3380811341,
       "expected_photoelectrons": 71774.7421875,
-      "expected_unclipped_signal_counts": 4306484.53125,
-      "measured_dark_subtracted_signal_counts": 4467820.0,
-      "peak_dark_subtracted_counts": 3504.5
+      "expected_unclipped_signal_counts": 1538030.189732143,
+      "measured_dark_subtracted_signal_counts": 1612134.5,
+      "peak_dark_subtracted_counts": 1303.5
     },
     {
       "magnitude": 13.5,
@@ -370,9 +370,9 @@
       "optical_capture_fraction": 0.9872942434877434,
       "incident_photons_per_exposure": 55901.81988447423,
       "expected_photoelectrons": 45294.66796875,
-      "expected_unclipped_signal_counts": 2717680.078125,
-      "measured_dark_subtracted_signal_counts": 2811512.0,
-      "peak_dark_subtracted_counts": 2513.5
+      "expected_unclipped_signal_counts": 970600.0279017857,
+      "measured_dark_subtracted_signal_counts": 1018284.5,
+      "peak_dark_subtracted_counts": 938.5
     },
     {
       "magnitude": 14.0,
@@ -383,9 +383,9 @@
       "optical_capture_fraction": 0.9875755239027182,
       "incident_photons_per_exposure": 52922.56909968584,
       "expected_photoelectrons": 42880.87890625,
-      "expected_unclipped_signal_counts": 2572852.734375,
-      "measured_dark_subtracted_signal_counts": 2686776.5,
-      "peak_dark_subtracted_counts": 2712.5
+      "expected_unclipped_signal_counts": 918875.9765625,
+      "measured_dark_subtracted_signal_counts": 975625.5,
+      "peak_dark_subtracted_counts": 828.0
     },
     {
       "magnitude": 14.5,
@@ -396,9 +396,9 @@
       "optical_capture_fraction": 0.9872923735739393,
       "incident_photons_per_exposure": 41727.88723626388,
       "expected_photoelectrons": 33810.4765625,
-      "expected_unclipped_signal_counts": 2028628.59375,
-      "measured_dark_subtracted_signal_counts": 2098827.5,
-      "peak_dark_subtracted_counts": 2588.0
+      "expected_unclipped_signal_counts": 724510.2120535715,
+      "measured_dark_subtracted_signal_counts": 770032.0,
+      "peak_dark_subtracted_counts": 999.5
     },
     {
       "magnitude": 15.0,
@@ -409,9 +409,9 @@
       "optical_capture_fraction": 0.9875929517507362,
       "incident_photons_per_exposure": 70230.7534898691,
       "expected_photoelectrons": 56905.19921875,
-      "expected_unclipped_signal_counts": 3414311.953125,
-      "measured_dark_subtracted_signal_counts": 3572782.5,
-      "peak_dark_subtracted_counts": 3415.5
+      "expected_unclipped_signal_counts": 1219397.1261160714,
+      "measured_dark_subtracted_signal_counts": 1304286.0,
+      "peak_dark_subtracted_counts": 1159.5
     }
   ],
   "camera_modes": [

@@ -72,9 +72,11 @@ specifications](https://andor.oxinst.com/products/ocam-emccd-camera-series/ocam)
 The preset keeps the detector's two saturation domains separate: Andor's
 published 270,000-electron image-area well is applied before EM multiplication,
 and the Keck-observed 10,000 dark-subtracted count ceiling is represented as a
-100,000-electron output-register limit at 10 electrons/count. This avoids the
-unphysical 25-count post-EM clip that results from treating a single small
-input-referred number as the output well.
+280,000-electron output-register limit at the approximately 28 output
+electrons/count system conversion. At EM gain 600, one input electron therefore
+produces about 21.43 counts. This avoids the unphysical 25-count post-EM clip
+that results from treating a single small input-referred number as the output
+well.
 
 The source is a 6600 K Planck photon spectrum normalized to the catalog Johnson
 V magnitude and integrated from 400 to 950 nm with eight-point Gauss-Legendre
@@ -170,10 +172,13 @@ photons/s after atmospheric extinction; the three mirror reflections reduce
 this to 184.11 million photons/s, and the finite SH windows capture 181.77
 million photons/s. The real and simulated central-2x2 spot fractions are 94.1%
 and 92.4%, respectively. The pedestal-insensitive lenslet signal is 0.848
-million count/frame in the real cube and 8.272 million count/frame in the
-simulation: a real/simulation ratio of 0.1026, reported but not applied. Because
+million count/frame in the real cube and 2.956 million count/frame in the
+simulation: a real/simulation ratio of 0.2870, reported but not applied. Because
 atmospheric extinction and telescope-mirror losses are already included, this
-is an approximate 10.26% remaining downstream HAKA-throughput diagnostic,
+is an approximate 28.70% remaining downstream HAKA-throughput diagnostic. With
+the three modeled mirror reflections included, the inferred post-atmosphere
+telescope-plus-HAKA throughput is 19.56%; including atmospheric extinction gives
+17.71% from above the atmosphere to the detector entrance. These estimates are
 still convolved with the estimated real dark, absolute detector calibration,
 and the unknown instrumental band shape.
 
