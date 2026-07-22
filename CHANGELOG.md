@@ -35,6 +35,14 @@ All notable changes to `makewfs` are documented here.
   renders now use the Keck-characterized approximately 28 output e-/ADU OCAM2K
   conversion; the unscaled eng519 comparison estimates 28.70% downstream HAKA
   throughput after the already-modeled atmosphere and telescope mirrors.
+- Added a reproducible warm HAKA CPU/GPU benchmark. It times non-periodic Mauna
+  Kea atmosphere evolution, the full eight-wavelength 57x57 Shack--Hartmann
+  propagation, and noisy OCAM2K exposure while excluding static setup and
+  synchronizing CUDA batches. Its local GIF shows CPU/GPU detector streams over
+  equal wall-clock playback with measured FPS, real-time factor, frame counter,
+  and atmosphere time overlays.
+- Removed generated PNG/GIF artifacts from version control and ignore them
+  globally; example scripts continue to create them locally on demand.
 - Added public end-to-end GPU execution through `numerics.device = "gpu"`.
   CuPy OPD, SH/PWFS optics, wavelength-resolved photon maps, the `getframes`
   detector chain, truth, and ADU remain device-resident. The runtime reports an

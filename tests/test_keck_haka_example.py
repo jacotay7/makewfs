@@ -36,6 +36,16 @@ def _comparison_module(simulate: ModuleType) -> ModuleType:
     return module
 
 
+def _benchmark_module(simulate: ModuleType) -> ModuleType:
+    sys.modules["simulate"] = simulate
+    spec = importlib.util.spec_from_file_location("keck_haka_benchmark", EXAMPLE / "benchmark.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_camera_lookup_boundaries_and_limits() -> None:
     example = _module()
     modes = example.load_camera_modes()
@@ -51,6 +61,28 @@ def test_camera_lookup_boundaries_and_limits() -> None:
         example.select_camera_mode(25.0, modes)
     with pytest.raises(ValueError, match="frame-rate column"):
         modes[0].frame_rate_hz("invalid")
+
+
+def test_haka_benchmark_display_advances_at_measured_throughput() -> None:
+    example = _module()
+    benchmark = _benchmark_module(example)
+    samples = (
+        benchmark.ThroughputSample(elapsed_s=1.0, frames=20, frames_per_s=20.0),
+        benchmark.ThroughputSample(elapsed_s=2.0, frames=50, frames_per_s=25.0),
+    )
+    result = benchmark.DeviceResult(
+        device="cpu",
+        frames=50,
+        elapsed_s=2.0,
+        frames_per_s=25.0,
+        physical_frame_rate_hz=750.0,
+        simulated_open_loop_time_s=50.0 / 750.0,
+        real_time_factor=25.0 / 750.0,
+        samples=samples,
+    )
+
+    assert benchmark._display_state(result, 0, 5) == (0, 0.0)
+    assert benchmark._display_state(result, 5, 5) == (25, pytest.approx(25.0 / 750.0))
 
 
 def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:

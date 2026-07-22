@@ -188,6 +188,57 @@ upper-exclusive, so magnitude 10.0 selects WATAO row 10 and magnitude 15.0 row
 1. The animation playback rate is only for viewing; each simulated exposure
 uses the physical inverse lookup-table frame rate.
 
+## CPU versus GPU open-loop throughput
+
+Run the warm end-to-end HAKA benchmark with:
+
+```bash
+python examples/keck_haka/benchmark.py
+```
+
+This constructs one persistent sensor and non-periodic `pyturb` atmosphere per
+device, performs untimed warm-up frames, and then measures five wall-clock
+seconds per device. Each timed frame advances Mauna Kea turbulence by the
+physical 1/750 s exposure, propagates all eight wavelengths through the 57x57
+Shack--Hartmann optics, and exposes the noisy 228x228 OCAM2K detector. Source SED
+quadrature, pupil/sensor/atmosphere construction, warm-up, host copies,
+calibration, plotting, and file output are excluded. GPU work is synchronized
+after every five-frame timing batch.
+
+The July 2026 run on an AMD Ryzen 9 9950X3D and NVIDIA RTX 5090 measures 28.3
+CPU frames/s and 401.1 GPU frames/s, a 14.2x speedup. Relative to the 750 Hz RTC
+cadence these are 0.038x and 0.535x real time. The generated
+`haka_cpu_gpu_benchmark.gif` shows the two OCAM2K streams over equal wall-clock
+playback: atmosphere clocks and displayed frame counters advance at the measured
+device rates, so the GPU stream visibly evolves faster. Intermediate detector
+frames are skipped only in the visualization, after timing is complete. GIF and
+PNG outputs are ignored by Git; the exact samples, invocation, machine,
+dependencies, and methodology are in
+[`haka_cpu_gpu_benchmark.json`](haka_cpu_gpu_benchmark.json). These are local
+measurements rather than portable performance guarantees. Change the timed
+interval or device selection with `--seconds` and `--device cpu|gpu|both`.
+
+The older 945.2 GPU frames/s result for
+`shack_hartmann_60x60_float64.toml` is not the same workload. It uses fixed zero
+OPD, one wavelength, and a generic CMOS detector. A controlled 200-frame GPU
+ablation on this machine gives:
+
+| Warm GPU workload | Frames/s | Time/frame |
+| --- | ---: | ---: |
+| Existing 60x60, monochromatic zero OPD + generic CMOS | 945.2 | 1.058 ms |
+| HAKA geometry, monochromatic zero OPD + OCAM2K | 1,241.9 | 0.805 ms |
+| HAKA geometry, eight wavelengths, optics only | 600.3 | 1.666 ms |
+| HAKA geometry, eight wavelengths, fixed OPD + OCAM2K | 433.9 | 2.304 ms |
+| HAKA geometry, eight wavelengths, evolving `pyturb` + OCAM2K | 405.7 | 2.465 ms |
+
+The HAKA geometry itself is not slower: its monochromatic case exceeds the old
+reference because it uses a 228x228 float32 output instead of 360x360 float64.
+The eight wavelength-resolved optical states are the dominant added cost. The
+OCAM2K spectral detector and per-frame metadata add the next-largest share, and
+the non-periodic atmosphere adds about 0.11 ms/frame. Increasing the CUDA timing
+batch from five to 100 frames measured 398.2 frames/s, so synchronization cadence
+does not explain the gap.
+
 ## Explicit assumptions
 
 - Magnitudes are interpreted as catalog Vega V. Every showcase star uses a
