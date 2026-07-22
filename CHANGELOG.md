@@ -29,8 +29,9 @@ All notable changes to `makewfs` are documented here.
   at every magnitude without changing the physical detector exposure. HAKA NGS
   photon formation now integrates a V-normalized 6600 K spectrum over the full
   400--950 nm band, applies measured Mauna Kea extinction at the observed
-  airmass, uses the sampled clear-pupil collecting area, and passes the resolved
-  spectral cube through OCAM2K's wavelength-dependent QE.
+  airmass, applies 0.88 reflectivity to the aluminum primary, secondary, and
+  tertiary, uses the sampled clear-pupil collecting area, and passes the
+  resolved spectral cube through OCAM2K's wavelength-dependent QE.
 - Added public end-to-end GPU execution through `numerics.device = "gpu"`.
   CuPy OPD, SH/PWFS optics, wavelength-resolved photon maps, the `getframes`
   detector chain, truth, and ADU remain device-resident. The runtime reports an

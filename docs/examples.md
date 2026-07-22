@@ -19,9 +19,10 @@ The most complete current workflows are:
 - `keck_haka/`: Keck II HAKA open-loop video across guide-star magnitudes 5--15,
   with a 57x57 Shack-Hartmann, 4x4 pixels per subaperture, OCAM2K mode lookup,
   `pyturb` Maunakea turbulence, a V-normalized 6600 K spectrum over 400--950 nm,
-  measured wavelength-dependent Maunakea extinction, a live-data-fitted
-  circle-plus-hexagon secondary shadow, and an unscaled animated comparison to
-  the V=10.16 eng519 RTC cube including eight relative amplifier responses.
+  measured wavelength-dependent Maunakea extinction, three 0.88-reflectivity
+  aluminum telescope mirrors, a live-data-fitted circle-plus-hexagon secondary
+  shadow, and an unscaled animated comparison to the V=10.16 eng519 RTC cube
+  including eight relative amplifier responses.
 - `sh_design_trade.py`, `pyramid_modulation.py`, `realistic_broadband.py`, and
   `precision_throughput.py` cover the optical design, modulation, broadband
   pupil, and CPU precision trade studies.

@@ -22,11 +22,13 @@ from simulate import (
     HAKA_BAND_MIN_NM,
     HAKA_REFERENCE_AIRMASS,
     HAKA_SOURCE_TEMPERATURE_K,
+    KECK_ALUMINUM_MIRROR_REFLECTIVITY,
     KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX,
     KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX,
     KECK_OCAM_AMPLIFIER_GAIN_FACTORS,
     KECK_OCAM_AMPLIFIER_LAYOUT,
     KECK_OCAM_AMPLIFIER_OFFSETS_ADU,
+    KECK_TELESCOPE_MIRROR_COUNT,
     MAUNA_KEA_EXTINCTION_PATH,
     CameraMode,
     configured_sensor,
@@ -417,6 +419,20 @@ def _simulate(args: argparse.Namespace) -> tuple[NDArray[np.float32], dict[str, 
             "after_atmosphere_photons_per_s_m2": sensor.config.metadata[
                 "after_atmosphere_photons_per_s_m2"
             ],
+            "after_telescope_mirrors_photons_per_s_m2": sensor.config.metadata[
+                "after_telescope_mirrors_photons_per_s_m2"
+            ],
+            "telescope_mirrors": {
+                "coating_assumption": "bare aluminum, scalar band-averaged reflectivity",
+                "count": KECK_TELESCOPE_MIRROR_COUNT,
+                "surfaces": ["primary", "secondary", "tertiary"],
+                "reflectivity_each": KECK_ALUMINUM_MIRROR_REFLECTIVITY,
+                "combined_throughput": sensor.config.metadata["telescope_mirror_throughput"],
+                "combined_loss_fraction": (
+                    1.0 - sensor.config.metadata["telescope_mirror_throughput"]
+                ),
+            },
+            "downstream_haka_throughput": base.source.throughput,
             "magnitude_system": "Vega V",
             "magnitude": args.magnitude,
             "target": {
@@ -682,9 +698,9 @@ def main() -> None:
                 "the surrounding 12-pixel border mean"
             ),
             "interpretation": (
-                "With atmospheric extinction already modeled, this is an estimate of the "
-                "downstream telescope-plus-HAKA end-to-end throughput convolved with detector-"
-                "calibration uncertainty; it is reported but never used as a scale factor."
+                "With atmospheric extinction and three telescope reflections already "
+                "modeled, this estimates the remaining downstream HAKA throughput convolved "
+                "with detector-calibration uncertainty; it is never used as a scale factor."
             ),
         },
         "known_limitations": [
@@ -702,7 +718,8 @@ def main() -> None:
                 "The catalog V=10.16 normalizes a 6600 K Planck spectrum over the "
                 "approximate 400--950 nm top-hat HAKA band. The measured Mauna Kea "
                 "extinction curve is applied at the frame-header airmass of 1.01; "
-                "the exact HAKA instrumental transmission curve remains unknown."
+                "three aluminum telescope reflections use scalar R=0.88 each. The exact "
+                "HAKA instrumental transmission curve remains unknown."
             ),
         ],
     }

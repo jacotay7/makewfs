@@ -5,7 +5,7 @@ natural-guide-star Shack-Hartmann model. It uses the repository boundaries
 directly:
 
 ```text
-V-normalized F6 V spectrum x Maunakea extinction
+V-normalized F6 V spectrum x Maunakea extinction x 3 aluminum mirrors
                        + pyturb Maunakea OPD
                                       |
                                       v
@@ -79,12 +79,24 @@ input-referred number as the output well.
 The source is a 6600 K Planck photon spectrum normalized to the catalog Johnson
 V magnitude and integrated from 400 to 950 nm with eight-point Gauss-Legendre
 quadrature. Atmospheric attenuation uses the mean Mauna Kea extinction curve
-in magnitudes per airmass published in CFHT Bulletin 19 and reproduced by the
-[W. M. Keck Observatory](https://www2.keck.hawaii.edu/inst/common/exts.html).
+in magnitudes per airmass published by [Gemini
+Observatory](https://www.gemini.edu/observing/telescopes-and-sites/sites#MK%20optical%20extinction%20curve).
 The eng519 header supplies `AIRMASS=1.01`; the same value is the showcase default.
+Gemini's table ends at 900 nm, so its 0.05 mag/airmass value is conservatively
+held constant from 900 to the 950 nm band edge.
 The curve is applied before the telescope and the absolute photon budget uses
 the 72.04 m² clear area measured from the same sampled segmented pupil used by
-the optical propagation. Downstream HAKA throughput remains exactly one.
+the optical propagation.
+
+The primary, secondary, and tertiary are each assigned 0.88 scalar reflectivity,
+for a combined telescope-mirror throughput of `0.88^3 = 0.6815`. Keck documents
+that its telescope mirrors use [bare aluminum
+coatings](https://keckobservatory.org/a_mirrors_perfect_reflection/), and
+[maintained aluminum coating data](https://www.layertec.de/en/coatings/metallic-coatings/aluminum-coatings/)
+place broadband visible/NIR reflectivity in roughly the 85--92% range. Thus
+0.88 is a defensible conservative band average,
+but not a measured reflectivity curve for these three mirrors. Downstream HAKA
+throughput remains exactly one and is never fitted to the RTC data.
 
 The JSON manifest contains a `frame_flux_audit` for every rendered exposure. It
 records launched and optically captured photons, expected photoelectrons,
@@ -147,21 +159,23 @@ The catalog V magnitude sets the absolute normalization of the 6600 K spectrum;
 B-V=0.46 is retained as supporting evidence for the F5--F7 classification. The
 400--950 nm passband is currently a top hat because a measured HAKA instrumental
 curve was not supplied. Atmospheric transmission and detector QE are both
-wavelength resolved. Source instrument throughput is one, so the simulation is
-expected to be brighter than the instrument. The measured real/simulation ratio
-is reported and never fed back as a scale factor.
+wavelength resolved. Downstream HAKA throughput is one, so the simulation is
+expected to be brighter than the instrument after the three modeled telescope
+reflections. The measured real/simulation ratio is reported and never fed back
+as a scale factor.
 
 For the checked-in deterministic run, the photon-weighted atmospheric
-transmission is 90.62%. The 72.04 m² clear pupil receives 270.44 million
-photons/s after atmospheric extinction and the finite SH windows capture 267.01
+transmission is 90.53%. The 72.04 m² clear pupil receives 270.16 million
+photons/s after atmospheric extinction; the three mirror reflections reduce
+this to 184.11 million photons/s, and the finite SH windows capture 181.77
 million photons/s. The real and simulated central-2x2 spot fractions are 94.1%
 and 92.4%, respectively. The pedestal-insensitive lenslet signal is 0.848
-million count/frame in the real cube and 12.149 million count/frame in the
-throughput-unity simulation: a real/simulation ratio of 0.0698, reported but not
-applied. Because atmospheric extinction is already included, this is an
-approximate 6.98% end-to-end telescope-plus-HAKA throughput diagnostic, still
-convolved with the estimated real dark, absolute detector calibration, and the
-unknown instrumental band shape.
+million count/frame in the real cube and 8.272 million count/frame in the
+simulation: a real/simulation ratio of 0.1026, reported but not applied. Because
+atmospheric extinction and telescope-mirror losses are already included, this
+is an approximate 10.26% remaining downstream HAKA-throughput diagnostic,
+still convolved with the estimated real dark, absolute detector calibration,
+and the unknown instrumental band shape.
 
 `WSFRRT1` is the default rate column; select `--frame-rate-column WSFRRT2` to
 render the alternate rates. Magnitude bins are lower-inclusive and
@@ -174,8 +188,9 @@ uses the physical inverse lookup-table frame rate.
 - Magnitudes are interpreted as catalog Vega V. Every showcase star uses a
   6600 K F6 V spectrum over a top-hat 400--950 nm band. The eng519 exposure uses
   its header airmass of 1.01 and the mean measured Mauna Kea extinction curve.
-  Downstream instrument throughput is exactly 1.0, so the predicted flux should
-  exceed a real OCAM2K frame.
+  Primary, secondary, and tertiary reflections transmit 0.88 each; downstream
+  HAKA throughput is exactly 1.0, so the predicted flux should still exceed a
+  real OCAM2K frame.
 - Seeing defaults to 0.65 arcsec at 500 nm. `pyturb` supplies its traceable
   `mauna-kea` profile and all wavefronts are open loop: no residual scaling,
   reconstructor, DM, or controller is applied.

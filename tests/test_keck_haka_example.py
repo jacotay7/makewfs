@@ -106,7 +106,11 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert budget.wavelengths_m[0] > 400e-9
     assert budget.wavelengths_m[-1] < 950e-9
     assert 0.85 < budget.photon_weighted_atmospheric_transmission < 0.95
-    assert budget.detector_surface_photons_per_s > 2.5e8
+    assert budget.telescope_mirror_throughput == pytest.approx(0.88**3)
+    assert budget.after_telescope_mirrors_photons_per_s_m2 == pytest.approx(
+        budget.after_atmosphere_photons_per_s_m2 * 0.88**3
+    )
+    assert budget.detector_surface_photons_per_s > 1.7e8
     dense_wavelength_nm = np.linspace(example.HAKA_BAND_MIN_NM, example.HAKA_BAND_MAX_NM, 20_001)
     extinction = np.loadtxt(example.MAUNA_KEA_EXTINCTION_PATH, delimiter=",", comments="#")
     dense_shape = example._blackbody_photon_shape(

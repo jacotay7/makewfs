@@ -63,6 +63,8 @@ HAKA_BAND_MAX_NM = 950.0
 HAKA_SPECTRAL_QUADRATURE_ORDER = 8
 HAKA_SOURCE_TEMPERATURE_K = 6600.0
 HAKA_REFERENCE_AIRMASS = 1.01
+KECK_ALUMINUM_MIRROR_REFLECTIVITY = 0.88
+KECK_TELESCOPE_MIRROR_COUNT = 3
 MAUNA_KEA_EXTINCTION_PATH = HERE / "mauna_kea_extinction.csv"
 _H_PLANCK_J_S = 6.62607015e-34
 _C_LIGHT_M_S = 299792458.0
@@ -120,8 +122,10 @@ class BroadbandBudget:
     collecting_area_m2: float
     above_atmosphere_photons_per_s_m2: float
     after_atmosphere_photons_per_s_m2: float
+    after_telescope_mirrors_photons_per_s_m2: float
     detector_surface_photons_per_s: float
     photon_weighted_atmospheric_transmission: float
+    telescope_mirror_throughput: float
 
 
 def load_camera_modes(path: Path = HERE / "camera_modes.csv") -> tuple[CameraMode, ...]:
@@ -306,21 +310,34 @@ def broadband_budget(
     *,
     temperature_k: float = HAKA_SOURCE_TEMPERATURE_K,
     airmass: float = HAKA_REFERENCE_AIRMASS,
+    mirror_reflectivity: float = KECK_ALUMINUM_MIRROR_REFLECTIVITY,
+    mirror_count: int = KECK_TELESCOPE_MIRROR_COUNT,
     throughput: float = 1.0,
 ) -> BroadbandBudget:
     """Build a V-normalized 400--950 nm F-star photon quadrature.
 
     The catalog V magnitude fixes the above-atmosphere normalization. The source
     is a blackbody photon spectrum and the tabulated Mauna Kea extinction in
-    mag/airmass is applied at the observed frame's airmass. ``throughput`` is an
-    optional wavelength-independent instrument term and remains one here.
+    mag/airmass is applied at the observed frame's airmass. The primary,
+    secondary, and tertiary are assigned the same band-averaged aluminum
+    reflectivity. ``throughput`` is the remaining downstream HAKA term and stays
+    one here.
     """
     try:
         import getframes
     except ImportError as exc:  # pragma: no cover - required makewfs dependency
         raise ImportError("makewfs requires getframes") from exc
-    if collecting_area_m2 <= 0 or airmass <= 0 or not 0 <= throughput <= 1:
-        raise ValueError("collecting area and airmass must be positive; throughput in [0, 1]")
+    if (
+        collecting_area_m2 <= 0
+        or airmass <= 0
+        or not 0 <= mirror_reflectivity <= 1
+        or mirror_count < 0
+        or not 0 <= throughput <= 1
+    ):
+        raise ValueError(
+            "collecting area and airmass must be positive; reflectivity and "
+            "throughput in [0, 1]; mirror count non-negative"
+        )
 
     v_band = getframes.Bandpass.johnson("V")
     if v_band.response is None:
@@ -354,14 +371,18 @@ def broadband_budget(
     transmitted_contributions = above_contributions * atmospheric_transmission
     above_flux = float(np.sum(above_contributions))
     transmitted_flux = float(np.sum(transmitted_contributions))
+    mirror_throughput = mirror_reflectivity**mirror_count
+    after_mirrors_flux = transmitted_flux * mirror_throughput
     return BroadbandBudget(
         wavelengths_m=tuple((wavelengths_nm * 1e-9).tolist()),
         wavelength_weights=tuple(transmitted_contributions.tolist()),
         collecting_area_m2=collecting_area_m2,
         above_atmosphere_photons_per_s_m2=above_flux,
         after_atmosphere_photons_per_s_m2=transmitted_flux,
-        detector_surface_photons_per_s=(transmitted_flux * collecting_area_m2 * throughput),
+        after_telescope_mirrors_photons_per_s_m2=after_mirrors_flux,
+        detector_surface_photons_per_s=(after_mirrors_flux * collecting_area_m2 * throughput),
         photon_weighted_atmospheric_transmission=transmitted_flux / above_flux,
+        telescope_mirror_throughput=mirror_throughput,
     )
 
 
@@ -421,9 +442,15 @@ def configured_sensor(
         "clear_collecting_area_m2": collecting_area_m2,
         "above_atmosphere_photons_per_s_m2": budget.above_atmosphere_photons_per_s_m2,
         "after_atmosphere_photons_per_s_m2": budget.after_atmosphere_photons_per_s_m2,
+        "after_telescope_mirrors_photons_per_s_m2": (
+            budget.after_telescope_mirrors_photons_per_s_m2
+        ),
         "photon_weighted_atmospheric_transmission": (
             budget.photon_weighted_atmospheric_transmission
         ),
+        "aluminum_mirror_reflectivity_each": KECK_ALUMINUM_MIRROR_REFLECTIVITY,
+        "telescope_mirror_count": KECK_TELESCOPE_MIRROR_COUNT,
+        "telescope_mirror_throughput": budget.telescope_mirror_throughput,
     }
     config = replace(
         base,
@@ -732,7 +759,19 @@ def _write_manifest(
             "photon_weighted_transmission": (
                 spectral_budget.photon_weighted_atmospheric_transmission
             ),
-            "reference": "CFHT Bulletin 19 (1988), reproduced by W. M. Keck Observatory",
+            "red_edge_extrapolation": (
+                "Gemini table ends at 900 nm; 0.05 mag/airmass is held constant to 950 nm"
+            ),
+            "reference": "Gemini Observatory Mauna Kea optical extinction curve",
+        },
+        "telescope_mirrors": {
+            "coating_assumption": "bare aluminum, scalar band-averaged reflectivity",
+            "count": KECK_TELESCOPE_MIRROR_COUNT,
+            "surfaces": ["primary", "secondary", "tertiary"],
+            "reflectivity_each": KECK_ALUMINUM_MIRROR_REFLECTIVITY,
+            "combined_throughput": spectral_budget.telescope_mirror_throughput,
+            "combined_loss_fraction": 1.0 - spectral_budget.telescope_mirror_throughput,
+            "downstream_haka_throughput": 1.0,
         },
         "clear_collecting_area_m2": collecting_area_m2,
         "master_dark_frames_per_mode": args.master_dark_frames,
@@ -794,7 +833,9 @@ def _write_manifest(
             ),
             (
                 "Mauna Kea atmospheric extinction is modeled across 400--950 nm at "
-                f"airmass {args.airmass:g}; downstream instrument throughput is unity."
+                f"airmass {args.airmass:g}. Three aluminum telescope reflections use "
+                f"R={KECK_ALUMINUM_MIRROR_REFLECTIVITY:g} each; downstream HAKA "
+                "throughput is unity."
             ),
             "Exposure equals the inverse selected frame rate (100% duty cycle).",
             (

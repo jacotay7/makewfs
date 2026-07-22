@@ -418,10 +418,24 @@
     "source_temperature_k": 6600.0,
     "airmass": 1.01,
     "atmospheric_extinction_curve": "mauna_kea_extinction.csv",
-    "photon_weighted_atmospheric_transmission": 0.9062410608952154,
+    "photon_weighted_atmospheric_transmission": 0.9053070967254322,
     "clear_collecting_area_m2": 72.03713339723187,
     "above_atmosphere_photons_per_s_m2": 4142573.6375711514,
-    "after_atmosphere_photons_per_s_m2": 3754170.328149032,
+    "after_atmosphere_photons_per_s_m2": 3750301.3128008517,
+    "after_telescope_mirrors_photons_per_s_m2": 2555725.3362370217,
+    "telescope_mirrors": {
+      "coating_assumption": "bare aluminum, scalar band-averaged reflectivity",
+      "count": 3,
+      "surfaces": [
+        "primary",
+        "secondary",
+        "tertiary"
+      ],
+      "reflectivity_each": 0.88,
+      "combined_throughput": 0.681472,
+      "combined_loss_fraction": 0.31852800000000003
+    },
+    "downstream_haka_throughput": 1.0,
     "magnitude_system": "Vega V",
     "magnitude": 10.16,
     "target": {
@@ -473,9 +487,9 @@
       -3.0,
       -4.0
     ],
-    "launched_photons_per_s": 270439668.72480154,
-    "captured_photons_per_s": 267011550.45515326,
-    "expected_photoelectrons_last_frame": 288435.5625
+    "launched_photons_per_s": 184107126.97319162,
+    "captured_photons_per_s": 181773380.0895989,
+    "expected_photoelectrons_last_frame": 196382.109375
   },
   "real_metrics": {
     "frames": 750,
@@ -523,57 +537,57 @@
   },
   "simulated_metrics": {
     "frames": 750,
-    "mean_estimated_dark_subtracted_frame_sum_counts": 17918713.284,
-    "mean_lenslet_core_minus_border_counts_per_frame": 12148949.234138642,
-    "std_lenslet_core_minus_border_counts_per_frame": 132438.4733557736,
-    "median_peak_counts": 11555.5,
+    "mean_estimated_dark_subtracted_frame_sum_counts": 12206441.061333334,
+    "mean_lenslet_core_minus_border_counts_per_frame": 8271657.582209752,
+    "std_lenslet_core_minus_border_counts_per_frame": 93662.44417091469,
+    "median_peak_counts": 8354.75,
     "peak_count_percentiles_10_50_90": [
-      10740.0,
-      11555.5,
-      12598.65
+      7727.3,
+      8354.75,
+      9121.7
     ],
-    "lower_quartile_pixel_temporal_rms_counts": 20.531445107985512,
+    "lower_quartile_pixel_temporal_rms_counts": 20.558876791090654,
     "mean_spot_centroid_xy_pixels": [
-      1.4928251348017616,
-      1.5044757172212146
+      1.492814500621194,
+      1.504727542324092
     ],
-    "mean_spot_central_2x2_fraction": 0.9237424626759934,
+    "mean_spot_central_2x2_fraction": 0.923714523533755,
     "mean_spot_normalized": [
       [
         0.0,
-        0.009481603361742887,
-        0.008751518186006887,
+        0.009414975466542125,
+        0.008773348918152199,
         0.0
       ],
       [
-        0.009889781787987462,
-        0.23269198204607985,
-        0.22658071765913973,
-        0.009133078058657299
+        0.009939580079961083,
+        0.23251921800568484,
+        0.22659632315440173,
+        0.009111967735291514
       ],
       [
-        0.010095582340841331,
-        0.23398647690926175,
-        0.23048328606151208,
-        0.00966845372019212
+        0.010132492384097231,
+        0.23398828790142298,
+        0.23061069447224544,
+        0.009641831813380844
       ],
       [
         0.0,
-        0.009845606402345866,
-        0.009391913466232731,
+        0.009872672625711756,
+        0.009398607443108184,
         0.0
       ]
     ]
   },
   "diagnostics_not_applied_to_simulation": {
-    "real_to_simulated_lenslet_signal_ratio": 0.06983249988515627,
+    "real_to_simulated_lenslet_signal_ratio": 0.10256608032499218,
     "signal_estimator": "sum over 57x57 lenslets of central-2x2 counts minus four times the surrounding 12-pixel border mean",
-    "interpretation": "With atmospheric extinction already modeled, this is an estimate of the downstream telescope-plus-HAKA end-to-end throughput convolved with detector-calibration uncertainty; it is reported but never used as a scale factor."
+    "interpretation": "With atmospheric extinction and three telescope reflections already modeled, this estimates the remaining downstream HAKA throughput convolved with detector-calibration uncertainty; it is never used as a scale factor."
   },
   "known_limitations": [
     "No matched OCAM2K dark cube was supplied. The real dark/bias estimate uses only outside-pupil pixels, with a static per-output/repeated-4x4 template and a per-frame drift for each output.",
     "The real pupil has static illumination/vignetting structure absent from phase-only pyturb.",
     "No image registration, spot shift, pupil rotation, or flux normalization is fitted.",
-    "The catalog V=10.16 normalizes a 6600 K Planck spectrum over the approximate 400--950 nm top-hat HAKA band. The measured Mauna Kea extinction curve is applied at the frame-header airmass of 1.01; the exact HAKA instrumental transmission curve remains unknown."
+    "The catalog V=10.16 normalizes a 6600 K Planck spectrum over the approximate 400--950 nm top-hat HAKA band. The measured Mauna Kea extinction curve is applied at the frame-header airmass of 1.01; three aluminum telescope reflections use scalar R=0.88 each. The exact HAKA instrumental transmission curve remains unknown."
   ]
 }

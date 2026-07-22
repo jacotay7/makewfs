@@ -21,8 +21,9 @@ magnitude_system = "vega"
 band = "V"
 # simulate.py replaces this scalar placeholder with a V-normalized 6600 K
 # 400--950 nm photon quadrature, applies measured Mauna Kea extinction at the
-# requested airmass, and uses the clear sampled pupil collecting area. Downstream
-# HAKA instrument throughput remains unity and is never fitted to the live cube.
+# requested airmass, applies 0.88 reflectivity for each of the primary, secondary,
+# and tertiary, and uses the clear sampled pupil collecting area. This field is
+# the remaining downstream HAKA throughput and is never fitted to the live cube.
 throughput = 1.0
 
 [sensor]
