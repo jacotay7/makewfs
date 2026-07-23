@@ -4,6 +4,16 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Added an R-band HAKA camera-LUT analysis using representative A0 V through M3
+  V continua and generated open-loop Maunakea states. It reports mean active
+  4x4-lenslet intensity SNR with OCAM2K photon, EM-excess, dark, CIC, read, and
+  quantization noise, fits a smooth ceiling-aware broken-power-law cadence floor
+  only to the R>=10 fine-adjustment tail, asymptotes to the true 2067 Hz OCAM2K
+  limit, and emits a smooth saturation-constrained policy that never slows below
+  that empirical model merely to recover per-frame SNR.
+- Generalized the HAKA broadband photon-budget helper from fixed Johnson V
+  normalization to an explicit Johnson normalization band, retaining V as the
+  showcase and eng519 default.
 - Fixed temporal integration to average and forward wavelength-resolved photon
   cubes to the detector, preserving configured spectral QE instead of silently
   falling back to scalar QE.

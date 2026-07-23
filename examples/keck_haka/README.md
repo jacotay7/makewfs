@@ -191,6 +191,85 @@ upper-exclusive, so magnitude 10.0 selects WATAO row 10 and magnitude 15.0 row
 1. The animation playback rate is only for viewing; each simulated exposure
 uses the physical inverse lookup-table frame rate.
 
+## Empirical LUT SNR analysis
+
+Quantify the on-sky camera-mode lookup table in Vega Johnson R with:
+
+```bash
+MPLBACKEND=Agg python examples/keck_haka/analyze_lut.py
+```
+
+The analysis uses A0 V (9500 K), F6 V (6600 K), G2 V (5800 K), and M3 V
+(3400 K) Planck continua, each independently normalized to the same R
+magnitude. For each continuum it propagates four generated open-loop Maunakea
+phase screens through the verified 400--950 nm HAKA model. The metric is the
+detector-limited intensity SNR of the dark-subtracted sum of all 16 pixels in
+each active 4x4 lenslet region, arithmetically averaged over 1,863 active
+lenslets and the atmosphere states. It includes photon shot noise, the
+high-gain EMCCD excess-noise factor, dark and CIC shot noise, output-amplifier
+read noise, measured amplifier conversion differences, and ADC quantization.
+It assumes perfect removal of the exposure-matched dark mean. It does not yet
+measure centroid/slope error, reconstructed wavefront error, or temporal-loop
+performance.
+
+The current LUT does not describe one constant intensity SNR. Across R=5--15,
+the SED-mean curve is deliberately sawtoothed at its camera-mode boundaries and
+spans about 0.92--9.86. The four continuum choices are close but measurably
+different after atmospheric extinction and wavelength-dependent OCAM2K QE; the
+red M3 V case is generally highest at fixed R magnitude.
+
+The empirical cadence model deliberately fits only the fine-adjustment tail:
+open-filter rows whose bin centres are R>=10, ending before the broad R=15.5--24
+catch-all row. The bright 2000 Hz points are excluded because they are human-
+rounded representations of OCAM2K's 2067 Hz ceiling, and the 1500 Hz points are
+excluded because they are convenient coarse steps rather than samples of the
+underlying trend. A weighted nonlinear fit uses a smooth broken power law that
+approaches the detector ceiling at high flux and a power law at low flux:
+
+```text
+frame_rate = 2067 Hz * [1 + (0.115403 / relative_R_flux)^0.529473]
+             ^(-1.30531 / 0.529473)
+relative_R_flux = 10^[-0.4 * (R - 10)]
+```
+
+The 0.115403 transition flux corresponds to R=12.344. The fitted tail has
+0.0554 dex RMS residual (a factor of 1.14), reasonable for the quantized
+empirical settings. Unlike the previous single power-law extrapolation, this
+model predicts 1044.9 Hz rather than 1485.2 Hz at R=10, matching the local
+empirical behavior without introducing a kink. It is smooth and monotone, has
+the physical 2067 Hz bright-limit asymptote, and is treated as a hard lower
+bound on cadence.
+
+At every 0.05 magnitude the optimizer tests whether a still-faster continuous
+mode can retain worst-SED SNR 4.5. It never exceeds 2067 Hz or drops below the
+fitted cadence. In this run the SNR-limited solution is faster through R=8.75;
+the fitted cadence becomes active at R=8.8. Gain rises smoothly until reaching
+600 at R=8.4; after the crossover the policy explicitly accepts lower SNR rather
+than slowing down. Every candidate keeps the expected peak plus five sigma below
+the image-area well, output-register well, and ADC ceiling for every SED,
+atmosphere state, and pixel.
+
+| R magnitude | Empirical floor | Proposed gain / rate | Worst-SED SNR |
+| ---: | ---: | ---: | ---: |
+| 5 | 1931.7 Hz | 4.25 / 2067 Hz | 4.50 |
+| 8 | 1562.5 Hz | 121.86 / 2067 Hz | 4.50 |
+| 9 | 1330.3 Hz | 600 / 1330.3 Hz | 4.17 |
+| 10 | 1044.9 Hz | 600 / 1044.9 Hz | 2.92 |
+| 12 | 456.4 Hz | 600 / 456.4 Hz | 1.67 |
+| 15 | 46.7 Hz | 600 / 46.7 Hz | 1.20 |
+
+This captures the operational trade: at the faint end, lower per-frame SNR is
+preferred to the temporal error that would accompany a slower exposure. Change
+the reference SNR with, for example, `--target-snr 4.0`; it affects only the
+faster-than-floor branch. The policy is a simulation hypothesis rather than an
+operational replacement; slope/reconstruction error, latency, controller
+stability, discrete supported camera setpoints, and on-sky validation are the
+next gates.
+The full reproducible result is in
+[`haka_lut_snr.json`](haka_lut_snr.json), and the tabular proposal is
+[`camera_modes_empirical_floor_continuous.csv`](camera_modes_empirical_floor_continuous.csv).
+The generated `haka_lut_snr.png` is intentionally ignored by Git.
+
 ## CPU versus GPU open-loop throughput
 
 Run the warm end-to-end HAKA benchmark with:
@@ -244,8 +323,9 @@ does not explain the gap.
 
 ## Explicit assumptions
 
-- Magnitudes are interpreted as catalog Vega V. Every showcase star uses a
-  6600 K F6 V spectrum over a top-hat 400--950 nm band. The eng519 exposure uses
+- Showcase and eng519 magnitudes are interpreted as catalog Vega V; the LUT SNR
+  analysis explicitly uses Vega Johnson R. Every showcase star uses a 6600 K
+  F6 V spectrum over a top-hat 400--950 nm band. The eng519 exposure uses
   its header airmass of 1.01 and the mean measured Mauna Kea extinction curve.
   Primary, secondary, and tertiary reflections transmit 0.88 each; independently
   confirmed downstream HAKA bench throughput is 0.287. Both terms are applied

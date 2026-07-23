@@ -119,7 +119,7 @@ class RenderedFrame:
 
 @dataclass(frozen=True)
 class BroadbandBudget:
-    """Absolute photon budget and quadrature for one catalog V magnitude."""
+    """Absolute photon budget and quadrature for one catalog magnitude."""
 
     wavelengths_m: tuple[float, ...]
     wavelength_weights: tuple[float, ...]
@@ -309,20 +309,21 @@ def _gauss_legendre_interval(
 
 
 def broadband_budget(
-    magnitude_v: float,
+    magnitude: float,
     collecting_area_m2: float,
     *,
+    normalization_band: str = "V",
     temperature_k: float = HAKA_SOURCE_TEMPERATURE_K,
     airmass: float = HAKA_REFERENCE_AIRMASS,
     mirror_reflectivity: float = KECK_ALUMINUM_MIRROR_REFLECTIVITY,
     mirror_count: int = KECK_TELESCOPE_MIRROR_COUNT,
     throughput: float = HAKA_DOWNSTREAM_THROUGHPUT,
 ) -> BroadbandBudget:
-    """Build a V-normalized 400--950 nm F-star photon quadrature.
+    """Build a Johnson-band-normalized 400--950 nm stellar photon quadrature.
 
-    The catalog V magnitude fixes the above-atmosphere normalization. The source
-    is a blackbody photon spectrum and the tabulated Mauna Kea extinction in
-    mag/airmass is applied at the observed frame's airmass. The primary,
+    The catalog magnitude in ``normalization_band`` fixes the above-atmosphere
+    normalization. The source is a blackbody photon spectrum and the tabulated
+    Mauna Kea extinction in mag/airmass is applied at the observed frame's airmass. The primary,
     secondary, and tertiary are assigned the same band-averaged aluminum
     reflectivity. ``throughput`` is the independently measured remaining
     downstream HAKA bench term.
@@ -343,20 +344,24 @@ def broadband_budget(
             "throughput in [0, 1]; mirror count non-negative"
         )
 
-    v_band = getframes.Bandpass.johnson("V")
-    if v_band.response is None:
-        raise AssertionError("getframes Johnson V must carry a spectral response")
-    response = v_band.response.response
-    v_nodes, v_quadrature = _gauss_legendre_interval(
+    normalized_band = normalization_band.upper()
+    try:
+        bandpass = getframes.Bandpass.johnson(normalized_band)
+    except (KeyError, ValueError) as exc:
+        raise ValueError(f"unsupported Johnson normalization band {normalization_band!r}") from exc
+    if bandpass.response is None:
+        raise AssertionError(f"getframes Johnson {normalized_band} must carry a spectral response")
+    response = bandpass.response.response
+    band_nodes, band_quadrature = _gauss_legendre_interval(
         float(response.wavelength_nm[0]),
         float(response.wavelength_nm[-1]),
         32,
     )
-    v_response = np.interp(v_nodes, response.wavelength_nm, response.value)
-    v_shape_integral = float(
-        np.sum(v_quadrature * _blackbody_photon_shape(v_nodes, temperature_k) * v_response)
+    band_response = np.interp(band_nodes, response.wavelength_nm, response.value)
+    band_shape_integral = float(
+        np.sum(band_quadrature * _blackbody_photon_shape(band_nodes, temperature_k) * band_response)
     )
-    density_scale = v_band.photon_flux(magnitude_v) / v_shape_integral
+    density_scale = bandpass.photon_flux(magnitude) / band_shape_integral
 
     wavelengths_nm, quadrature = _gauss_legendre_interval(
         HAKA_BAND_MIN_NM,
@@ -400,6 +405,7 @@ def configured_sensor(
     collecting_area_m2: float,
     source_temperature_k: float = HAKA_SOURCE_TEMPERATURE_K,
     airmass: float = HAKA_REFERENCE_AIRMASS,
+    magnitude_band: str = "V",
 ) -> makewfs.WavefrontSensor:
     """Build one magnitude/camera-mode configuration from public sibling APIs."""
     try:
@@ -436,6 +442,7 @@ def configured_sensor(
     budget = broadband_budget(
         magnitude,
         collecting_area_m2,
+        normalization_band=magnitude_band,
         temperature_k=source_temperature_k,
         airmass=airmass,
         throughput=base.source.throughput,
@@ -448,7 +455,8 @@ def configured_sensor(
         "frame_rate_column": frame_rate_column,
         "obwnname": mode.filter_name,
         "bkgnd": mode.background_mode,
-        "catalog_v_magnitude": magnitude,
+        f"catalog_{magnitude_band.lower()}_magnitude": magnitude,
+        "magnitude_normalization_band": magnitude_band.upper(),
         "source_temperature_k": source_temperature_k,
         "airmass": airmass,
         "bandpass_nm": [HAKA_BAND_MIN_NM, HAKA_BAND_MAX_NM],

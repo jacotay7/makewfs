@@ -47,6 +47,18 @@ def _benchmark_module(simulate: ModuleType) -> ModuleType:
     return module
 
 
+def _lut_module(simulate: ModuleType) -> ModuleType:
+    sys.modules["simulate"] = simulate
+    spec = importlib.util.spec_from_file_location(
+        "keck_haka_analyze_lut", EXAMPLE / "analyze_lut.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_camera_lookup_boundaries_and_limits() -> None:
     example = _module()
     modes = example.load_camera_modes()
@@ -89,12 +101,29 @@ def test_haka_benchmark_display_advances_at_measured_throughput() -> None:
 def test_checked_haka_artifacts_use_independently_confirmed_throughput() -> None:
     showcase = json.loads((EXAMPLE / "keck_haka.json").read_text(encoding="utf-8"))
     comparison = json.loads((EXAMPLE / "real_vs_simulation.json").read_text(encoding="utf-8"))
+    lut_analysis = json.loads((EXAMPLE / "haka_lut_snr.json").read_text(encoding="utf-8"))
 
     assert showcase["telescope_mirrors"]["downstream_haka_throughput"] == 0.287
     assert comparison["simulation"]["downstream_haka_throughput"] == 0.287
     validation = comparison["independent_throughput_validation"]
     assert validation["adopted_downstream_haka_throughput"] == 0.287
     assert validation["real_to_simulated_lenslet_signal_ratio"] == pytest.approx(1.0, abs=0.02)
+    assert lut_analysis["magnitude_system"] == "Vega Johnson R"
+    assert lut_analysis["active_lenslets"] == 1863
+    assert lut_analysis["optimization_constraints"]["target_snr"] == 4.5
+    cadence_fit = lut_analysis["empirical_frame_rate_model"]
+    assert cadence_fit["kind"] == "faint-tail smooth broken power law with 2067 Hz asymptote"
+    assert cadence_fit["rms_multiplicative_factor"] < 1.14
+    assert cadence_fit["maximum_frame_rate_hz"] == 2067.0
+    assert min(anchor["magnitude_r"] for anchor in cadence_fit["anchors"]) >= 10.0
+    optimized = lut_analysis["optimization"]
+    assert optimized[0]["magnitude_r"] == 5.0
+    assert optimized[-1]["magnitude_r"] == 15.0
+    assert all(
+        row["proposed_frame_rate_hz"] >= row["empirical_frame_rate_floor_hz"] for row in optimized
+    )
+    assert optimized[0]["target_snr_met"] is True
+    assert optimized[-1]["target_snr_met"] is False
 
 
 def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
@@ -187,6 +216,16 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert brighter.detector_surface_photons_per_s / budget.detector_surface_photons_per_s == (
         pytest.approx(10**0.4)
     )
+    r_budget = example.broadband_budget(10.16, collecting_area_m2, normalization_band="R")
+    r_brighter = example.broadband_budget(9.16, collecting_area_m2, normalization_band="r")
+    assert r_brighter.detector_surface_photons_per_s / r_budget.detector_surface_photons_per_s == (
+        pytest.approx(10**0.4)
+    )
+    assert r_budget.detector_surface_photons_per_s != pytest.approx(
+        budget.detector_surface_photons_per_s
+    )
+    with pytest.raises(ValueError, match="normalization band"):
+        example.broadband_budget(10.0, collecting_area_m2, normalization_band="invalid")
     assert example._atmosphere_display_gap_s(1.0 / 2000.0, 1.0 / 30.0) == pytest.approx(
         1.0 / 30.0 - 1.0 / 2000.0
     )
@@ -224,6 +263,81 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert len(sensor.detector.camera.config.amplifier_gain_factors) == 8
     assert sensor.config.source.normalization == "detector_photon_rate"
     assert len(sensor.config.source.wavelengths_m) == example.HAKA_SPECTRAL_QUADRATURE_ORDER
+
+
+def test_haka_lut_snr_matches_analytic_uniform_limit_and_optimizer() -> None:
+    example = _module()
+    analysis = _lut_module(example)
+    import getframes
+
+    camera = getframes.load_preset("andor_ocam2k").replace(
+        resolution=(228, 228),
+        amplifier_layout=(4, 2),
+        amplifier_boundaries_y_px=example.KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX,
+        amplifier_boundaries_x_px=example.KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX,
+        amplifier_gain_factors=(1.0,) * 8,
+        amplifier_offsets_adu=(0.0,) * 8,
+        dark_current_e_per_s=0.0,
+        clock_induced_charge_e=0.0,
+        read_noise_e=0.0,
+    )
+    active = np.ones((57, 57), dtype=np.bool_)
+    rate = np.full((1, 228, 228), 1000.0, dtype=np.float64)
+    samples = analysis.lenslet_snr(
+        rate,
+        magnitude_r=10.0,
+        frame_rate_hz=100.0,
+        em_gain=600.0,
+        reference_magnitude_r=10.0,
+        camera=camera,
+        active_lenslets=active,
+    )
+    pixel_signal_adu = 10.0 * 600.0 / camera.gain_e_per_adu
+    pixel_variance_adu2 = (
+        600.0**2 * camera.gain_excess_noise_factor**2 * 10.0 / camera.gain_e_per_adu**2 + 1.0 / 12.0
+    )
+    expected = 16.0 * pixel_signal_adu / np.sqrt(16.0 * pixel_variance_adu2)
+    assert samples.shape == (57 * 57,)
+    assert samples == pytest.approx(expected)
+    assert expected == pytest.approx(np.sqrt(160.0) / np.sqrt(2.0), rel=2e-4)
+
+    modes = example.load_camera_modes()
+    cadence_fit = analysis.fit_empirical_frame_rate_model(modes, frame_rate_column="WSFRRT1")
+    assert cadence_fit.transition_relative_flux == pytest.approx(0.115403, rel=2e-4)
+    assert cadence_fit.flux_exponent == pytest.approx(1.30531, rel=2e-4)
+    assert cadence_fit.transition_sharpness == pytest.approx(0.529473, rel=2e-4)
+    assert cadence_fit.rms_log10_residual < 0.056
+    assert cadence_fit.frame_rate_hz(9.0) == pytest.approx(1330.28, abs=0.02)
+    assert cadence_fit.frame_rate_hz(10.0) == pytest.approx(1044.94, abs=0.02)
+    assert cadence_fit.frame_rate_hz(12.0) == pytest.approx(456.42, abs=0.02)
+    fitted_rates = [
+        cadence_fit.frame_rate_hz(magnitude) for magnitude in np.linspace(5.0, 15.0, 101)
+    ]
+    assert np.all(np.diff(fitted_rates) < 0.0)
+
+    noisy_camera = camera.replace(read_noise_e=216.0)
+    sed = analysis.GuideStarSED("test", "test", 6000.0, "black")
+    ensemble = analysis.RateEnsemble(sed, np.full((1, 228, 228), 2.0, dtype=np.float64))
+    mode = example.CameraMode(99, 10.0, 10.5, 8.0, 100.0, 100.0, "open", 1)
+    current_snr = analysis.evaluate_mode(
+        ensemble,
+        magnitude_r=10.25,
+        frame_rate_hz=mode.frame_rate_hz("WSFRRT1"),
+        em_gain=mode.em_gain,
+        camera=noisy_camera,
+        active_lenslets=active,
+    ).mean
+    optimized = analysis.optimize_at_magnitude(
+        10.25,
+        target_snr=current_snr,
+        minimum_frame_rate_hz=1,
+        ensembles=(ensemble,),
+        camera=noisy_camera,
+        active_lenslets=active,
+    )
+    assert optimized["proposed_frame_rate_hz"] > 100.0
+    assert optimized["minimum_snr_across_seds"] >= current_snr * (1.0 - 1e-10)
+    assert optimized["five_sigma_saturation_fraction"]["maximum"] < 1.0
 
 
 def test_real_comparison_estimates_dark_from_outside_pupil(tmp_path: Path) -> None:
