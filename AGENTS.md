@@ -155,11 +155,18 @@ Once Phase 0 creates the tooling, the normal pre-handoff gate is:
 ```bash
 ruff check .
 ruff format --check .
-mypy
+python -m mypy
 pytest --cov=makewfs --cov-branch --cov-report=term-missing
 mkdocs build --strict
 python -m build
 ```
+
+Run `python -m mypy` from a clean Python 3.10 environment, as the CI lint job
+does. The configured mypy target is the minimum supported Python version, so the
+type-check environment must also resolve the Python 3.10 dependency markers
+(including `tomli`) and a NumPy release whose stubs support Python 3.10. Running
+the Python 3.10-targeted check from a newer environment can instead install
+newer-only NumPy stubs and omit the conditional `tomli` dependency.
 
 Also run the narrowest relevant tests while iterating. Mark slow statistical,
 validation, GPU, and example tests explicitly; ordinary tests must stay quick.
