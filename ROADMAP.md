@@ -233,12 +233,12 @@ The stable public surface should stay small:
 import makewfs
 
 config = makewfs.load_config("wfs.toml")
-wfs = makewfs.WavefrontSensor(config)       # build and cache static optics once
+wfs = makewfs.WavefrontSensor(config)  # build and cache static optics once
 # Equivalently: makewfs.WavefrontSensor.from_toml("wfs.toml")
 
-ideal_rate = wfs.photon_rate(opd_m)         # ndarray, photons/s/native pixel
-reference = wfs.reference()                 # ideal zero-OPD photon-rate image
-frame = wfs.expose(opd_m, seed=0)           # getframes.Frame, ADU
+ideal_rate = wfs.photon_rate(opd_m)  # ndarray, photons/s/native pixel
+reference = wfs.reference()  # ideal zero-OPD photon-rate image
+frame = wfs.expose(opd_m, seed=0)  # getframes.Frame, ADU
 
 # One-off convenience; not recommended inside a high-rate loop.
 frame = makewfs.simulate(opd_m, "wfs.toml", seed=0)

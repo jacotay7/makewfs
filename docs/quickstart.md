@@ -19,7 +19,7 @@ wfs = makewfs.WavefrontSensor(config)
 opd_m = np.zeros(config.input.shape)
 
 ideal_rate = wfs.photon_rate(opd_m)  # photons/s/native detector pixel
-frame = wfs.expose(opd_m, seed=0)    # getframes.Frame; data are ADU
+frame = wfs.expose(opd_m, seed=0)  # getframes.Frame; data are ADU
 ```
 
 The same minimal API accepts the shipped four-face pyramid configuration:
