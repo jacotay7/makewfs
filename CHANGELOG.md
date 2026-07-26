@@ -9,6 +9,8 @@ All notable changes to `makewfs` are documented here.
 - Prepared the first stable public release with versioned package metadata,
   PyPI/CI badges, citation and release documentation, and a trusted-publishing
   GitHub Actions workflow using the `pypi` environment.
+- Fixed the benchmark runner on Python 3.10 by using the portable
+  `datetime.timezone.utc` API.
 - Raised the detector dependency to released `getframes>=2.1.1`, made
   wavelength-resolved detector QE and full spectral truth part of the supported
   contract, and removed the pre-release integrated-signal compatibility path.

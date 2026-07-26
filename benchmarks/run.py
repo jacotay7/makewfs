@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tracemalloc
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -192,7 +192,7 @@ def main() -> int:
     revision, source_dirty = _git_state(root)
     report: dict[str, Any] = {
         "schema_version": 2,
-        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "command": shlex.join([sys.executable, *sys.argv]),
         "revision": revision,
         "source_dirty": source_dirty,
