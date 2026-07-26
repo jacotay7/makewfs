@@ -4,6 +4,14 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-26
+
+- Prepared the first stable public release with versioned package metadata,
+  PyPI/CI badges, citation and release documentation, and a trusted-publishing
+  GitHub Actions workflow using the `pypi` environment.
+- Raised the detector dependency to released `getframes>=2.1.1`, made
+  wavelength-resolved detector QE and full spectral truth part of the supported
+  contract, and removed the pre-release integrated-signal compatibility path.
 - Added an R-band HAKA camera-LUT analysis using representative A0 V through M3
   V continua and generated open-loop Maunakea states. It reports mean active
   4x4-lenslet intensity SNR with OCAM2K photon, EM-excess, dark, CIC, read, and
@@ -103,13 +111,11 @@ All notable changes to `makewfs` are documented here.
 - Added a public API/configuration stability audit and same-run benchmark
   regression envelopes for representative CPU kernels.
 - Added versioned benchmark snapshots and isolated non-editable-wheel
-  interoperability verification for `pyturb` 1.0 and `getframes` 2.0.
+  interoperability verification for `pyturb` 1.0 and `getframes`.
 - Added a versioned labelled SVG capability gallery with units, color bars,
   seeds, configuration digests, and modeling notes.
 - Added wavelength-resolved detector QE through the public `getframes` spectral
   cube contract, with truth preservation and a shipped comparison example.
-- The spectral-QE path uses the upcoming `getframes>=2.1.0` capability when
-  available and retains a documented integrated-signal fallback for 2.0.
 - Formalized the private optical `ArrayBackend` boundary and added static
   leakage/parity checks so a future device backend does not require sensor
   mathematics to be rewritten.

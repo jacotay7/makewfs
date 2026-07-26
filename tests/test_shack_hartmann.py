@@ -95,10 +95,10 @@ def test_wavelength_resolved_qe_applies_per_pixel_spectral_weights(tmp_path: Pat
     )
     frame = sensor.expose(np.zeros(config.input.shape), seed=17)
     assert frame.truth is not None
-    spectral_photon_rate = getattr(frame.truth, "spectral_photon_rate", None)
-    wavelengths_nm = getattr(frame.truth, "wavelengths_nm", None)
-    if spectral_photon_rate is None or wavelengths_nm is None:
-        pytest.skip("full spectral truth requires getframes >= 2.1.1 (Camera.expose_spectral)")
+    spectral_photon_rate = frame.truth.spectral_photon_rate
+    wavelengths_nm = frame.truth.wavelengths_nm
+    assert spectral_photon_rate is not None
+    assert wavelengths_nm is not None
     assert frame.metadata["spectral"] is True
     np.testing.assert_allclose(
         frame.truth.photon_rate,

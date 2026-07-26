@@ -9,11 +9,13 @@ description = "Configuration-driven adaptive-optics wavefront sensor image simul
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Jacob Taylor" }]
+authors = [{ name = "Jacob Taylor", email = "jacobataylor7@gmail.com" }]
 keywords = ["adaptive-optics", "wavefront-sensor", "shack-hartmann", "pyramid"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -25,7 +27,7 @@ classifiers = [
 dependencies = [
     "numpy>=1.23",
     "scipy>=1.10",
-    "getframes>=2.0",
+    "getframes>=2.1.1",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
@@ -48,7 +50,10 @@ makewfs = "makewfs.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/jacotay7/makewfs"
+Documentation = "https://jacotay7.github.io/makewfs/"
 Repository = "https://github.com/jacotay7/makewfs"
+Issues = "https://github.com/jacotay7/makewfs/issues"
+Changelog = "https://github.com/jacotay7/makewfs/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/makewfs"]
@@ -57,7 +62,21 @@ packages = ["src/makewfs"]
 path = "src/makewfs/__about__.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/makewfs", "tests", "docs", "examples", "validation", "benchmarks", "README.md", "ROADMAP.md", "AGENTS.md", "LICENSE", "CHANGELOG.md"]
+include = [
+    "src/makewfs",
+    "tests",
+    "docs",
+    "examples",
+    "validation",
+    "benchmarks",
+    "README.md",
+    "ROADMAP.md",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "CITATION.cff",
+    "LICENSE",
+    "CHANGELOG.md",
+]
 
 [tool.ruff]
 line-length = 100

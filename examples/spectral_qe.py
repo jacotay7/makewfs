@@ -9,9 +9,8 @@ stars with the *same* incident photon rate but different colors are exposed:
   star -- whose light lands where the detector is insensitive -- yields fewer
   photoelectrons than the blue star.
 
-getframes 2.0/2.1 lacks the spectral-cube truth API, so makewfs uses the
-documented QE-weighted integrated fallback; the comparison below is exact for
-total detected electrons.
+getframes 2.1.1 applies detector QE independently at each wavelength and
+preserves the incident photon cube in frame truth.
 """
 
 from __future__ import annotations

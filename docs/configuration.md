@@ -233,9 +233,9 @@ angular_quadrature_order = 3
 `field_angle_arcsec = [x, y]` is the source centroid. A finite FWHM uses a
 deterministic Gaussian quadrature around that centroid. By default the detector
 receives one summed photon-rate map and uses its scalar QE. For broadband
-scenes, `detector.qe_curve_path` enables the optional wavelength-resolved path;
-full spectral truth requires the unreleased `getframes` cube API, while released
-2.0 cameras use the documented integrated-signal fallback.
+scenes, `detector.qe_curve_path` enables wavelength-resolved exposure through
+the released `getframes>=2.1.1` spectral cube API, preserving the incident cube
+and wavelength nodes in detector truth.
 
 For a sodium LGS, configure a detector-surface return rate and optional range
 profile. The range model is currently Shack–Hartmann-specific:

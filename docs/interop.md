@@ -59,12 +59,8 @@ python -m pip install -e '.[interop]'
 python -m pytest -m interop
 ```
 
-The clean-room smoke check has also been run from non-editable wheels for
-`getframes 2.1.0.dev0`, `pyturb 1.0.0`, and `makewfs 0.1.0.dev0` in an isolated
-Python 3.13 environment. It imports the installed packages, builds a small SH
-configuration, renders an ideal rate map, and exposes one seeded detector frame.
-The scalar package constraint remains `getframes>=2.0` and `pyturb>=1.0`. Full
-spectral cube truth needs the `Camera.expose_spectral` API arriving in
-getframes 2.1.1 (already on `main`); released `getframes 2.1.0` does not provide
-it, so those releases use the documented QE-weighted integrated-signal fallback
-until 2.1.1 ships and can be pinned.
+The release clean-room check installs non-editable `makewfs` distributions with
+released `getframes>=2.1.1` and `pyturb>=1.0` in an isolated environment. It
+imports the installed packages, builds a small SH configuration, renders an
+ideal rate map, exposes one seeded detector frame, and verifies
+wavelength-resolved detector truth.

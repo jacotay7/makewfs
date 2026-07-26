@@ -5,9 +5,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from makewfs.cli import main
+from makewfs.cli import build_parser, main
 
 CONFIG = Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann_minimal.toml"
+
+
+def test_version_matches_package(capsys) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(SystemExit, match="0"):
+        build_parser().parse_args(["--version"])
+    assert capsys.readouterr().out.strip() == "makewfs 1.0.0"
 
 
 def test_validate_and_ideal_commands(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]

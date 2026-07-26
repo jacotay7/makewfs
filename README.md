@@ -1,7 +1,12 @@
 # makewfs
 
-`makewfs` will turn a configured pupil-plane phase/OPD map into a realistic
-adaptive-optics wavefront-sensor image. The first supported sensors will be
+[![CI](https://github.com/jacotay7/makewfs/actions/workflows/ci.yml/badge.svg)](https://github.com/jacotay7/makewfs/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/makewfs.svg)](https://pypi.org/project/makewfs/)
+[![Python](https://img.shields.io/pypi/pyversions/makewfs.svg)](https://pypi.org/project/makewfs/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+`makewfs` turns a configured pupil-plane phase/OPD map into a realistic
+adaptive-optics wavefront-sensor image. The supported sensors are
 Shack–Hartmann and four-face pyramid sensors.
 
 The package owns the wavefront-sensor optics. It deliberately reuses
@@ -9,14 +14,13 @@ The package owns the wavefront-sensor optics. It deliberately reuses
 [`getframes`](https://github.com/jacotay7/getframes) for detector response and
 noise; neither model will be reimplemented here.
 
-> **Status:** early development. The CPU Shack–Hartmann and four-face pyramid
-> paths, configuration API, and detector handoff are implemented. Broadband
-> source morphology and Shack–Hartmann LGS elongation are implemented. An
-> optional wavelength-resolved detector-QE prototype is available with the
-> unreleased `getframes` cube API; full range-resolved turbulence and a released
-> spectral-QE contract remain roadmap work. Optional end-to-end CuPy execution is
-> available for both sensors when used with the GPU-capable `getframes` checkout:
-> atmosphere/OPD, optics, detector truth, and ADU can remain device-resident.
+> **Status:** stable. `makewfs` 1.0 freezes the configuration-driven
+> Shack–Hartmann and four-face pyramid API under
+> [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Broadband source
+> morphology, wavelength-resolved detector QE, Shack–Hartmann sodium-layer
+> elongation, and optional end-to-end CuPy execution are supported. The
+> documented mean-altitude LGS OPD approximation remains intentionally distinct
+> from future range-resolved turbulence.
 
 - [Complete implementation roadmap](ROADMAP.md)
 - [Instructions for implementation agents](AGENTS.md)
@@ -28,6 +32,18 @@ import makewfs
 
 wfs = makewfs.WavefrontSensor.from_toml("wfs.toml")
 frame = wfs.expose(opd_m, seed=0)  # getframes.Frame, data in ADU
+```
+
+Install the CPU package from PyPI with:
+
+```bash
+python -m pip install makewfs
+```
+
+For the optional CUDA 12.x path:
+
+```bash
+python -m pip install "makewfs[gpu]"
 ```
 
 Set `device = "gpu"` under `[numerics]` and pass a CuPy OPD array for the

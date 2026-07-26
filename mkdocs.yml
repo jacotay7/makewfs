@@ -42,6 +42,7 @@ nav:
   - Performance: performance.md
   - Troubleshooting: troubleshooting.md
   - Stability: stability.md
+  - Release process: release.md
   - API reference: api.md
   - Contributing: contributing.md
   - Architecture decisions:

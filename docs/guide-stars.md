@@ -28,10 +28,10 @@ with Gaussian FWHM mode.
 quadrature. The Shack–Hartmann spot sampling scales with wavelength; the ideal
 pyramid mask retains its configured fixed pupil separation. Without
 `detector.qe_curve_path`, the resulting photon-rate maps are summed before one
-scalar-QE `getframes` exposure. With that curve, the optional spectral-QE path
-passes the cube to `getframes` 2.1's development API (or applies an explicitly
-documented integrated fallback on 2.0); the release gate remains in
-`ROADMAP.md`.
+scalar-QE `getframes` exposure. With that curve, the spectral-QE path passes the
+cube to the released `getframes>=2.1.1` API. Detector QE is applied once per
+wavelength and the incident spectral cube is retained in
+`FrameTruth.spectral_photon_rate`.
 
 For measured relative curves, `sed_path` and `transmission_path` point to
 two-column text files with `wavelength_nm value`. If explicit wavelengths are

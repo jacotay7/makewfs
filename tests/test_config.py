@@ -26,7 +26,7 @@ def test_load_config_and_digest() -> None:
     assert config.sensor.kind == "shack_hartmann"
     assert config.input.shape == (128, 128)
     assert len(config.digest) == 16
-    assert __version__ == "0.1.0.dev0"
+    assert __version__ == "1.0.0"
 
 
 def test_config_round_trip_preserves_digest() -> None:

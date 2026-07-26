@@ -100,10 +100,10 @@ for time_s, opd_m in atmosphere.frames(dt=config.exposure_s, steps=1000):
     frame = wfs.expose(opd_m)
 ```
 
-### getframes 2.1.0 (`/home/donkeykong/getframes`)
+### getframes 2.1.1 (`/home/donkeykong/getframes`)
 
-The installed/released sibling is now `getframes 2.1.0` (the audit baseline was
-2.0.0). The scalar dependency constraint remains `getframes>=2.0`.
+The released sibling is now `getframes 2.1.1` (the audit baseline was 2.0.0).
+The 1.0 dependency constraint is `getframes>=2.1.1`.
 
 - `Camera.expose(photon_rate, exposure, ...)` accepts a scalar or native-pixel
   photon-rate map and returns an array-like `Frame` in ADU with noise-free truth.
@@ -118,12 +118,8 @@ The installed/released sibling is now `getframes 2.1.0` (the audit baseline was
 - Broadband photometry, QE curves, SEDs, transmission products, sky, and thermal
   radiometry already exist (`getframes.QE`, `SED`, `Bandpass`, `Spectrum`).
 - **Wavelength-resolved cube exposure** (`Camera.expose_spectral` + spectral
-  `FrameTruth`) is implemented on getframes `main` and slated for the **2.1.1**
-  release. It is present in this workspace's editable getframes checkout (so the
-  makewfs spectral test passes locally), but released 2.1.0 does not include it.
-  The section 13 gate stays open until 2.1.1 is released and pinned; against a
-  getframes without it, makewfs uses the documented QE-weighted integrated
-  fallback.
+  `FrameTruth`) is released in 2.1.1. `makewfs` pins that minimum and tests the
+  full spectral truth contract directly.
 
 The detector handoff must call this public API. No detector-noise functions are
 to be copied into `makewfs`.
@@ -155,11 +151,10 @@ must not be implemented until its acceptance test demonstrates the need.
   bright-guide-star photon rates), and all worked examples were reworked for
   legibility: colorbars with units, real named getframes presets, a GIF for the
   moving-atmosphere example, and a verified LGS-elongation figure.
-- [ ] Broader independent validation, the wavelength-resolved
-  detector-QE gate (implemented on getframes `main`, awaiting the getframes 2.1.1
-  release before it can be pinned), and release completion remain staged. The
-  public CuPy optical/detector path now has parity evidence, and the versioned
-  documentation gallery and relative benchmark regression envelopes are in place.
+- [ ] The final GitHub tag, documentation publication, and PyPI release remain.
+  Targeted independent validation, the wavelength-resolved detector-QE gate,
+  public CuPy parity evidence, the versioned documentation gallery, and relative
+  benchmark regression envelopes are in place.
 
 ## 4. End-state user experience
 
@@ -497,8 +492,9 @@ and validation of the near-field geometry.
   typed-package marker, dynamic version, and MIT license matching the sibling
   projects. Test Python 3.10 through the current stable version supported by the
   runtime dependencies rather than baking in an unnecessary upper bound.
-- [x] Add runtime dependencies (`numpy`, `scipy`, `getframes>=2.0`) and separated
-  `dev`, `docs`, `examples`, `interop`, and optional CUDA 12 `gpu` extras.
+- [x] Add runtime dependencies (`numpy`, `scipy`, initially `getframes>=2.0`) and
+  separated `dev`, `docs`, `examples`, `interop`, and optional CUDA 12 `gpu`
+  extras. The 1.0 spectral contract later raised the detector minimum to 2.1.1.
   `pyturb` belongs to `interop/examples`, not core.
 - [x] Configure Ruff lint and format, strict mypy, pytest strict markers, branch
   coverage, and pre-commit. Use 100-character lines and NumPy-style docstrings to
@@ -589,13 +585,11 @@ Shack–Hartmann frame through `getframes`.
 - [x] Document the mean-altitude OPD approximation and show the division of labor:
   `pyturb.Atmosphere(..., lgs_altitude=mean_range)` supplies cone-effect OPD;
   `makewfs` supplies detector-plane sodium elongation.
-- [ ] Resolve the wavelength-resolved detector-QE gate in section 13: the
-  broadband SH spectrum varies materially across pixels, and the
-  `Camera.expose_spectral` cube API is implemented on getframes `main` (slated
-  for the 2.1.1 release) and already exercised by the makewfs spectral test
-  against the local editable checkout. Released `getframes 2.1.0` does not carry
-  it, so pin `getframes>=2.1.1` once it releases before claiming the full gate;
-  until then makewfs uses the QE-weighted integrated fallback.
+- [x] Resolve the wavelength-resolved detector-QE gate in section 13: the
+  broadband SH spectrum varies materially across pixels, and released
+  `getframes>=2.1.1` provides `Camera.expose_spectral` with full spectral
+  `FrameTruth`. The makewfs dependency is pinned and the contract is exercised
+  directly without an integrated fallback.
 - [x] Cross-validate selected monochromatic SH cases against an independent
   Fourier-optics calculation; the small-grid direct DFT reference is frozen in
   the core test suite, while optional package references remain validation-only.
@@ -735,11 +729,8 @@ detector on GPU without an architectural rewrite.
   document stability, and record intentional future extension points.
 - [x] Verify clean-room installation using non-editable versioned `pyturb` and
   `getframes` wheels, not editable sibling checkouts; record minimum compatible
-  scalar versions (`pyturb>=1.0`, `getframes>=2.0`). Released `getframes 2.1.0`
-  provides binning but not the spectral cube; that cube lands in getframes 2.1.1
-  (already on `main`), so the optional spectral-QE full-truth path passes against
-  the local editable checkout but stays behind a version guard until 2.1.1
-  releases and can be pinned.
+  versions (`pyturb>=1.0`, `getframes>=2.1.1`). The released spectral cube and
+  full-truth path are part of the required detector contract.
 - [x] Build and inspect sdist/wheel contents and run package metadata checks.
 - [ ] Tag `1.0.0`, publish docs, and cut a reproducible release.
 
@@ -919,17 +910,13 @@ repository only if the preceding phase proves the need.
   photon-rate cube or a pre-QE electron-rate map with correct `FrameTruth`
   semantics. Apply QE/PRNU/noise exactly once and test equivalence to scalar
   monochromatic exposure.
-- [ ] Release and pin the first `getframes` version with that contract before
-  using it from `makewfs`. The contract (`Camera.expose_spectral` + spectral
-  `FrameTruth`) is implemented on getframes `main` and slated for **2.1.1**;
-  released 2.1.0 did not include it. This stays open until 2.1.1 is released and
-  makewfs pins `getframes>=2.1.1` for the spectral path.
+- [x] Release and pin the first `getframes` version with that contract before
+  using it from `makewfs`. Version 2.1.1 provides `Camera.expose_spectral` and
+  spectral `FrameTruth`; `makewfs>=1.0` requires `getframes>=2.1.1`.
 
-The current compatibility path precomputes a QE-weighted electron rate and calls
-`Camera.expose(..., quantum_efficiency=1.0)` only when the released camera lacks
-the public cube API. The preferred path calls `Camera.expose_spectral` and keeps
-the incident photon cube in `FrameTruth`; `makewfs` must not depend on private
-helpers or mislabel electron rate as photon rate.
+The detector adapter calls `Camera.expose_spectral` and keeps the incident photon
+cube in `FrameTruth`; `makewfs` does not depend on private helpers or mislabel
+electron rate as photon rate.
 
 ### pyturb: same-realization multi-range LGS OPD
 

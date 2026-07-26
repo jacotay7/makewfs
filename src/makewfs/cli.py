@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from .__about__ import __version__
 from .api import WavefrontSensor
 from .config import load_config
 
@@ -52,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="makewfs", description="Render configured AO WFS images from phase/OPD arrays."
     )
-    parser.add_argument("--version", action="version", version="makewfs 0.1.0.dev0")
+    parser.add_argument("--version", action="version", version=f"makewfs {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     validate = commands.add_parser("validate-config", help="validate a TOML configuration")
     validate.add_argument("config")

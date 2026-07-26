@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use makewfs in your research, please cite this software."
+title: "makewfs: configuration-driven adaptive-optics wavefront-sensor image simulation"
+type: software
+authors:
+  - family-names: Taylor
+    given-names: Jacob
+version: 1.0.0
+date-released: 2026-07-26
+license: MIT
+repository-code: "https://github.com/jacotay7/makewfs"
+url: "https://jacotay7.github.io/makewfs/"

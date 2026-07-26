@@ -23,12 +23,12 @@ pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, and a documented SH sodium-range geometry
 model. It also includes a versioned labelled documentation gallery, benchmark
-reference snapshot, non-editable-wheel clean-room smoke evidence, an optional
-wavelength-resolved detector-QE prototype, and public end-to-end CuPy execution
-with CPU parity tests. The GPU path uses `numerics.device = "gpu"` and the
-sibling `getframes` CuPy detector. Do not present range-resolved turbulent LGS
-OPD, the spectral-QE path as a released/stable contract, or broad
-independent-reference parity as implemented until their gates pass.
+reference snapshot, non-editable-wheel clean-room smoke evidence, released
+wavelength-resolved detector QE through `getframes>=2.1.1`, and public
+end-to-end CuPy execution with CPU parity tests. The GPU path uses
+`numerics.device = "gpu"` and the sibling `getframes` CuPy detector. Do not
+present range-resolved turbulent LGS OPD or broad independent-reference parity
+as implemented until their gates pass.
 
 ## Product boundary
 

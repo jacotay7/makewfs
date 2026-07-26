@@ -47,12 +47,6 @@ class DetectorAdapter:
         if camera.resolution != optical_shape:
             camera = camera.with_config(resolution=list(optical_shape))
         self.camera = camera
-        self._supports_binning = "binning" in inspect.signature(camera.expose).parameters
-        if not self._supports_binning and (config.binning != 1 or config.binning_mode != "digital"):
-            raise RuntimeError(
-                "detector binning requires getframes 2.1 or newer; "
-                "use binning=1 with released getframes 2.0"
-            )
         self.config = config
         self.optical_shape = optical_shape
         self.device = device
@@ -65,18 +59,14 @@ class DetectorAdapter:
         self,
         photon_rate: NDArray[Any],
         *,
-        quantum_efficiency: float | None = None,
         seed: int | None,
     ) -> Any:
         kwargs: dict[str, Any] = {
             "seed": seed,
             "include_truth": self.config.include_truth,
+            "binning": self.config.binning,
+            "binning_mode": self.config.binning_mode,
         }
-        if quantum_efficiency is not None:
-            kwargs["quantum_efficiency"] = quantum_efficiency
-        if self._supports_binning:
-            kwargs["binning"] = self.config.binning
-            kwargs["binning_mode"] = self.config.binning_mode
         return self.camera.expose(
             self._detector_array(photon_rate),
             self.config.exposure_s,
@@ -101,37 +91,16 @@ class DetectorAdapter:
         ):
             cube = self._detector_array(spectral_photon_rate)
             wavelengths_nm = np.asarray(spectral_wavelengths_m) * 1e9
-            if hasattr(self.camera, "expose_spectral"):
-                frame = self.camera.expose_spectral(
-                    cube,
-                    wavelengths_nm,
-                    self.config.exposure_s,
-                    self.config.temperature_c,
-                    binning=self.config.binning,
-                    binning_mode=self.config.binning_mode,
-                    seed=seed,
-                    include_truth=self.config.include_truth,
-                )
-            else:
-                if self.device == "gpu":
-                    raise RuntimeError(
-                        "GPU spectral execution requires getframes.Camera.expose_spectral"
-                    )
-                # Compatibility fallback for released getframes 2.0: preserve
-                # the QE-weighted signal while the sibling spectral cube API is
-                # released. Full spectral cube truth requires getframes 2.1+.
-                qe = np.asarray(self.camera.config.qe_curve(wavelengths_nm))
-                electron_rate = np.tensordot(qe, cube, axes=(0, 0))
-                frame = self._expose_camera(
-                    electron_rate,
-                    quantum_efficiency=1.0,
-                    seed=seed,
-                )
-                frame.metadata["spectral"] = True
-                frame.metadata["spectral_wavelengths_nm"] = [
-                    float(value) for value in wavelengths_nm
-                ]
-                frame.metadata["spectral_truth"] = "integrated-only getframes 2.0 fallback"
+            frame = self.camera.expose_spectral(
+                cube,
+                wavelengths_nm,
+                self.config.exposure_s,
+                self.config.temperature_c,
+                binning=self.config.binning,
+                binning_mode=self.config.binning_mode,
+                seed=seed,
+                include_truth=self.config.include_truth,
+            )
         else:
             frame = self._expose_camera(
                 self._detector_array(photon_rate),

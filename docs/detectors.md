@@ -1,7 +1,7 @@
 # Detectors and radiometry
 
 `makewfs` stops at incident photons. The detector adapter calls
-`getframes.Camera.expose()` for scalar scenes, or the optional
+`getframes.Camera.expose()` for scalar scenes, or the
 `getframes.Camera.expose_spectral()` cube API when a QE curve is configured.
 Exposure, camera preset, temperature, binning, precision, and seed come from
 configuration.
@@ -20,8 +20,6 @@ keeps one optical photon-rate map per wavelength and calls
 `getframes.Camera.expose_spectral` once. QE is applied exactly once inside
 `getframes`; `FrameTruth.photon_rate` remains the integrated incident map while
 `FrameTruth.spectral_photon_rate` and `wavelengths_nm` preserve the cube. Without
-a QE curve, the existing scalar path is retained for compatibility. With a
-released getframes camera that lacks `Camera.expose_spectral` (including 2.1.0),
-makewfs applies the same QE-weighted electron map through a compatibility
-fallback and records that integrated-only mode in metadata; full cube truth
-requires the `Camera.expose_spectral` API landing in getframes 2.1.1.
+a QE curve, the scalar path is retained. `makewfs>=1.0` requires
+`getframes>=2.1.1`, the first released detector version with this spectral cube
+and truth contract.

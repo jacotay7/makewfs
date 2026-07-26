@@ -10,12 +10,11 @@ for throughput and memory; float64 is the reference path. Benchmark cold
 construction separately from warm frames and record Python, NumPy, SciPy, and
 hardware versions.
 
-Install the optional CUDA extra plus the GPU-capable sibling checkout, then set
+Install the optional CUDA extra, then set
 `numerics.device = "gpu"` in the WFS TOML:
 
 ```bash
-python -m pip install -e '../getframes[gpu]'
-python -m pip install -e '.[gpu]'
+python -m pip install 'makewfs[gpu]'
 python -m pytest -q -m gpu
 ```
 
@@ -68,9 +67,8 @@ incoherent source states but a small 64x64 detector and gains 5.58x.
 The [rendered snapshot](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.md)
 and [raw JSON](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.json)
 record exact configuration paths, command, revision, dirty-checkout flag,
-environment, timings, and detector-only rates. The checked-in snapshot was
-recorded from the GPU development checkout; it is local evidence, not a release
-or CI performance guarantee.
+environment, timings, and detector-only rates. The checked-in snapshot records a
+specific local environment and is not a cross-hardware performance guarantee.
 
 The repository benchmark runner separates cold construction, warm optical
 frames, end-to-end frames, and detector-only frames:
