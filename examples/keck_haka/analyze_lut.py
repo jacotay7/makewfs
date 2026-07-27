@@ -143,9 +143,9 @@ def _validate_arguments(args: argparse.Namespace) -> None:
 
 def _amplifier_maps(camera: Any) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Return public-config conversion and offset maps in detector (y, x) order."""
-    height, width = camera.resolution
-    y_edges = (0, *camera.amplifier_boundaries_y_px, height)
-    x_edges = (0, *camera.amplifier_boundaries_x_px, width)
+    height, width = camera.output_resolution
+    y_edges = (0, *camera.active_amplifier_boundaries_y_px, height)
+    x_edges = (0, *camera.active_amplifier_boundaries_x_px, width)
     rows = len(y_edges) - 1
     columns = len(x_edges) - 1
     factors = np.asarray(camera.amplifier_gain_factors, dtype=np.float64).reshape(rows, columns)

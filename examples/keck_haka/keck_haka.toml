@@ -50,6 +50,12 @@ binning_mode = "digital"
 precision = "float32"
 include_truth = true
 
+[detector.roi]
+left_px = 4
+top_px = 4
+width_px = 228
+height_px = 228
+
 [numerics]
 dtype = "float32"
 fft_oversampling = 2

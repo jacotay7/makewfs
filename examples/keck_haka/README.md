@@ -36,8 +36,8 @@ maintained `make_keck_aperture`, whose documentation cites validation against
 Keck internal simulation efforts. The supplied RTC pupil further constrains the
 secondary shadow. After correcting the eight relative amplifier responses, a
 fit to the 4x4 core-minus-border subaperture illumination favors the union of a
-2.567 m diameter circle and a segment-aligned regular hexagon measuring 2.532 m
-flat-to-flat (2.924 m corner-to-corner), offset by (+0.038, -0.025) m in pupil
+2.575 m diameter circle and a segment-aligned regular hexagon measuring 2.520 m
+flat-to-flat (2.910 m corner-to-corner), offset by (+0.031, -0.033) m in pupil
 (x, y). This captures the circular secondary mirror between the hexagonal
 segment/baffle limits. The support pattern is rotated by 30 degrees so it has a
 vertical rather than horizontal arm, as in the RTC image. Reproduce the fit and
@@ -50,7 +50,9 @@ python examples/keck_haka/fit_secondary.py
 The detector starts from the public `getframes` `andor_ocam2k` preset and changes
 the ROI and lookup-table EM gain. OCAM2K's eight outputs are modeled as four rows
 by two columns. The full 240-pixel detector has 60-row by 120-column regions; the
-centered 228-pixel RTC crop therefore splits at y=[54, 114, 174] and x=[114].
+RTC ROI begins at `(left, top) = (4, 4)` and is 228x228 pixels, so it splits at
+y=[56, 116, 176] and x=[116]. `getframes` retains the full detector geometry,
+simulates its detector effects, and returns that ROI.
 Per-output dark/bias levels and relative conversion gains are inferred directly
 from the supplied eng519 V=10.16 open-loop cube. The gain fit uses the total
 estimated-dark-subtracted signal in subapertures that are at least 98%
@@ -170,14 +172,14 @@ real/simulation ratio therefore validates the adopted absolute budget and is
 never fed back as a fitted scale factor.
 
 For the checked-in deterministic run, the photon-weighted atmospheric
-transmission is 90.53%. The 72.04 m² clear pupil receives 270.16 million
+transmission is 90.53%. The 72.06 m² clear pupil receives 270.24 million
 photons/s after atmospheric extinction; the three mirror reflections reduce
-this to 184.11 million photons/s. The confirmed HAKA bench throughput reduces
-that to 52.84 million photons/s, and the finite SH windows capture 52.17
-million photons/s. The real and simulated central-2x2 spot fractions are 94.1%
-and 92.4%, respectively. The pedestal-insensitive lenslet signal is 0.848
+this to 184.16 million photons/s. The confirmed HAKA bench throughput reduces
+that to 52.86 million photons/s, and the finite SH windows capture 52.18
+million photons/s. The real and simulated central-2x2 spot fractions are 94.0%
+and 92.4%, respectively. The pedestal-insensitive lenslet signal is 0.852
 million count/frame in the real cube and 0.848 million count/frame in the
-simulation: a real/simulation ratio of 1.00029, or a +0.029% validation residual.
+simulation: a real/simulation ratio of 1.00489, or a +0.489% validation residual.
 The adopted telescope-mirror-plus-HAKA throughput is 19.56%; including
 atmospheric extinction gives 17.71% from above the atmosphere to the detector
 entrance. Agreement this close should not be interpreted as a similarly precise

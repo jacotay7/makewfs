@@ -110,6 +110,7 @@ kernel file hash and all normalized states are included in frame provenance.
 | `detector.precision` | `"float32"` or `"float64"` (default `"float64"`). |
 | `detector.include_truth` | Boolean (default `true`) controlling detector truth arrays. |
 | `detector.qe_curve_path` | Optional configuration-relative two-column `wavelength_nm qe` curve passed to `getframes`; enables wavelength-resolved QE for broadband optical cubes. |
+| `detector.roi` | Optional full-detector ROI table with non-negative `left_px`/`top_px` and positive `width_px`/`height_px`. Its shape must match the optical mosaic. |
 | `numerics.dtype` | Optical real precision, `"float32"` or `"float64"` (default `"float64"`). |
 | `numerics.device` | Execution device, `"cpu"` (default) or `"gpu"`. GPU requires the `makewfs[gpu]` extra and a GPU-capable `getframes`; optical, truth, and ADU arrays stay device-resident. |
 | `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). Also scales the pyramid propagation grid so diffraction beyond the detector crop is discarded instead of wrapping onto the pupil rims. |
@@ -258,6 +259,21 @@ elongation but does not create range-resolved turbulent OPD. See the
 ## Detector choices
 
 `detector.preset` names any installed `getframes` preset, including OCAM2K,
-SAPHIRA, EMCCD, sCMOS, and generic teaching cameras. The optical mosaic is
-configured as a detector ROI when its dimensions differ from the preset's full
-resolution. Detector binning and all noise physics remain in `getframes`.
+SAPHIRA, EMCCD, sCMOS, and generic teaching cameras. When the optical mosaic is
+a hardware ROI rather than the full sensor, preserve its full-detector origin:
+
+```toml
+[detector.roi]
+left_px = 4
+top_px = 4
+width_px = 228
+height_px = 228
+```
+
+The ROI uses unbinned detector pixels, with `left_px`/`top_px` measured from the
+full sensor's upper-left corner. Its `(height_px, width_px)` must equal the ideal
+optical output shape. `makewfs` passes this geometry to `getframes`, which retains
+the preset's native sensor size, evaluates detector effects in full-detector
+coordinates, and returns the cropped image. Without `detector.roi`, a differing
+optical shape retains the legacy behavior of replacing the camera resolution.
+Detector binning and all noise physics remain in `getframes`.

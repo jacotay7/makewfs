@@ -12,9 +12,9 @@
     "lgs": "examples/configs/lgs_thin_beacon.toml"
   },
   "digests": {
-    "shack_hartmann": "b50e5ff54b93708a",
-    "pyramid": "e48440ffee25d952",
-    "lgs": "50a3dd1abfa8f9ef"
+    "shack_hartmann": "c2e27598cc4ad410",
+    "pyramid": "15fdd86ee7ba4399",
+    "lgs": "ef6d9f6629fb30e2"
   },
   "notes": [
     "LGS return rate is supplied by configuration; only geometric elongation is modeled.",

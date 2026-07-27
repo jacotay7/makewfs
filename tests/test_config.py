@@ -204,6 +204,48 @@ def test_numerics_accepts_serializable_gpu_device() -> None:
     assert gpu_wfs.digest != cpu_wfs.digest
 
 
+def test_detector_roi_is_validated_and_round_trips() -> None:
+    data = _minimal_tables()
+    detector = data["detector"]
+    assert isinstance(detector, dict)
+    detector["roi"] = {
+        "left_px": 4,
+        "top_px": 4,
+        "width_px": 228,
+        "height_px": 228,
+    }
+
+    config = WFSConfig.from_dict(data)
+
+    assert config.detector.roi is not None
+    assert config.detector.roi.getframes_tuple == (4, 4, 228, 228)
+    assert config.to_dict()["detector"]["roi"] == detector["roi"]
+    assert WFSConfig.from_dict(config.to_dict()).digest == config.digest
+
+
+@pytest.mark.parametrize(
+    "roi,match",
+    [
+        ([], "expected a table"),
+        ({"left_px": -1, "top_px": 0, "width_px": 8, "height_px": 8}, "left_px"),
+        ({"left_px": 0, "top_px": 0, "width_px": 0, "height_px": 8}, "width_px"),
+        (
+            {
+                "left_px": 0,
+                "top_px": 0,
+                "width_px": 8,
+                "height_px": 8,
+                "extra": 1,
+            },
+            "unknown key",
+        ),
+    ],
+)
+def test_detector_roi_rejects_invalid_values(roi, match) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ConfigError, match=match):
+        DetectorConfig.from_dict({"preset": "generic_cmos", "exposure_s": 1, "roi": roi})
+
+
 def test_source_magnitude_and_lgs_constraints() -> None:
     with pytest.raises(ConfigError, match="band"):
         SourceConfig.from_dict({"normalization": "magnitude", "magnitude": 12})

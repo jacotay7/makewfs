@@ -946,6 +946,21 @@ electron rate as photon rate.
   stochastic distributions, fixed patterns, truth arrays, and CPU/GPU statistical
   parity. Do not recreate a second detector in `makewfs`.
 
+### getframes: full-detector ROI geometry
+
+- [x] **Gate:** the Keck HAKA OCAM2K RTC image is a 228x228 ROI with
+  `left_px=4` and `top_px=4` on the preset's 240x240 detector. Replacing the
+  preset resolution loses the physical origin and misplaces the eight-output
+  amplifier boundaries.
+- [x] Add a public getframes ROI contract that preserves the full sensor
+  resolution, evaluates detector/fixed-pattern effects in full-detector
+  coordinates, and crops the returned frame and truth arrays. makewfs only
+  forwards the serializable ROI; it does not reconstruct detector maps.
+- [ ] Release and pin the first getframes version with `CameraConfig.roi` before
+  presenting detector ROI execution as available from released makewfs
+  dependencies. The implementation and cross-repository tests currently target
+  the sibling getframes `main` checkout.
+
 ## 14. Scientific references and independent implementations
 
 Implementation agents must read the relevant primary source before adding a

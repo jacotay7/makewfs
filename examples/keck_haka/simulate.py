@@ -26,19 +26,28 @@ HERE = Path(__file__).resolve().parent
 KECK_DIAMETER_M = 10.95
 # Fit to the amplifier-corrected live pupil. The shadow is the union of a
 # circular secondary and a slightly larger pointy-top hexagonal component.
-KECK_SECONDARY_CIRCLE_RADIUS_M = 1.2832730274061606
-KECK_SECONDARY_HEX_CIRCUMRADIUS_M = 1.4620156552414303
-KECK_SECONDARY_OFFSET_X_M = 0.037589960343722195
-KECK_SECONDARY_OFFSET_Y_M = -0.02544440807975979
+KECK_SECONDARY_CIRCLE_RADIUS_M = 1.2873048283643613
+KECK_SECONDARY_HEX_CIRCUMRADIUS_M = 1.4550129501344706
+KECK_SECONDARY_OFFSET_X_M = 0.03132835365923644
+KECK_SECONDARY_OFFSET_Y_M = -0.032594058104417935
 KECK_CENTRAL_OBSCURATION_DIAMETER_M = 2.0 * KECK_SECONDARY_CIRCLE_RADIUS_M
 KECK_SPIDER_WIDTH_M = 0.026
 HAKA_ILLUMINATED_LENSLETS_ACROSS = 54.0
 HAKA_GRID_EXTENT_M = KECK_DIAMETER_M * 57.0 / HAKA_ILLUMINATED_LENSLETS_ACROSS
 KECK_OCAM_AMPLIFIER_LAYOUT = (4, 2)
-# The 228-pixel RTC ROI is the centred crop of the 240-pixel detector. The full
-# detector's 60-row x 120-column output regions therefore split here.
-KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX = (54, 114, 174)
-KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX = (114,)
+# The RTC ROI is [top:top+height, left:left+width] on the 240x240 detector.
+KECK_OCAM_ROI_LEFT_PX = 4
+KECK_OCAM_ROI_TOP_PX = 4
+KECK_OCAM_ROI_WIDTH_PX = 228
+KECK_OCAM_ROI_HEIGHT_PX = 228
+KECK_OCAM_FULL_AMPLIFIER_BOUNDARIES_Y_PX = (60, 120, 180)
+KECK_OCAM_FULL_AMPLIFIER_BOUNDARIES_X_PX = (120,)
+KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX = tuple(
+    boundary - KECK_OCAM_ROI_TOP_PX for boundary in KECK_OCAM_FULL_AMPLIFIER_BOUNDARIES_Y_PX
+)
+KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX = tuple(
+    boundary - KECK_OCAM_ROI_LEFT_PX for boundary in KECK_OCAM_FULL_AMPLIFIER_BOUNDARIES_X_PX
+)
 # Raw modes measured outside the generated pupil are [404, 407], [409, 408],
 # [413, 408], [405, 404] ADU. These are offsets around the 408 ADU pedestal.
 KECK_OCAM_AMPLIFIER_OFFSETS_ADU = (-4.0, -1.0, 1.0, 0.0, 5.0, 0.0, -3.0, -4.0)
@@ -47,14 +56,14 @@ KECK_OCAM_AMPLIFIER_OFFSETS_ADU = (-4.0, -1.0, 1.0, 0.0, 5.0, 0.0, -3.0, -4.0)
 # corresponding ADU responses have arithmetic mean one, so this is not a global
 # flux adjustment.
 KECK_OCAM_AMPLIFIER_GAIN_FACTORS = (
-    1.3862224707711355,
-    1.2023941960165427,
-    0.9756623546347103,
-    0.8999189270422476,
-    0.6255148659644185,
-    1.6243649181651014,
-    0.6628431913249156,
-    1.7011882405009537,
+    1.3737406261492462,
+    1.2011866097543242,
+    0.9705027257405701,
+    0.9024763049728306,
+    0.6262655226757171,
+    1.6490741185051536,
+    0.6628838205328217,
+    1.6967367262098727,
 )
 OCAM2K_MAX_EM_GAIN = 600.0
 OCAM2K_MAX_FRAME_RATE_HZ = 2067.0
@@ -424,12 +433,9 @@ def configured_sensor(
             f"throughput {HAKA_DOWNSTREAM_THROUGHPUT:g}"
         )
     camera = getframes.load_preset("andor_ocam2k").replace(
-        resolution=(228, 228),
         em_gain=mode.em_gain,
         bias_offset_adu=408.0,
         amplifier_layout=KECK_OCAM_AMPLIFIER_LAYOUT,
-        amplifier_boundaries_y_px=KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX,
-        amplifier_boundaries_x_px=KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX,
         amplifier_gain_factors=KECK_OCAM_AMPLIFIER_GAIN_FACTORS,
         amplifier_offsets_adu=KECK_OCAM_AMPLIFIER_OFFSETS_ADU,
     )
@@ -805,6 +811,12 @@ def _write_manifest(
         "pupil_sha256": hashlib.sha256(pupil.tobytes()).hexdigest(),
         "pupil_shape": list(pupil.shape),
         "detector_roi_shape": [228, 228],
+        "detector_roi_full_sensor_xywh_px": [
+            KECK_OCAM_ROI_LEFT_PX,
+            KECK_OCAM_ROI_TOP_PX,
+            KECK_OCAM_ROI_WIDTH_PX,
+            KECK_OCAM_ROI_HEIGHT_PX,
+        ],
         "amplifier_model": {
             "layout_rows_columns": list(KECK_OCAM_AMPLIFIER_LAYOUT),
             "roi_boundaries_y_px": list(KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX),

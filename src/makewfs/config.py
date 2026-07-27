@@ -572,6 +572,31 @@ class PyramidConfig:
 
 
 @dataclass(frozen=True)
+class _DetectorROIConfig:
+    """Detector region of interest in full-sensor pixel coordinates."""
+
+    left_px: int
+    top_px: int
+    width_px: int
+    height_px: int
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> _DetectorROIConfig:
+        _strict(data, {"left_px", "top_px", "width_px", "height_px"}, "detector.roi")
+        return cls(
+            _positive_int(data.get("left_px", 0), "detector.roi.left_px", minimum=0),
+            _positive_int(data.get("top_px", 0), "detector.roi.top_px", minimum=0),
+            _positive_int(data.get("width_px"), "detector.roi.width_px"),
+            _positive_int(data.get("height_px"), "detector.roi.height_px"),
+        )
+
+    @property
+    def getframes_tuple(self) -> tuple[int, int, int, int]:
+        """Return getframes' ``(left, top, width, height)`` ROI convention."""
+        return (self.left_px, self.top_px, self.width_px, self.height_px)
+
+
+@dataclass(frozen=True)
 class DetectorConfig:
     """Detector construction and exposure settings."""
 
@@ -584,6 +609,7 @@ class DetectorConfig:
     precision: str
     include_truth: bool
     qe_curve_path: str | None = None
+    roi: _DetectorROIConfig | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> DetectorConfig:
@@ -597,6 +623,7 @@ class DetectorConfig:
             "precision",
             "include_truth",
             "qe_curve_path",
+            "roi",
         }
         _strict(data, allowed, "detector")
         preset = None if data.get("preset") is None else str(data["preset"])
@@ -623,18 +650,23 @@ class DetectorConfig:
             if qe_curve is None
             else str(((Path.cwd() if base is None else base) / str(qe_curve)).resolve())
         )
+        raw_roi = data.get("roi")
+        if raw_roi is not None and not isinstance(raw_roi, Mapping):
+            raise ConfigError("detector.roi: expected a table")
+        roi = None if raw_roi is None else _DetectorROIConfig.from_dict(raw_roi)
         return cls(
-            preset,
-            inline,
-            _finite(data.get("exposure_s"), "detector.exposure_s", minimum=0),
-            None
+            preset=preset,
+            inline=inline,
+            exposure_s=_finite(data.get("exposure_s"), "detector.exposure_s", minimum=0),
+            temperature_c=None
             if data.get("temperature_c") is None
             else _finite(data["temperature_c"], "detector.temperature_c"),
-            _positive_int(data.get("binning", 1), "detector.binning"),
-            mode,
-            precision,
-            include_truth,
-            qe_curve_path,
+            binning=_positive_int(data.get("binning", 1), "detector.binning"),
+            binning_mode=mode,
+            precision=precision,
+            include_truth=include_truth,
+            qe_curve_path=qe_curve_path,
+            roi=roi,
         )
 
 

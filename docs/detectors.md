@@ -10,6 +10,13 @@ This preserves the existing detector model: QE, photon shot noise, dark current,
 read noise, EM/eAPD gain, fixed-pattern effects, saturation, digitization,
 persistence, and truth metadata are not duplicated here.
 
+For a physical detector subarray, configure `[detector.roi]` with `left_px`,
+`top_px`, `width_px`, and `height_px` in full-sensor native pixels. `makewfs`
+passes the ROI-shaped photon-rate map and its full-detector origin to
+`getframes`; amplifier seams and fixed detector structure therefore remain
+registered to the camera preset rather than being reconstructed in the optical
+model.
+
 Magnitude normalization uses public `getframes.Bandpass` and `getframes.Telescope`
 radiometry. Direct detector-surface photon rates are the preferred way to isolate
 WFS optical behavior in a trade study.

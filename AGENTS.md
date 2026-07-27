@@ -124,6 +124,9 @@ write a failing integration test/design note, use the conditional gates in
   path-specific actionable messages.
 - Resolve file references relative to the config file. Hash referenced masks,
   curves, and static OPD for provenance.
+- Physical detector subarrays use `[detector.roi]` with full-sensor pixel
+  coordinates and are passed to getframes. Do not emulate an ROI by shrinking a
+  preset's detector geometry or manually shifting amplifier boundaries.
 - A new user-facing field requires validation tests, serialization/digest tests,
   config-reference documentation, and at least one example where appropriate.
 - Backward-incompatible schema changes require a schema-version change and a

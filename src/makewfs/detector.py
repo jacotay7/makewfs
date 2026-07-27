@@ -44,7 +44,19 @@ class DetectorAdapter:
             )
         if config.qe_curve_path is not None:
             camera = camera.with_config(qe_curve=gf.QE.from_file(config.qe_curve_path))
-        if camera.resolution != optical_shape:
+        if config.roi is not None:
+            if "roi" not in gf.CameraConfig.__dataclass_fields__:
+                raise RuntimeError(
+                    "detector ROI execution requires a getframes version with "
+                    "CameraConfig.roi support"
+                )
+            camera = camera.with_config(roi=config.roi.getframes_tuple)
+            if camera.resolution != optical_shape:
+                raise ValueError(
+                    f"detector.roi produces shape {camera.resolution}, but the configured "
+                    f"optics produce {optical_shape}"
+                )
+        elif camera.resolution != optical_shape:
             camera = camera.with_config(resolution=list(optical_shape))
         self.camera = camera
         self.config = config

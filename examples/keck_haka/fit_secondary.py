@@ -21,6 +21,8 @@ from numpy.typing import NDArray
 from scipy.optimize import differential_evolution
 from simulate import (
     HAKA_GRID_EXTENT_M,
+    KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX,
+    KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX,
     KECK_OCAM_AMPLIFIER_GAIN_FACTORS,
     KECK_OCAM_AMPLIFIER_LAYOUT,
     KECK_SECONDARY_CIRCLE_RADIUS_M,
@@ -49,8 +51,8 @@ def _arguments() -> argparse.Namespace:
 def _apply_amplifier_response(cube: NDArray[np.float32]) -> NDArray[np.float64]:
     """Convert each output to a common relative electron/count response."""
     corrected = cube.astype(np.float64, copy=True)
-    y_edges = (0, 54, 114, 174, 228)
-    x_edges = (0, 114, 228)
+    y_edges = (0, *KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX, 228)
+    x_edges = (0, *KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX, 228)
     factors = np.asarray(KECK_OCAM_AMPLIFIER_GAIN_FACTORS).reshape(KECK_OCAM_AMPLIFIER_LAYOUT)
     for row, (y0, y1) in enumerate(pairwise(y_edges)):
         for column, (x0, x1) in enumerate(pairwise(x_edges)):

@@ -109,7 +109,7 @@ def test_checked_haka_artifacts_use_independently_confirmed_throughput() -> None
     assert validation["adopted_downstream_haka_throughput"] == 0.287
     assert validation["real_to_simulated_lenslet_signal_ratio"] == pytest.approx(1.0, abs=0.02)
     assert lut_analysis["magnitude_system"] == "Vega Johnson R"
-    assert lut_analysis["active_lenslets"] == 1863
+    assert lut_analysis["active_lenslets"] == 1867
     assert lut_analysis["optimization_constraints"]["target_snr"] == 4.5
     cadence_fit = lut_analysis["empirical_frame_rate_model"]
     assert cadence_fit["kind"] == "faint-tail smooth broken power law with 2067 Hz asymptote"
@@ -134,9 +134,9 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert np.all((pupil >= 0) & (pupil <= 1))
     assert len(example._keck_segment_centres(1.0)) == 36
     assert pupil[114, 114] == 0.0  # the Keck primary has no central segment
-    assert pytest.approx(1.2833, abs=1e-4) == example.KECK_SECONDARY_CIRCLE_RADIUS_M
+    assert pytest.approx(1.2873, abs=1e-4) == example.KECK_SECONDARY_CIRCLE_RADIUS_M
     assert np.sqrt(3.0) * example.KECK_SECONDARY_HEX_CIRCUMRADIUS_M == pytest.approx(
-        2.5323, abs=1e-4
+        2.5202, abs=1e-4
     )
     # Each component adds a distinct part of the union: the circle extends
     # beyond a hex flat and the hex extends beyond the circle at a vertex.
@@ -241,6 +241,7 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
         "amplifier_boundaries_x_px",
         "amplifier_gain_factors",
         "amplifier_offsets_adu",
+        "roi",
     }
     available_camera_fields = {field.name for field in fields(getframes.CameraConfig)}
     if not required_camera_fields <= available_camera_fields:
@@ -258,11 +259,18 @@ def test_keck_pupil_and_haka_geometry(tmp_path: Path) -> None:
     assert sensor.config.detector.exposure_s == 1.0 / 2000.0
     assert sensor.detector.camera.config.em_gain == 8.0
     assert sensor.detector.camera.config.amplifier_layout == (4, 2)
-    assert sensor.detector.camera.config.amplifier_boundaries_y_px == (54, 114, 174)
-    assert sensor.detector.camera.config.amplifier_boundaries_x_px == (114,)
+    assert sensor.detector.camera.sensor_resolution == (240, 240)
+    assert sensor.detector.camera.resolution == (228, 228)
+    assert sensor.detector.camera.config.roi == (4, 4, 228, 228)
+    assert sensor.detector.camera.config.active_amplifier_boundaries_y_px == (56, 116, 176)
+    assert sensor.detector.camera.config.active_amplifier_boundaries_x_px == (116,)
     assert len(sensor.detector.camera.config.amplifier_gain_factors) == 8
     assert sensor.config.source.normalization == "detector_photon_rate"
     assert len(sensor.config.source.wavelengths_m) == example.HAKA_SPECTRAL_QUADRATURE_ORDER
+    frame = sensor.expose(np.zeros(config.input.shape, dtype=np.float32), seed=9)
+    assert frame.shape == (228, 228)
+    assert frame.truth is not None
+    assert frame.truth.mean_electrons.shape == (228, 228)
 
 
 def test_haka_lut_snr_matches_analytic_uniform_limit_and_optimizer() -> None:
@@ -270,11 +278,11 @@ def test_haka_lut_snr_matches_analytic_uniform_limit_and_optimizer() -> None:
     analysis = _lut_module(example)
     import getframes
 
+    if "roi" not in {field.name for field in fields(getframes.CameraConfig)}:
+        pytest.skip("Keck HAKA detector integration requires getframes ROI support")
     camera = getframes.load_preset("andor_ocam2k").replace(
-        resolution=(228, 228),
+        roi=(4, 4, 228, 228),
         amplifier_layout=(4, 2),
-        amplifier_boundaries_y_px=example.KECK_OCAM_AMPLIFIER_BOUNDARIES_Y_PX,
-        amplifier_boundaries_x_px=example.KECK_OCAM_AMPLIFIER_BOUNDARIES_X_PX,
         amplifier_gain_factors=(1.0,) * 8,
         amplifier_offsets_adu=(0.0,) * 8,
         dark_current_e_per_s=0.0,

@@ -4,6 +4,15 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Added detector-owned full-sensor ROI configuration through
+  `[detector.roi]`. makewfs now passes ROI origin and shape to getframes instead
+  of replacing a preset's native detector resolution. The HAKA OCAM2K simulation
+  uses its measured `left_px=4`, `top_px=4`, 228x228 ROI, placing amplifier
+  boundaries at y=(56, 116, 176) and x=(116) in RTC image coordinates.
+  Stability note: `detector` now serializes a `roi` key, so every configuration
+  digest changes even when no ROI is configured. `schema_version` stays 1 and
+  existing TOML files load unchanged; only recorded provenance digests must be
+  regenerated.
 - Accelerated the common two-times Shack--Hartmann detector integration with
   direct flux-preserving strided sums, and made temporal exposure integration
   accumulate rates and OPD incrementally instead of stacking full frame cubes.
@@ -61,7 +70,8 @@ All notable changes to `makewfs` are documented here.
   downstream HAKA throughput as 28.7%; it is applied as physical radiometry after
   the telescope mirrors rather than inferred or fitted by the RTC comparison.
   The regenerated eng519 comparison has a real/simulation signal ratio of
-  1.00029.
+  1.00489 after correcting the RTC ROI origin and refitting the amplifier
+  responses and secondary shadow.
 - Added a reproducible warm HAKA CPU/GPU benchmark. It times non-periodic Mauna
   Kea atmosphere evolution, the full eight-wavelength 57x57 Shack--Hartmann
   propagation, and noisy OCAM2K exposure while excluding static setup and
