@@ -76,12 +76,26 @@ def block_sum(
     """Sum square pixel blocks while preserving total flux."""
     if factor < 1:
         raise ValueError("factor must be positive")
+    if factor == 1:
+        return array
     height, width = array.shape[-2:]
     if height % factor or width % factor:
         raise ValueError(f"shape {array.shape[-2:]} is not divisible by factor {factor}")
+    if factor == 2:
+        # Two-times oversampling is the common SH path. Direct strided sums
+        # avoid NumPy's disproportionately expensive multi-axis reduction over
+        # thousands of tiny spot images and work unchanged with CuPy arrays.
+        return cast(
+            NDArray[Any],
+            array[..., 0::2, 0::2]
+            + array[..., 0::2, 1::2]
+            + array[..., 1::2, 0::2]
+            + array[..., 1::2, 1::2],
+        )
     resolved = backend or cpu_backend()
     reshaped = array.reshape((*array.shape[:-2], height // factor, factor, width // factor, factor))
-    return cast(NDArray[Any], resolved.sum(reshaped, axis=(-1, -3)))
+    reduced_x = resolved.sum(reshaped, axis=-1)
+    return cast(NDArray[Any], resolved.sum(reduced_x, axis=-2))
 
 
 def spot_intensity(

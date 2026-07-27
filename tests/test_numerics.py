@@ -83,7 +83,11 @@ def test_padding_cropping_and_block_sum_preserve_flux() -> None:
     padded = pad_center(array, (8, 8))
     assert padded.sum() == array.sum()
     assert np.array_equal(crop_center(padded, (4, 4)), array)
+    assert np.array_equal(block_sum(array, 1), array)
     assert block_sum(array, 2).sum() == array.sum()
+    batch = np.arange(3 * 8 * 8, dtype=np.float32).reshape(3, 8, 8)
+    expected = batch.reshape(3, 4, 2, 4, 2).sum(axis=(-1, -3))
+    np.testing.assert_array_equal(block_sum(batch, 2), expected)
 
 
 def test_sampling_helpers_reject_invalid_geometry() -> None:

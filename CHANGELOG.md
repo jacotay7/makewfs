@@ -4,6 +4,10 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Accelerated the common two-times Shack--Hartmann detector integration with
+  direct flux-preserving strided sums, and made temporal exposure integration
+  accumulate rates and OPD incrementally instead of stacking full frame cubes.
+
 ## [1.0.0] - 2026-07-26
 
 - Prepared the first stable public release with versioned package metadata,

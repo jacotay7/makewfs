@@ -156,6 +156,13 @@ must not be implemented until its acceptance test demonstrates the need.
   public CuPy parity evidence, the versioned documentation gallery, and relative
   benchmark regression envelopes are in place.
 
+The 2026-07-26 closed-loop HAKA profile led to an additional equivalent CPU
+optimization: two-times SH block integration now uses direct strided sums and
+temporal exposures accumulate arrays incrementally. On an Intel i7-10700, the
+four-sample eight-wavelength 228×228 controlled benchmark dropped from a
+226.8 ms median to 146.6 ms with one FFT worker before host-specific worker
+tuning.
+
 ## 4. End-state user experience
 
 ### Configuration first

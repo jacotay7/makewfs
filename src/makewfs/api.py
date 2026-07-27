@@ -155,10 +155,11 @@ class WavefrontSensor:
         """Expose one detector frame after uniformly averaging temporal OPD samples."""
         total_start = perf_counter()
         optical_start = total_start
-        rates: list[Any] = []
-        spectral_rates: list[Any] = []
+        rate_sum: Any | None = None
+        spectral_rate_sum: Any | None = None
         spectral_wavelengths_m: tuple[float, ...] | None = None
-        opds: list[Any] = []
+        opd_sum: Any | None = None
+        sample_count = 0
         launched = 0.0
         captured: Any = 0.0
         for sample in iter_phase_samples(
@@ -167,27 +168,32 @@ class WavefrontSensor:
             backend=self.backend,
         ):
             result = self._render(sample)
-            rates.append(result.photon_rate)
+            if rate_sum is None:
+                rate_sum = self.backend.zeros_like(result.photon_rate)
+                opd_sum = self.backend.zeros_like(result.opd_m)
+            rate_sum += result.photon_rate
+            assert opd_sum is not None
+            opd_sum += result.opd_m
             if result.spectral_photon_rate is not None:
-                spectral_rates.append(result.spectral_photon_rate)
+                if spectral_rate_sum is None:
+                    spectral_rate_sum = self.backend.zeros_like(result.spectral_photon_rate)
+                spectral_rate_sum += result.spectral_photon_rate
                 if spectral_wavelengths_m is None:
                     spectral_wavelengths_m = result.spectral_wavelengths_m
                 elif spectral_wavelengths_m != result.spectral_wavelengths_m:
                     raise RuntimeError("spectral wavelength nodes changed within one exposure")
-            opds.append(result.opd_m)
             launched = result.launched_rate_per_s
             captured += result.captured_rate_per_s
-        if not rates:
+            sample_count += 1
+        if rate_sum is None or opd_sum is None:
             raise ValueError("phase_samples must contain at least one sample")
-        average_rate = self.backend.mean(self.backend.stack(rates), axis=0)
+        average_rate = rate_sum / sample_count
         average_spectral_rate = (
-            None
-            if not spectral_rates
-            else self.backend.mean(self.backend.stack(spectral_rates), axis=0)
+            None if spectral_rate_sum is None else spectral_rate_sum / sample_count
         )
-        average_opd = self.backend.mean(self.backend.stack(opds), axis=0)
+        average_opd = opd_sum / sample_count
         captured_rate, opd_rms = self.backend.scalars(
-            captured / len(rates), self._opd_rms(average_opd)
+            captured / sample_count, self._opd_rms(average_opd)
         )
         frame_metadata = self._frame_metadata(
             launched_rate=launched,
@@ -195,7 +201,7 @@ class WavefrontSensor:
             opd_rms_m=opd_rms,
             seed=seed,
         )
-        frame_metadata["wfs_temporal_samples"] = len(rates)
+        frame_metadata["wfs_temporal_samples"] = sample_count
         optical_elapsed = perf_counter() - optical_start
         detector_start = perf_counter()
         frame = self.detector.expose(

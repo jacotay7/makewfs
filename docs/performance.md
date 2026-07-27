@@ -10,6 +10,12 @@ for throughput and memory; float64 is the reference path. Benchmark cold
 construction separately from warm frames and record Python, NumPy, SciPy, and
 hardware versions.
 
+The common two-times Shack--Hartmann oversampling path integrates detector
+pixels with direct strided sums. Temporally integrated exposures accumulate
+photon-rate, spectral-rate, and OPD arrays incrementally, avoiding a second
+full-frame stack. These are mathematically equivalent allocation/reduction
+optimizations; temporal samples are still rendered as separate intensities.
+
 Install the optional CUDA extra, then set
 `numerics.device = "gpu"` in the WFS TOML:
 
