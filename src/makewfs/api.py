@@ -97,6 +97,18 @@ class WavefrontSensor:
         dtype = np.dtype(self.config.numerics.dtype)
         return self.photon_rate(self.backend.zeros(self.config.input.shape, dtype=dtype))
 
+    def valid_subapertures(self) -> Any:
+        """Return the configured static Shack--Hartmann lenslet-valid mask.
+
+        The mask is derived from pupil illumination and the configured minimum
+        illuminated fraction, not from a detector frame.  It is therefore safe
+        to freeze into a calibration artifact and use for active-slope vector
+        ordering.  Pyramid sensors do not have lenslet subapertures.
+        """
+        if self.config.sensor.kind != "shack_hartmann":
+            raise ValueError("valid_subapertures is defined only for Shack--Hartmann")
+        return self.engine.lenslet_valid.copy()
+
     def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
         """Render one wavefront and expose it through the configured detector."""
         total_start = perf_counter()

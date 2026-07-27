@@ -8,6 +8,17 @@ import pytest
 from makewfs import WavefrontSensor
 
 
+def test_shack_hartmann_exposes_static_valid_subaperture_mask() -> None:
+    config = Path(__file__).parents[1] / "examples" / "configs" / "shack_hartmann_minimal.toml"
+    sensor = WavefrontSensor.from_toml(config)
+    mask = np.asarray(sensor.valid_subapertures(), dtype=bool)
+    assert sensor.config.shack_hartmann is not None
+    count = sensor.config.shack_hartmann.lenslets_across_pupil
+    assert mask.shape == (count, count)
+    assert mask.any()
+    assert np.array_equal(mask, np.asarray(sensor.valid_subapertures(), dtype=bool))
+
+
 @pytest.mark.interop
 def test_pyturb_opd_frames_feed_wavefront_sensor() -> None:
     pyturb = pytest.importorskip("pyturb")
