@@ -15,10 +15,13 @@ V-normalized F6 V spectrum x Maunakea extinction x 3 aluminum mirrors
                          getframes spectral OCAM2K ADU
 ```
 
-The exact eight-output geometry, measured amplifier responses, and separate
-image/output-well fields currently require the sibling `getframes` checkout;
-they are not part of the published 2.1 package yet. The normal makewfs CI gate
-remains conditional on those fields until that sibling change is released.
+Released `getframes==2.1.1` contains the separate image/output-well field,
+four-by-two OCAM2K amplifier layout, and public exact-boundary and measured
+gain/offset fields used below. A clean-wheel audit in `shmpipeline-ao` also
+confirmed that 2.1.1 does **not** contain the generic `CameraConfig.roi` field
+needed for the centred 228 x 228 crop. Until the already-implemented ROI
+contract receives a later release, this example still requires the sibling
+checkout and its cross-repository open-loop parity gate remains skipped.
 
 The geometry is 57 x 57 subapertures with 4 x 4 native detector pixels per
 subaperture, giving the requested 228 x 228 OCAM2K ROI. The generated pupil has
