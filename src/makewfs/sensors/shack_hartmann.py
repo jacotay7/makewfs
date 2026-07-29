@@ -13,7 +13,7 @@ from ..config import WFSConfig
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
-from ..sampling import load_blur_kernel, spot_intensity
+from ..sampling import load_blur_kernel, spot_intensity, spot_sampling_geometry
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
@@ -65,7 +65,7 @@ class ShackHartmannEngine(SensorEngine):
         self._grid_transform_enabled = abs(rotation) > 1e-15 or bool(offset_x or offset_y)
         self._sample_indices: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
         if self._grid_transform_enabled:
-            pitch = config.telescope.pupil_diameter_m / self.n_lenslets
+            pitch = config.input.grid_extent_m / self.n_lenslets
             cosine = math.cos(rotation)
             sine = math.sin(rotation)
             self._field_x = cosine * self.xx - sine * self.yy + offset_x * pitch
@@ -107,7 +107,7 @@ class ShackHartmannEngine(SensorEngine):
             ),
             axis=(1, 3),
         )
-        pitch = config.telescope.pupil_diameter_m / self.n_lenslets
+        pitch = config.input.grid_extent_m / self.n_lenslets
         cosine = math.cos(rotation)
         sine = math.sin(rotation)
         centers = cosine * local_centers_x - sine * local_centers_y + offset_x * pitch
@@ -177,18 +177,15 @@ class ShackHartmannEngine(SensorEngine):
         """Group GPU states that share one exact focal-plane FFT geometry."""
         if self.backend.is_cpu or self.settings.field_stop_radius_lambda_over_d is not None:
             return tuple((index,) for index in range(len(self.source_states)))
-        groups: dict[int, list[int]] = {}
+        groups: dict[tuple[str, int | float], list[int]] = {}
         for index, sampling in enumerate(self._state_spot_sampling):
-            nfft = self.backend.next_fast_length(
-                max(
-                    self.samples_per_lenslet,
-                    math.ceil(
-                        self.samples_per_lenslet * sampling * self.config.numerics.fft_oversampling
-                    ),
-                    (self.settings.pixels_per_subaperture * self.config.numerics.fft_oversampling),
-                )
+            geometry = spot_sampling_geometry(
+                pixels=self.settings.pixels_per_subaperture,
+                samples_per_lenslet=self.samples_per_lenslet,
+                sampling=sampling,
+                oversampling=self.config.numerics.fft_oversampling,
             )
-            groups.setdefault(nfft, []).append(index)
+            groups.setdefault(geometry, []).append(index)
         return tuple(tuple(indices) for indices in groups.values())
 
     def _make_lenslet_mask(self) -> NDArray[np.float64]:
@@ -222,7 +219,9 @@ class ShackHartmannEngine(SensorEngine):
         if configured is None:
             assert self.settings.lenslet_focal_length_m is not None
             assert self.settings.detector_pixel_pitch_m is not None
-            lenslet_pitch = self.config.telescope.pupil_diameter_m / self.n_lenslets
+            lenslet_pitch = self.settings.lenslet_pitch_m
+            if lenslet_pitch is None:
+                lenslet_pitch = self.config.telescope.pupil_diameter_m / self.n_lenslets
             configured = (
                 self.settings.lenslet_focal_length_m
                 * self.config.sensor.wavelength_m

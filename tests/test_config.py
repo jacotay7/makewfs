@@ -127,11 +127,13 @@ def test_physical_shack_hartmann_sampling_mode() -> None:
             "lenslets_across_pupil": 8,
             "pixels_per_subaperture": 8,
             "minimum_illuminated_fraction": 0.25,
+            "lenslet_pitch_m": 0.0002,
             "lenslet_focal_length_m": 0.02,
             "detector_pixel_pitch_m": 15e-6,
         }
     )
     assert config.spot_sampling_pixels_per_lambda_over_d is None
+    assert config.lenslet_pitch_m == 0.0002
     assert config.lenslet_focal_length_m == 0.02
 
 
@@ -327,12 +329,29 @@ def test_source_quadrature_and_curve_fields_are_checked(tmp_path: Path) -> None:
 
 
 def test_sensor_specific_validation_and_defaults() -> None:
+    undersampled = ShackHartmannConfig.from_dict(
+        {
+            "lenslets_across_pupil": 57,
+            "pixels_per_subaperture": 4,
+            "spot_sampling_pixels_per_lambda_over_d": 0.457,
+        }
+    )
+    assert undersampled.spot_sampling_pixels_per_lambda_over_d == 0.457
+    with pytest.raises(ConfigError, match="must be >="):
+        ShackHartmannConfig.from_dict(
+            {
+                "lenslets_across_pupil": 57,
+                "pixels_per_subaperture": 4,
+                "spot_sampling_pixels_per_lambda_over_d": 0.0,
+            }
+        )
     with pytest.raises(ConfigError, match="normalized and physical"):
         ShackHartmannConfig.from_dict(
             {
                 "lenslets_across_pupil": 2,
                 "pixels_per_subaperture": 4,
                 "spot_sampling_pixels_per_lambda_over_d": 2,
+                "lenslet_pitch_m": 0.0002,
                 "lenslet_focal_length_m": 0.02,
                 "detector_pixel_pitch_m": 15e-6,
             }

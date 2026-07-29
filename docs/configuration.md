@@ -134,9 +134,10 @@ fft_workers = 1  # CPU-only FFT control; accepted but ignored by CuPy FFTs
 | --- | --- |
 | `lenslets_across_pupil` | Positive square lenslet count. |
 | `pixels_per_subaperture` | Native detector pixels per lenslet, at least 2. |
-| `spot_sampling_pixels_per_lambda_over_d` | Normalized sampling, at least 0.5; mutually exclusive with physical relay fields. |
+| `spot_sampling_pixels_per_lambda_over_d` | Positive normalized sampling; mutually exclusive with physical relay fields. Values below 1 represent detector pixels wider than `lambda/D`. |
 | `minimum_illuminated_fraction` | Validity threshold in `[0, 1]`. |
 | `lenslet_fill_factor` | Square clear fill fraction in `[0, 1]` (default 1). |
+| `lenslet_pitch_m` | Optional positive physical lenslet pitch. When omitted, the legacy telescope-pupil pitch is used. |
 | `lenslet_focal_length_m` | Optional positive physical lenslet focal length. |
 | `detector_pixel_pitch_m` | Optional positive detector pitch for physical sampling. |
 | `relay_magnification` | Positive relay magnification (default 1). |
@@ -149,7 +150,7 @@ fft_workers = 1  # CPU-only FFT control; accepted but ignored by CuPy FFTs
 
 `[shack_hartmann]` requires positive `lenslets_across_pupil`, at least two
 `pixels_per_subaperture`, and `minimum_illuminated_fraction` in `[0, 1]`.
-Either `spot_sampling_pixels_per_lambda_over_d` (at least `0.5`) or both
+Either positive `spot_sampling_pixels_per_lambda_over_d` or both
 `lenslet_focal_length_m` and `detector_pixel_pitch_m` must be supplied, but
 never both. The optional `lenslet_fill_factor` is in `[0, 1]`,
 `relay_magnification` is positive, `field_stop_radius_lambda_over_d` is
@@ -162,6 +163,9 @@ is a non-negative integer. The optional
 `lenslet_grid_offset_fraction = [x, y]` shifts its origin by fractions of one
 subaperture pitch. These two controls use an explicit physical-coordinate
 resampling path; the default zero values retain the fast axis-aligned path.
+Integer-compatible focal grids use the batched FFT path. Arbitrary sampling,
+including undersampled quadcell modes, uses an exact sampled DFT at detector
+quadrature points so the configured plate scale is not rounded to an FFT bin.
 
 `[pyramid]` requires `pixels_across_pupil` ≥ 8 and positive
 `pupil_separation_pixels`. `modulation_radius_lambda_over_d` is non-negative;
@@ -199,14 +203,17 @@ or with physical lenslet optics. Do not provide both forms:
 lenslets_across_pupil = 20
 pixels_per_subaperture = 8
 minimum_illuminated_fraction = 0.25
+lenslet_pitch_m = 0.0002
 lenslet_focal_length_m = 0.020
 detector_pixel_pitch_m = 15e-6
 relay_magnification = 1.0
 ```
 
-In physical mode, `makewfs` derives pixels per `lambda / D_subaperture` from
-the telescope diameter, lenslet count, sensing wavelength, focal length, pixel
-pitch, and relay magnification.
+In physical mode, `makewfs` derives pixels per `lambda / D_subaperture` as
+`f_lenslet * wavelength * relay_magnification /
+(lenslet_pitch * detector_pixel_pitch)`. For backward compatibility,
+`lenslet_pitch_m` defaults to the entrance-pupil diameter divided by the
+lenslet count, but hardware models should provide the measured pitch explicitly.
 
 `field_stop_radius_lambda_over_d` clips each subaperture's focal-plane field
 stop, `optical_blur_fwhm_pixels` applies a flux-spreading optical Gaussian

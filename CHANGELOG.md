@@ -4,6 +4,12 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- Fixed arbitrary Shack--Hartmann spot sampling so normalized plate scales no
+  longer snap to a nearby integer FFT grid. Integer-compatible geometries retain
+  the FFT path; arbitrary and undersampled quadcell modes use a sampled DFT at
+  detector-cell quadrature points, with CPU/GPU-compatible batching. Physical
+  lenslet models can now provide an explicit `lenslet_pitch_m`, separating
+  hardware focal-plane sampling from the telescope-pupil coordinate scale.
 - Added detector-owned full-sensor ROI configuration through
   `[detector.roi]`. makewfs now passes ROI origin and shape to getframes instead
   of replacing a preset's native detector resolution. The HAKA OCAM2K simulation

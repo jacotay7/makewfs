@@ -65,6 +65,26 @@ def _direct_centered_idft(array: np.ndarray) -> np.ndarray:
     return result
 
 
+def _direct_sampled_spot(
+    field: np.ndarray, *, pixels: int, sampling: float, oversampling: int
+) -> np.ndarray:
+    """Independent sampled Fraunhofer sum at detector-cell quadrature points."""
+    samples = field.shape[0]
+    high_resolution_pixels = pixels * oversampling
+    result = np.zeros((high_resolution_pixels, high_resolution_pixels), dtype=np.complex128)
+    for output_y in range(high_resolution_pixels):
+        frequency_y = (output_y - (high_resolution_pixels - 1) / 2) / (sampling * oversampling)
+        for output_x in range(high_resolution_pixels):
+            frequency_x = (output_x - (high_resolution_pixels - 1) / 2) / (sampling * oversampling)
+            for input_y in range(samples):
+                for input_x in range(samples):
+                    result[output_y, output_x] += field[input_y, input_x] * np.exp(
+                        -2j * np.pi * (frequency_y * input_y + frequency_x * input_x) / samples
+                    )
+    intensity = np.abs(result / (samples * sampling * oversampling)) ** 2
+    return intensity.reshape(pixels, oversampling, pixels, oversampling).sum(axis=(1, 3))
+
+
 def test_centered_fft_matches_independent_small_dft() -> None:
     rng = np.random.default_rng(4)
     array = rng.normal(size=(5, 5)) + 1j * rng.normal(size=(5, 5))
@@ -87,6 +107,49 @@ def test_batched_shack_spots_match_direct_random_small_grid() -> None:
         [np.abs(_direct_centered_dft(field, frequency_offset=0.5)) ** 2 for field in fields]
     )
     assert np.allclose(spots, expected, atol=1e-12, rtol=1e-12)
+
+
+def test_arbitrary_undersampled_shack_spot_matches_direct_sampled_dft() -> None:
+    rng = np.random.default_rng(191)
+    field = np.exp(1j * rng.normal(size=(4, 4)))
+    actual = spot_intensity(
+        field[None],
+        pixels=4,
+        samples_per_lenslet=4,
+        sampling=0.457,
+        oversampling=2,
+        workers=1,
+    )[0]
+    expected = _direct_sampled_spot(field, pixels=4, sampling=0.457, oversampling=2)
+    assert np.allclose(actual, expected, atol=1e-12, rtol=1e-12)
+
+
+def test_distinct_quadcell_plate_scales_do_not_snap_to_same_fft_grid() -> None:
+    samples = 4
+    wavelength_m = 640e-9
+    source_offset_rad = np.deg2rad(1.0 / 3600.0)
+    coordinate = (np.arange(samples) + 0.5 - samples / 2) / samples
+    field = np.tile(
+        np.exp(2j * np.pi * source_offset_rad * coordinate[None, :] / wavelength_m),
+        (samples, 1),
+    )
+    coarse = spot_intensity(
+        field[None],
+        pixels=4,
+        samples_per_lenslet=samples,
+        sampling=0.457,
+        oversampling=2,
+        workers=1,
+    )[0]
+    fine = spot_intensity(
+        field[None],
+        pixels=4,
+        samples_per_lenslet=samples,
+        sampling=0.91,
+        oversampling=2,
+        workers=1,
+    )[0]
+    assert not np.allclose(coarse / coarse.sum(), fine / fine.sum(), rtol=1e-8, atol=1e-10)
 
 
 def test_small_shack_mosaic_matches_independent_random_phase_reference() -> None:
@@ -237,15 +300,17 @@ def test_physical_lenslet_sampling_matches_normalized_mode() -> None:
         shack_hartmann=replace(
             config.shack_hartmann,
             spot_sampling_pixels_per_lambda_over_d=None,
+            lenslet_pitch_m=0.0002,
             lenslet_focal_length_m=0.02,
             detector_pixel_pitch_m=15e-6,
+            relay_magnification=0.5,
         ),
     )
     normalized = replace(
         config,
         shack_hartmann=replace(
             config.shack_hartmann,
-            spot_sampling_pixels_per_lambda_over_d=0.02 * 700e-9 / 15e-6,
+            spot_sampling_pixels_per_lambda_over_d=0.02 * 700e-9 * 0.5 / (0.0002 * 15e-6),
         ),
     )
     phase = np.zeros(config.input.shape)

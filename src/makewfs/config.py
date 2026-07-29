@@ -391,6 +391,7 @@ class ShackHartmannConfig:
     spot_sampling_pixels_per_lambda_over_d: float | None
     minimum_illuminated_fraction: float
     lenslet_fill_factor: float = 1.0
+    lenslet_pitch_m: float | None = None
     lenslet_focal_length_m: float | None = None
     detector_pixel_pitch_m: float | None = None
     relay_magnification: float = 1.0
@@ -411,6 +412,7 @@ class ShackHartmannConfig:
                 "spot_sampling_pixels_per_lambda_over_d",
                 "minimum_illuminated_fraction",
                 "lenslet_fill_factor",
+                "lenslet_pitch_m",
                 "lenslet_focal_length_m",
                 "detector_pixel_pitch_m",
                 "relay_magnification",
@@ -424,6 +426,7 @@ class ShackHartmannConfig:
             "shack_hartmann",
         )
         raw_sampling = data.get("spot_sampling_pixels_per_lambda_over_d")
+        lenslet_pitch = data.get("lenslet_pitch_m")
         focal = data.get("lenslet_focal_length_m")
         pixel_pitch = data.get("detector_pixel_pitch_m")
         if raw_sampling is None and (focal is None or pixel_pitch is None):
@@ -431,7 +434,9 @@ class ShackHartmannConfig:
                 "shack_hartmann: provide spot_sampling_pixels_per_lambda_over_d or "
                 "both lenslet_focal_length_m and detector_pixel_pitch_m"
             )
-        if raw_sampling is not None and (focal is not None or pixel_pitch is not None):
+        if raw_sampling is not None and (
+            lenslet_pitch is not None or focal is not None or pixel_pitch is not None
+        ):
             raise ConfigError(
                 "shack_hartmann: normalized and physical sampling modes are mutually exclusive"
             )
@@ -470,7 +475,7 @@ class ShackHartmannConfig:
             else _finite(
                 raw_sampling,
                 "shack_hartmann.spot_sampling_pixels_per_lambda_over_d",
-                minimum=0.5,
+                minimum=1e-15,
             ),
             _finite(
                 data.get("minimum_illuminated_fraction", 0.25),
@@ -484,6 +489,9 @@ class ShackHartmannConfig:
                 minimum=0,
                 maximum=1,
             ),
+            None
+            if lenslet_pitch is None
+            else _finite(lenslet_pitch, "shack_hartmann.lenslet_pitch_m", minimum=1e-15),
             None
             if focal is None
             else _finite(focal, "shack_hartmann.lenslet_focal_length_m", minimum=1e-15),

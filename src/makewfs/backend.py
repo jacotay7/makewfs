@@ -80,6 +80,10 @@ class ArrayBackend:
         """Stack backend arrays."""
         return self.xp.stack(values, axis=axis)
 
+    def matmul(self, left: Any, right: Any) -> Any:
+        """Multiply backend arrays with batched broadcasting."""
+        return self.xp.matmul(left, right)
+
     def sum(self, value: Any, *, axis: Any = None) -> Any:
         """Reduce a backend array by summation."""
         return self.xp.sum(value, axis=axis)

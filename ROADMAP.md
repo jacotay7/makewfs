@@ -1,5 +1,11 @@
 # makewfs roadmap
 
+Current checkpoint (2026-07-29): corrected the completed Phase 2
+Shack--Hartmann sampling contract after HAKA 0.75/1.50 arcsec quadcell modes
+exposed integer-FFT scale snapping. Arbitrary positive normalized sampling now
+uses a sampled DFT with independent-reference coverage; exact integer grids
+retain the FFT path.
+
 This is the implementation plan and checklist for `makewfs`. It is written so
 that an AI agent can take one bounded checklist item, implement it, validate it,
 document it, and leave the repository in a healthy state.

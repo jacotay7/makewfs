@@ -1,8 +1,11 @@
 # Shack-Hartmann sensor
 
 The Shack-Hartmann engine partitions the configured pupil into a square lenslet
-grid. Each subaperture is propagated by a batched Fraunhofer FFT, integrated onto
-its native detector pixels, and assembled into a `(lenslet_y, lenslet_x)` mosaic.
+grid. Each subaperture is propagated by a batched Fraunhofer transform, integrated
+onto its native detector pixels, and assembled into a
+`(lenslet_y, lenslet_x)` mosaic. Integer-compatible focal grids use an FFT;
+arbitrary normalized sampling uses a directly sampled DFT so the requested
+plate scale is represented exactly.
 
 `pixels_per_subaperture` and
 `spot_sampling_pixels_per_lambda_over_d` determine the detector sampling. Partial
@@ -15,13 +18,17 @@ window, zero wavefront slope lies on the boundary shared by the central four
 pixels. The Fourier propagation is evaluated at half-integer samples before
 flux-conserving pixel-area integration, so a symmetric flat-wavefront spot gives
 equal signal in those four pixels rather than being assigned to one of them.
+Positive normalized sampling below one is supported for undersampled quadcell
+modes whose native detector pixels are wider than `lambda/D`.
 
 Set `numerics.pupil_supersampling` above one when edge-area convergence matters;
 this averages analytic sub-pixels rather than interpolating a binary mask.
 
-Instead of normalized spot sampling, a configuration may provide lenslet focal
-length, detector pixel pitch, and relay magnification. The engine derives the
-same normalized sampling from those physical fields and rejects mixed modes.
+Instead of normalized spot sampling, a configuration may provide lenslet pitch,
+lenslet focal length, detector pixel pitch, and relay magnification. The engine
+derives the same normalized sampling from those physical fields and rejects
+mixed modes. Supplying the measured lenslet pitch explicitly is important when
+the telescope pupil is reduced onto a millimetre-scale hardware array.
 The optional field stop, Gaussian or measured-kernel blur, and detector-margin
 controls are applied to the ideal photon-rate mosaic before the camera adapter.
 

@@ -9,7 +9,33 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from .backend import ArrayBackend, centered_fft_intensity, cpu_backend, next_fast_length
+from .backend import ArrayBackend, centered_fft_intensity, cpu_backend
+
+
+def spot_sampling_geometry(
+    *,
+    pixels: int,
+    samples_per_lenslet: int,
+    sampling: float,
+    oversampling: int,
+) -> tuple[str, int | float]:
+    """Return the exact propagation geometry for one detector sampling.
+
+    An FFT is exact only when its integer grid simultaneously represents the
+    requested ``pixels / (lambda / D)`` sampling and contains the requested
+    detector window. Arbitrary or undersampled geometries use a sampled DFT at
+    detector-cell quadrature points instead of rounding the physical scale.
+    """
+    high_resolution_pixels = pixels * oversampling
+    ideal_nfft = samples_per_lenslet * sampling * oversampling
+    integer_nfft = round(ideal_nfft)
+    if (
+        math.isclose(ideal_nfft, integer_nfft, rel_tol=0.0, abs_tol=1e-12)
+        and integer_nfft >= samples_per_lenslet
+        and integer_nfft >= high_resolution_pixels
+    ):
+        return ("fft", int(integer_nfft))
+    return ("dft", float(sampling))
 
 
 def load_blur_kernel(path: str) -> NDArray[np.float64]:
@@ -117,42 +143,60 @@ def spot_intensity(
     by ``oversampling`` improves pixel-area integration while the final block
     sum returns the configured native-pixel grid.
     """
-    # The requested native-pixel window must fit even when a designer chooses
-    # a large detector pixel scale.  The previous implementation only sized
-    # the FFT from the optical sampling and could fail while cropping a valid
-    # configuration.
     resolved = backend or cpu_backend()
-    nfft = next_fast_length(
-        max(
-            samples_per_lenslet,
-            math.ceil(samples_per_lenslet * sampling * oversampling),
-            pixels * oversampling,
-        )
+    geometry, geometry_value = spot_sampling_geometry(
+        pixels=pixels,
+        samples_per_lenslet=samples_per_lenslet,
+        sampling=sampling,
+        oversampling=oversampling,
     )
-    padded = pad_center(field, (nfft, nfft), backend=resolved)
     high_resolution_pixels = pixels * oversampling
-    if high_resolution_pixels % 2 == 0:
-        # An even detector has its optical axis on the boundary shared by its
-        # central four pixels. Evaluate the Fourier transform at half-integer
-        # frequency samples so equal-area integration is exactly symmetric
-        # around that boundary. The pupil-plane phase ramp performs the
-        # half-sample Fourier shift without interpolating intensity or changing
-        # flux. Its sign only selects the equivalent half-pixel sampling branch.
-        coordinate = resolved.arange(nfft, dtype=np.float64)
-        half_sample = resolved.exp(-1j * math.pi * coordinate / nfft)
-        padded *= half_sample[None, :, None] * half_sample[None, None, :]
-    intensity = centered_fft_intensity(
-        padded,
-        workers=workers,
-        backend=resolved,
-        overwrite_input=True,
-    )
-    # ``fftshift`` puts zero frequency at ``nfft // 2``. This start index is
-    # symmetric for odd grids; even grids become symmetric after the half-sample
-    # evaluation above.
-    crop_start = nfft // 2 - high_resolution_pixels // 2
-    crop_stop = crop_start + high_resolution_pixels
-    cropped = intensity[..., crop_start:crop_stop, crop_start:crop_stop]
+    if geometry == "fft":
+        nfft = int(geometry_value)
+        padded = pad_center(field, (nfft, nfft), backend=resolved)
+        if high_resolution_pixels % 2 == 0:
+            # An even detector has its optical axis on the boundary shared by its
+            # central four pixels. Evaluate the Fourier transform at half-integer
+            # frequency samples so equal-area integration is exactly symmetric
+            # around that boundary. The pupil-plane phase ramp performs the
+            # half-sample Fourier shift without interpolating intensity or changing
+            # flux. Its sign only selects the equivalent half-pixel sampling branch.
+            coordinate = resolved.arange(nfft, dtype=np.float64)
+            half_sample = resolved.exp(-1j * math.pi * coordinate / nfft)
+            padded *= half_sample[None, :, None] * half_sample[None, None, :]
+        intensity = centered_fft_intensity(
+            padded,
+            workers=workers,
+            backend=resolved,
+            overwrite_input=True,
+        )
+        # ``fftshift`` puts zero frequency at ``nfft // 2``. This start index is
+        # symmetric for odd grids; even grids become symmetric after the half-sample
+        # evaluation above.
+        crop_start = nfft // 2 - high_resolution_pixels // 2
+        crop_stop = crop_start + high_resolution_pixels
+        cropped = intensity[..., crop_start:crop_stop, crop_start:crop_stop]
+    else:
+        # Evaluate the Fraunhofer transform exactly at the detector quadrature
+        # points. This preserves arbitrary normalized sampling, including
+        # quadcell pixels wider than lambda/D, without silently snapping the
+        # physical scale to a nearby integer FFT grid.
+        detector_coordinate = (
+            resolved.arange(high_resolution_pixels, dtype=np.float64)
+            - (high_resolution_pixels - 1) / 2.0
+        ) / (sampling * oversampling)
+        pupil_coordinate = resolved.arange(samples_per_lenslet, dtype=np.float64)
+        kernel = resolved.exp(
+            -2j
+            * math.pi
+            * detector_coordinate[:, None]
+            * pupil_coordinate[None, :]
+            / samples_per_lenslet
+        )
+        kernel = resolved.astype(kernel, field.dtype)
+        transformed = resolved.matmul(resolved.matmul(kernel, field), kernel.T)
+        ideal_nfft = samples_per_lenslet * sampling * oversampling
+        cropped = resolved.abs(transformed / ideal_nfft) ** 2
     if field_stop_radius_lambda_over_d is not None:
         coordinates = resolved.arange(high_resolution_pixels, dtype=np.float64)
         y, x = resolved.meshgrid(coordinates, coordinates, indexing="ij")
@@ -175,4 +219,11 @@ def spot_intensity(
     return native
 
 
-__all__ = ["block_sum", "crop_center", "load_blur_kernel", "pad_center", "spot_intensity"]
+__all__ = [
+    "block_sum",
+    "crop_center",
+    "load_blur_kernel",
+    "pad_center",
+    "spot_intensity",
+    "spot_sampling_geometry",
+]
