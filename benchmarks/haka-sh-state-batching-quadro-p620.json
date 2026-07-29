@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "config": "shmpipeline-ao/examples/keck_haka/config/haka-resolved-wfs.toml",
+  "equivalence": {
+    "maximum_absolute_photon_rate_error": 0.000619121638010256,
+    "maximum_relative_photon_rate_error": 5.082930015717353e-08
+  },
+  "grouped_state_indices": [
+    [0, 1, 2, 3, 4],
+    [5],
+    [6],
+    [7]
+  ],
+  "hardware": {
+    "cupy": "14.1.1",
+    "gpu": "Quadro P620",
+    "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
+    "python": "3.13.13"
+  },
+  "method": {
+    "script": "benchmarks/benchmark_sh_state_batching.py",
+    "alternating_variant_order": true,
+    "cuda_synchronized_after_each_frame": true,
+    "frames_per_variant": 64,
+    "seed": 71,
+    "temporal_samples": 4
+  },
+  "optical_p50_reduction_fraction": 0.021608692611609026,
+  "results": {
+    "grouped": {
+      "optical_ms": {
+        "count": 64,
+        "p50_ms": 36.38796848827042,
+        "p95_ms": 37.535395626036916,
+        "p99_ms": 37.809868764015846
+      },
+      "total_ms": {
+        "count": 64,
+        "p50_ms": 39.71877199364826,
+        "p95_ms": 40.961311386490706,
+        "p99_ms": 41.287369327037595
+      }
+    },
+    "sequential": {
+      "optical_ms": {
+        "count": 64,
+        "p50_ms": 37.191631010500714,
+        "p95_ms": 38.07754014269449,
+        "p99_ms": 38.28459492098773
+      },
+      "total_ms": {
+        "count": 64,
+        "p50_ms": 40.6939024978783,
+        "p95_ms": 41.40006073866971,
+        "p99_ms": 41.709220257471316
+      }
+    }
+  },
+  "sequential_state_indices": [
+    [0],
+    [1],
+    [2],
+    [3],
+    [4],
+    [5],
+    [6],
+    [7]
+  ],
+  "source_states": 8,
+  "scope": {
+    "cpu_reference_unchanged": true,
+    "field_stop_states_remain_sequential": true,
+    "reason": "A configured field stop depends on each state's wavelength-scaled sampling, so unlike states are not batched.",
+    "claim": "Matched local benchmark evidence, not a portable latency guarantee."
+  }
+}

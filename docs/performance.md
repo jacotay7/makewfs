@@ -16,6 +16,25 @@ photon-rate, spectral-rate, and OPD arrays incrementally, avoiding a second
 full-frame stack. These are mathematically equivalent allocation/reduction
 optimizations; temporal samples are still rendered as separate intensities.
 
+On GPU, Shack--Hartmann source states that resolve to the same FFT size are
+propagated in one device batch. State accumulation order and the CPU reference
+remain unchanged. A configured wavelength-scaled field stop keeps states
+sequential because its mask differs with sampling. On a Quadro P620, the
+eight-state, four-temporal-sample HAKA-class path groups the first five
+wavelengths and leaves the other three single. A matched, alternating-order
+64-frame benchmark measured 37.19 ms sequential versus 36.39 ms grouped median
+optics time, a 2.16% reduction. The maximum relative ideal photon-rate
+difference was 5.1e-8. Reproduce it with:
+
+```bash
+python benchmarks/benchmark_sh_state_batching.py path/to/haka-resolved-wfs.toml \
+  --frames 64 --temporal-samples 4
+```
+
+The versioned Quadro P620 record is
+`benchmarks/haka-sh-state-batching-quadro-p620.json`. It is a local matched
+measurement, not a portable latency guarantee.
+
 Install the optional CUDA extra, then set
 `numerics.device = "gpu"` in the WFS TOML:
 

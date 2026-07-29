@@ -16,6 +16,11 @@ All notable changes to `makewfs` are documented here.
 - Accelerated the common two-times Shack--Hartmann detector integration with
   direct flux-preserving strided sums, and made temporal exposure integration
   accumulate rates and OPD incrementally instead of stacking full frame cubes.
+- Batch GPU Shack--Hartmann source states only when they share the same FFT
+  geometry. CPU and wavelength-dependent field-stop execution remain on the
+  sequential reference path. A matched 64-frame Quadro P620 HAKA-class
+  benchmark reduces median optics time by 2.16% with a maximum relative
+  photon-rate difference of 5.1e-8.
 
 ## [1.0.0] - 2026-07-26
 

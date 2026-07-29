@@ -108,3 +108,37 @@ def test_pyturb_gpu_opd_flows_to_shack_hartmann_adu_without_host_copy() -> None:
     assert isinstance(opd_m, cupy.ndarray)
     assert isinstance(frame.data, cupy.ndarray)
     assert isinstance(frame.truth.photon_rate, cupy.ndarray)
+
+
+@pytest.mark.gpu
+def test_broadband_sh_gpu_state_batch_matches_sequential_execution() -> None:
+    cupy = _cupy()
+    data = load_config(
+        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml"
+    ).to_dict()
+    data["numerics"]["device"] = "gpu"
+    config = WFSConfig.from_dict(data)
+    sensor = WavefrontSensor(config)
+    engine = sensor.engine
+    assert any(len(group) > 1 for group in engine._state_groups)
+    rng = cupy.random.RandomState(17)
+    opd = rng.normal(0.0, 8.0e-8, config.input.shape)
+
+    grouped = engine.render(opd)
+    engine._state_groups = tuple((index,) for index in range(len(engine.source_states)))
+    sequential = engine.render(opd)
+
+    np.testing.assert_allclose(
+        cupy.asnumpy(grouped.photon_rate),
+        cupy.asnumpy(sequential.photon_rate),
+        rtol=5e-6,
+        atol=5e-5,
+    )
+    assert grouped.spectral_photon_rate is not None
+    assert sequential.spectral_photon_rate is not None
+    np.testing.assert_allclose(
+        cupy.asnumpy(grouped.spectral_photon_rate),
+        cupy.asnumpy(sequential.spectral_photon_rate),
+        rtol=5e-6,
+        atol=5e-5,
+    )

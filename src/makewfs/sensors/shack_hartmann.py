@@ -171,6 +171,25 @@ class ShackHartmannEngine(SensorEngine):
         self._state_wavelength_indices = tuple(
             wavelength_index[state.wavelength_m] for state in self.source_states
         )
+        self._state_groups = self._build_state_groups()
+
+    def _build_state_groups(self) -> tuple[tuple[int, ...], ...]:
+        """Group GPU states that share one exact focal-plane FFT geometry."""
+        if self.backend.is_cpu or self.settings.field_stop_radius_lambda_over_d is not None:
+            return tuple((index,) for index in range(len(self.source_states)))
+        groups: dict[int, list[int]] = {}
+        for index, sampling in enumerate(self._state_spot_sampling):
+            nfft = self.backend.next_fast_length(
+                max(
+                    self.samples_per_lenslet,
+                    math.ceil(
+                        self.samples_per_lenslet * sampling * self.config.numerics.fft_oversampling
+                    ),
+                    (self.settings.pixels_per_subaperture * self.config.numerics.fft_oversampling),
+                )
+            )
+            groups.setdefault(nfft, []).append(index)
+        return tuple(tuple(indices) for indices in groups.values())
 
     def _make_lenslet_mask(self) -> NDArray[np.float64]:
         """Apply optional square lenslet fill factor to the entrance pupil."""
@@ -245,6 +264,32 @@ class ShackHartmannEngine(SensorEngine):
             ),
         )
 
+    def _fields(
+        self,
+        internal: NDArray[np.float64],
+        state_group: tuple[int, ...],
+    ) -> NDArray[Any]:
+        """Build one device batch for source states sharing FFT geometry."""
+        angles = self.backend.stack([self._field_angle_opd[index] for index in state_group])
+        total_opd = internal[None, ...] + angles
+        piston = total_opd[
+            :,
+            self._piston_index[0],
+            self._piston_index[1],
+        ][:, None, None]
+        wavelengths = self.backend.asarray(
+            [self.source_states[index].wavelength_m for index in state_group],
+            dtype=self._real_dtype,
+        )[:, None, None]
+        phase = 2.0 * math.pi * (total_opd - piston) / wavelengths
+        return cast(
+            NDArray[Any],
+            self.backend.asarray(
+                self.lenslet_mask[None, ...] * self.backend.exp(1j * phase),
+                dtype=self._complex_dtype,
+            ),
+        )
+
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
         internal = self._sample_to_lenslet_grid(internal)
@@ -261,14 +306,30 @@ class ShackHartmannEngine(SensorEngine):
         s = self.samples_per_lenslet
         n = self.n_lenslets
         margin = self.settings.detector_margin_pixels
-        for state_index, state in enumerate(states):
-            field = self._field(internal, state, state_index)
-            subapertures = field.reshape(n, s, n, s).transpose(0, 2, 1, 3).reshape(n * n, s, s)
+        for state_group in self._state_groups:
+            if len(state_group) == 1:
+                subapertures = (
+                    self._field(
+                        internal,
+                        states[state_group[0]],
+                        state_group[0],
+                    )
+                    .reshape(n, s, n, s)
+                    .transpose(0, 2, 1, 3)
+                    .reshape(n * n, s, s)
+                )
+            else:
+                subapertures = (
+                    self._fields(internal, state_group)
+                    .reshape(len(state_group), n, s, n, s)
+                    .transpose(0, 1, 3, 2, 4)
+                    .reshape(len(state_group) * n * n, s, s)
+                )
             spots = spot_intensity(
                 subapertures,
                 pixels=self.settings.pixels_per_subaperture,
                 samples_per_lenslet=s,
-                sampling=self._state_spot_sampling[state_index],
+                sampling=self._state_spot_sampling[state_group[0]],
                 oversampling=self.config.numerics.fft_oversampling,
                 workers=self.config.numerics.fft_workers,
                 field_stop_radius_lambda_over_d=self.settings.field_stop_radius_lambda_over_d,
@@ -276,30 +337,41 @@ class ShackHartmannEngine(SensorEngine):
                 optical_blur_kernel=self._optical_blur_kernel,
                 backend=self.backend,
             )
-            base_mosaic = (
-                spots.reshape(
-                    n,
-                    n,
-                    self.settings.pixels_per_subaperture,
-                    self.settings.pixels_per_subaperture,
-                )
-                .transpose(0, 2, 1, 3)
-                .reshape((self._base_shape, self._base_shape))
+            grouped_spots = spots.reshape(
+                len(state_group),
+                n * n,
+                self.settings.pixels_per_subaperture,
+                self.settings.pixels_per_subaperture,
             )
-            if margin:
-                mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
-                mosaic[
-                    margin : margin + self._base_shape,
-                    margin : margin + self._base_shape,
-                ] = base_mosaic
-            else:
-                mosaic = base_mosaic
-            cropped_flux = self.backend.sum(mosaic)
-            contribution = mosaic * (self.source_rate * state.weight / self._total_field_flux)
-            photon_rate += contribution
-            if spectral_photon_rate is not None:
-                spectral_photon_rate[self._state_wavelength_indices[state_index]] += contribution
-            captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
+            for group_index, state_index in enumerate(state_group):
+                state = states[state_index]
+                base_mosaic = (
+                    grouped_spots[group_index]
+                    .reshape(
+                        n,
+                        n,
+                        self.settings.pixels_per_subaperture,
+                        self.settings.pixels_per_subaperture,
+                    )
+                    .transpose(0, 2, 1, 3)
+                    .reshape((self._base_shape, self._base_shape))
+                )
+                if margin:
+                    mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
+                    mosaic[
+                        margin : margin + self._base_shape,
+                        margin : margin + self._base_shape,
+                    ] = base_mosaic
+                else:
+                    mosaic = base_mosaic
+                cropped_flux = self.backend.sum(mosaic)
+                contribution = mosaic * (self.source_rate * state.weight / self._total_field_flux)
+                photon_rate += contribution
+                if spectral_photon_rate is not None:
+                    spectral_photon_rate[self._state_wavelength_indices[state_index]] += (
+                        contribution
+                    )
+                captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
         if spectral_photon_rate is None:
             spectral_photon_rate = photon_rate[None, ...]
         return OpticalResult(

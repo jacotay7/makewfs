@@ -107,7 +107,7 @@ class WavefrontSensor:
         """
         if self.config.sensor.kind != "shack_hartmann":
             raise ValueError("valid_subapertures is defined only for Shack--Hartmann")
-        return self.engine.lenslet_valid.copy()
+        return cast(ShackHartmannEngine, self.engine).lenslet_valid.copy()
 
     def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
         """Render one wavefront and expose it through the configured detector."""
