@@ -135,6 +135,7 @@ def spot_intensity(
     field_stop_radius_lambda_over_d: float | None = None,
     optical_blur_fwhm_pixels: float = 0.0,
     optical_blur_kernel: NDArray[np.float64] | None = None,
+    charge_diffusion_kernel: NDArray[np.float64] | None = None,
     backend: ArrayBackend | None = None,
 ) -> NDArray[Any]:
     """Propagate lenslet fields and integrate onto ``pixels`` detector pixels.
@@ -142,6 +143,17 @@ def spot_intensity(
     The Fourier pixel scale is ``lambda / D_subap / sampling``.  Zero padding
     by ``oversampling`` improves pixel-area integration while the final block
     sum returns the configured native-pixel grid.
+
+    ``optical_blur_fwhm_pixels`` is a focal-plane optical width in native
+    detector pixels and is applied on the oversampled grid before pixel
+    integration, so sub-pixel widths remain physical. ``optical_blur_kernel`` is
+    a measured native-pitch kernel and is applied after pixel integration.
+
+    ``charge_diffusion_kernel`` is the sensor's lateral charge-diffusion kernel,
+    owned and built by ``getframes`` for this oversampling. Detector physics
+    belongs to ``getframes``; this function only applies the supplied operator at
+    the one sampling where a sub-pixel width is representable, ahead of the
+    pixel-area integration that collects the diffused charge.
     """
     resolved = backend or cpu_backend()
     geometry, geometry_value = spot_sampling_geometry(
@@ -205,14 +217,36 @@ def spot_intensity(
             y - (high_resolution_pixels - 1) / 2.0,
         ) / (oversampling * sampling)
         cropped = cropped * (radius_lambda_over_d <= field_stop_radius_lambda_over_d)
-    native = block_sum(cropped, oversampling, backend=resolved)
     if optical_blur_kernel is not None and optical_blur_fwhm_pixels > 0.0:
         raise ValueError("provide either optical_blur_fwhm_pixels or optical_blur_kernel")
+    if optical_blur_fwhm_pixels > 0.0:
+        # Residual focal-plane optical blur acts on the continuous irradiance
+        # before each pixel integrates over its own area. Convolving the
+        # already-summed native grid instead is unrepresentable for sub-pixel
+        # widths: a sigma below about half a native pixel leaves a discrete
+        # kernel indistinguishable from a delta function, so the configured
+        # value would silently do nothing. Blur the oversampled grid, where the
+        # same physical width is resolved, and let block_sum integrate after.
+        sigma = optical_blur_fwhm_pixels * oversampling / 2.3548200450309493
+        if sigma < 0.5:
+            raise ValueError(
+                "optical_blur_fwhm_pixels "
+                f"{optical_blur_fwhm_pixels} is not representable at "
+                f"numerics.fft_oversampling {oversampling}: it needs a "
+                "focal-plane sigma of at least 0.5 oversampled samples. "
+                "Raise fft_oversampling to at least "
+                f"{math.ceil(0.5 * 2.3548200450309493 / optical_blur_fwhm_pixels)}."
+            )
+        cropped = resolved.gaussian_filter(cropped, sigma=(0.0, sigma, sigma))
+    if charge_diffusion_kernel is not None:
+        # Detector-owned operator, applied last in the focal plane: charge
+        # diffuses in the silicon and only then is collected per pixel below.
+        cropped = resolved.convolve(cropped, resolved.asarray(charge_diffusion_kernel)[None, ...])
+    native = block_sum(cropped, oversampling, backend=resolved)
     if optical_blur_kernel is not None:
+        # A measured kernel is supplied on the native pixel pitch, so it is the
+        # one blur that belongs after pixel integration.
         native = resolved.convolve(native, resolved.asarray(optical_blur_kernel)[None, ...])
-    elif optical_blur_fwhm_pixels > 0.0:
-        sigma = optical_blur_fwhm_pixels / 2.3548200450309493
-        native = resolved.gaussian_filter(native, sigma=(0.0, sigma, sigma))
     # Keep the precision produced by the complex FFT through pixel integration.
     # Sensor-level accumulation intentionally converts to the configured photon
     # rate dtype, but this avoids promoting the large spot batch prematurely.

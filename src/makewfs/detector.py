@@ -11,6 +11,28 @@ from numpy.typing import NDArray
 from .config import DetectorConfig
 
 
+def resolve_camera_config(config: DetectorConfig) -> Any:
+    """Resolve the ``getframes`` camera configuration this detector declares.
+
+    Optics that must know a sensor property before a frame exists -- such as the
+    lateral charge diffusion that acts on the focal-plane irradiance ahead of
+    pixel integration -- read it from here, so the value keeps its single owner
+    in ``getframes`` instead of being restated in WFS configuration.
+    """
+    try:
+        import getframes as gf
+    except ImportError as exc:  # pragma: no cover - dependency is required at install time
+        raise ImportError("makewfs requires getframes for detector frames") from exc
+    if config.preset is not None:
+        return gf.load_preset(config.preset)
+    return gf.CameraConfig.from_dict(config.inline)
+
+
+def charge_diffusion_fwhm_px(config: DetectorConfig) -> float:
+    """Return the sensor's lateral charge-diffusion FWHM in native pixels."""
+    return float(getattr(resolve_camera_config(config), "charge_diffusion_fwhm_px", 0.0))
+
+
 class DetectorAdapter:
     """Own a configured :class:`getframes.Camera` and nothing else."""
 
@@ -32,16 +54,7 @@ class DetectorAdapter:
                     "Camera(..., device='gpu') support"
                 )
             camera_kwargs["device"] = "gpu"
-        if config.preset is not None:
-            camera = gf.Camera.from_preset(
-                config.preset,
-                **camera_kwargs,
-            )
-        else:
-            camera = gf.Camera(
-                gf.CameraConfig.from_dict(config.inline),
-                **camera_kwargs,
-            )
+        camera = gf.Camera(resolve_camera_config(config), **camera_kwargs)
         if config.qe_curve_path is not None:
             camera = camera.with_config(qe_curve=gf.QE.from_file(config.qe_curve_path))
         if config.roi is not None:

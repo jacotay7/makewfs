@@ -14,10 +14,13 @@ from .backend import ArrayBackend, cpu_backend, cupy_backend
 from .config import WFSConfig, load_config
 from .detector import DetectorAdapter
 from .provenance import metadata as build_metadata
+from .pupil import make_pupil
 from .sensors.base import OpticalResult, SensorEngine
 from .sensors.pyramid import PyramidEngine
 from .sensors.shack_hartmann import ShackHartmannEngine
 from .wavefront import iter_phase_samples
+
+_ARCSEC_PER_RADIAN = 206264.80624709636
 
 
 class WavefrontSensor:
@@ -108,6 +111,70 @@ class WavefrontSensor:
         if self.config.sensor.kind != "shack_hartmann":
             raise ValueError("valid_subapertures is defined only for Shack--Hartmann")
         return cast(ShackHartmannEngine, self.engine).lenslet_valid.copy()
+
+    def subaperture_plate_scale_arcsec(self) -> float:
+        """Return the on-sky angle one detector pixel subtends per subaperture.
+
+        Shack--Hartmann only. Derived from the configured spot sampling and the
+        subaperture's own size on sky, so it stays consistent with the geometry
+        that actually forms the spots rather than restating it.
+        """
+        if self.config.sensor.kind != "shack_hartmann":
+            raise ValueError("plate scale is defined only for Shack--Hartmann")
+        engine = cast(ShackHartmannEngine, self.engine)
+        sampling = engine._spot_sampling(self.config.sensor.wavelength_m)
+        subaperture_m = self.config.input.grid_extent_m / engine.n_lenslets
+        lambda_over_d_rad = self.config.sensor.wavelength_m / subaperture_m
+        return float(lambda_over_d_rad / sampling * _ARCSEC_PER_RADIAN)
+
+    def subaperture_field_of_view_arcsec(self) -> float:
+        """Return the on-sky field of view one subaperture's window spans.
+
+        A Shack--Hartmann's detector window is itself a field stop. Each
+        subaperture's spot is formed and integrated only over its own
+        ``pixels_per_subaperture`` block, and the blocks are tiled without
+        overlap, so light beyond this field is neither recorded nor allowed to
+        contaminate a neighbour. An instrument whose physical field stop matches
+        its pixel field is therefore already represented; one whose stop is
+        larger would spill light between subapertures, which this does not
+        model. Reporting the value makes that assumption checkable instead of
+        leaving it implied by the pixel count.
+        """
+        settings = self.config.shack_hartmann
+        if settings is None:
+            raise ValueError("field of view is defined only for Shack--Hartmann")
+        return self.subaperture_plate_scale_arcsec() * settings.pixels_per_subaperture
+
+    def pupil_illumination(self, shape: tuple[int, int] | None = None) -> Any:
+        """Return the configured pupil illumination on a requested grid.
+
+        Consumers that own actuator or wavefront models need the illumination on
+        the same grid their own arrays use, and pupil formation belongs here, so
+        this evaluates the configured telescope pupil on ``shape`` (default
+        ``config.input.shape``) rather than the sensor's internal propagation
+        grid. A configured ``custom_mask_path`` is not resampled: it must already
+        match the requested shape, so supply the mask at that sampling instead of
+        letting a mask be silently interpolated.
+        """
+        resolved = self.config.input.shape if shape is None else shape
+        return make_pupil(
+            self.config.telescope,
+            resolved,
+            self.config.input.grid_extent_m,
+            supersampling=self.config.numerics.pupil_supersampling,
+            backend=self.backend,
+            dtype=np.dtype(self.config.numerics.dtype),
+        )
+
+    @property
+    def charge_diffusion_fwhm_px(self) -> float:
+        """Return the resolved sensor's lateral charge-diffusion FWHM in pixels.
+
+        Charge diffusion is detector physics owned by ``getframes``; this only
+        reports the resolved value, so a consumer recording provenance does not
+        have to restate a detector measurement of its own.
+        """
+        return float(getattr(self.detector.camera.config, "charge_diffusion_fwhm_px", 0.0))
 
     def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
         """Render one wavefront and expose it through the configured detector."""

@@ -58,7 +58,11 @@ height_px = 228
 
 [numerics]
 dtype = "float32"
-fft_oversampling = 2
+# At least 4 focal-plane samples per native pixel, so the OCAM2K preset's
+# measured 0.37-pixel charge diffusion is representable ahead of pixel
+# integration. getframes rejects a width it cannot represent rather than
+# applying nothing.
+fft_oversampling = 4
 fft_workers = 1
 pupil_samples_per_lenslet = 4
 pupil_supersampling = 1

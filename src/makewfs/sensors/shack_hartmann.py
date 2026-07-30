@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from ..backend import ArrayBackend, complex_dtype, real_dtype
 from ..config import WFSConfig
+from ..detector import charge_diffusion_fwhm_px
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
@@ -144,6 +145,7 @@ class ShackHartmannEngine(SensorEngine):
             if self.settings.optical_blur_kernel_path is None
             else load_blur_kernel(self.settings.optical_blur_kernel_path)
         )
+        self._charge_diffusion_kernel = self._resolve_charge_diffusion_kernel()
         base_shape = self.n_lenslets * self.settings.pixels_per_subaperture
         self.output_shape = (
             base_shape + 2 * self.settings.detector_margin_pixels,
@@ -187,6 +189,29 @@ class ShackHartmannEngine(SensorEngine):
             )
             groups.setdefault(geometry, []).append(index)
         return tuple(tuple(indices) for indices in groups.values())
+
+    def _resolve_charge_diffusion_kernel(self) -> NDArray[np.float64] | None:
+        """Ask ``getframes`` for the configured sensor's charge-diffusion kernel.
+
+        The width is a property of the detector, so ``getframes`` owns both the
+        measured value and the kernel model. This engine only needs the operator
+        at its own focal-plane oversampling, because the spots are integrated
+        onto native pixels inside the optical propagation.
+        """
+        fwhm_px = charge_diffusion_fwhm_px(self.config.detector)
+        if fwhm_px <= 0.0:
+            return None
+        import getframes as gf
+
+        if not hasattr(gf, "charge_diffusion_kernel"):
+            raise RuntimeError(
+                "charge_diffusion_fwhm_px requires a getframes version with "
+                "charge_diffusion_kernel support"
+            )
+        kernel = gf.charge_diffusion_kernel(
+            fwhm_px, oversampling=self.config.numerics.fft_oversampling
+        )
+        return cast(NDArray[np.float64], self.backend.asarray(kernel, dtype=self._rate_dtype))
 
     def _make_lenslet_mask(self) -> NDArray[np.float64]:
         """Apply optional square lenslet fill factor to the entrance pupil."""
@@ -334,6 +359,7 @@ class ShackHartmannEngine(SensorEngine):
                 field_stop_radius_lambda_over_d=self.settings.field_stop_radius_lambda_over_d,
                 optical_blur_fwhm_pixels=self.settings.optical_blur_fwhm_pixels,
                 optical_blur_kernel=self._optical_blur_kernel,
+                charge_diffusion_kernel=self._charge_diffusion_kernel,
                 backend=self.backend,
             )
             grouped_spots = spots.reshape(

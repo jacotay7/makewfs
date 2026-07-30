@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from makewfs import WavefrontSensor, load_config
 from makewfs.backend import centered_fft2
@@ -383,6 +384,69 @@ def test_shack_hartmann_field_stop_blur_and_margin_are_optical_settings() -> Non
     assert np.all(configured >= 0)
 
 
+def test_detector_charge_diffusion_reaches_the_spots_and_stays_getframes_owned() -> None:
+    """The sensor's own charge-diffusion width must widen the delivered spots.
+
+    ``makewfs`` owns no diffusion physics: the width and its kernel both come
+    from the ``getframes`` camera configuration. The regression guarded here is a
+    sub-pixel width that survives configuration but is applied where it cannot
+    change anything -- after pixel integration.
+    """
+    import getframes as gf
+
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    # Four focal-plane samples per native pixel make 0.37 px representable.
+    config = replace(config, numerics=replace(config.numerics, fft_oversampling=4))
+    inline = gf.load_preset("generic_cmos").to_dict()
+    plain = np.asarray(
+        WavefrontSensor(
+            replace(config, detector=replace(config.detector, preset=None, inline=inline))
+        ).photon_rate(np.zeros(config.input.shape))
+    )
+    diffused = np.asarray(
+        WavefrontSensor(
+            replace(
+                config,
+                detector=replace(
+                    config.detector,
+                    preset=None,
+                    inline={**inline, "charge_diffusion_fwhm_px": 0.37},
+                ),
+            )
+        ).photon_rate(np.zeros(config.input.shape))
+    )
+    assert diffused.shape == plain.shape
+    assert diffused.sum() == pytest.approx(plain.sum(), rel=1e-3)
+
+    settings = config.shack_hartmann
+    pixels = settings.pixels_per_subaperture
+    lenslets = settings.lenslets_across_pupil
+
+    def peak_fraction(image: np.ndarray) -> float:
+        """Mean fraction of a bright subaperture's flux in its brightest pixel."""
+        cubes = image.reshape(lenslets, pixels, lenslets, pixels).transpose(0, 2, 1, 3)
+        flux = cubes.sum(axis=(2, 3))
+        bright = cubes[flux > 0.5 * flux.max()]
+        return float((bright.max(axis=(1, 2)) / bright.sum(axis=(1, 2))).mean())
+
+    assert peak_fraction(diffused) < peak_fraction(plain)
+
+
+def test_charge_diffusion_below_the_focal_plane_sampling_is_rejected() -> None:
+    import getframes as gf
+
+    config = load_config(SH_CONFIG)
+    inline = {**gf.load_preset("generic_cmos").to_dict(), "charge_diffusion_fwhm_px": 0.37}
+    unrepresentable = replace(
+        config,
+        numerics=replace(config.numerics, fft_oversampling=2),
+        detector=replace(config.detector, preset=None, inline=inline),
+    )
+    with pytest.raises(ValueError, match="samples per native pixel"):
+        WavefrontSensor(unrepresentable)
+
+
 def test_measured_shack_blur_kernel_is_applied(tmp_path: Path) -> None:
     config = load_config(SH_CONFIG)
     assert config.shack_hartmann is not None
@@ -444,3 +508,49 @@ def test_pyramid_detector_margin_is_zero_filled() -> None:
     assert image.shape == (size, size)
     assert np.all(image[:3] == 0)
     assert np.all(image[-3:] == 0)
+
+
+def test_subaperture_field_of_view_matches_the_detector_window() -> None:
+    """The detector window is the field stop, so report what it subtends.
+
+    A Shack--Hartmann forms and integrates each spot only over its own pixel
+    block, and the blocks tile without overlap, so the pixel field *is* a hard
+    square field stop. Reporting it makes that checkable against an instrument's
+    stated stop rather than leaving it implied by the pixel count.
+    """
+    config = load_config(SH_CONFIG)
+    assert config.shack_hartmann is not None
+    sensor = WavefrontSensor(config)
+    scale = sensor.subaperture_plate_scale_arcsec()
+    field = sensor.subaperture_field_of_view_arcsec()
+    assert scale > 0.0
+    assert field == pytest.approx(scale * config.shack_hartmann.pixels_per_subaperture)
+
+    # The plate scale must follow the optics: doubling the lenslet focal length
+    # halves the angle a pixel subtends.
+    longer = replace(
+        config,
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            spot_sampling_pixels_per_lambda_over_d=None,
+            lenslet_pitch_m=0.2e-3,
+            lenslet_focal_length_m=10e-3,
+            detector_pixel_pitch_m=24e-6,
+            relay_magnification=0.48,
+        ),
+    )
+    doubled = replace(
+        longer,
+        shack_hartmann=replace(longer.shack_hartmann, lenslet_focal_length_m=20e-3),
+    )
+    assert WavefrontSensor(doubled).subaperture_plate_scale_arcsec() == pytest.approx(
+        WavefrontSensor(longer).subaperture_plate_scale_arcsec() / 2.0
+    )
+
+
+def test_field_of_view_is_shack_hartmann_only() -> None:
+    sensor = WavefrontSensor(load_config(PYRAMID_CONFIG))
+    with pytest.raises(ValueError, match="Shack--Hartmann"):
+        sensor.subaperture_plate_scale_arcsec()
+    with pytest.raises(ValueError, match="Shack--Hartmann"):
+        sensor.subaperture_field_of_view_arcsec()

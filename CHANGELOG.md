@@ -4,6 +4,44 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Detector charge diffusion now reaches the Shack--Hartmann spots.** The
+  measured OCAM2K value was previously carried as
+  `shack_hartmann.optical_blur_fwhm_pixels` and applied *after* pixel
+  integration, where a 0.37-pixel FWHM Gaussian is a numerical no-op, so a
+  measured detector property changed nothing. Charge diffusion is detector
+  physics, so `getframes` now owns both the value
+  (`CameraConfig.charge_diffusion_fwhm_px`, declared by the `andor_ocam2k`
+  preset) and the kernel model; the Shack--Hartmann engine asks `getframes` for
+  the operator at its own focal-plane oversampling and applies it to the
+  oversampled irradiance ahead of the pixel-area integration that collects the
+  diffused charge. Configuration that cannot represent the width now fails with
+  the required `fft_oversampling` instead of applying nothing.
+  **This changes delivered spot profiles and slope gains** for any detector
+  declaring a nonzero width, so recorded HAKA evidence must be regenerated.
+  `makewfs.charge_diffusion_fwhm_px` and `makewfs.resolve_camera_config` are new
+  public helpers for consumers needing a sensor property before a frame exists.
+- Added `WavefrontSensor.subaperture_plate_scale_arcsec()` and
+  `subaperture_field_of_view_arcsec()`, which report what one detector pixel and
+  one subaperture window subtend on sky. A Shack--Hartmann's pixel block is
+  already a hard square field stop: each spot is formed and integrated only over
+  its own block and the blocks tile without overlap, so light beyond the pixel
+  field neither reaches the detector nor contaminates a neighbour. That was
+  implicit in the pixel count, where a change to `pixels_per_subaperture`, the
+  relay magnification, or the detector margin would move the implied stop
+  silently. Both are derived from the same spot-sampling geometry that forms the
+  spots rather than restating it. Light spilling between subapertures from a
+  physical stop larger than the pixel field remains unmodelled.
+- Added `WavefrontSensor.pupil_illumination(shape=None)`, which evaluates the
+  configured telescope pupil on a requested grid (default the OPD input grid).
+  Consumers that own actuator or wavefront models need the illumination on their
+  own grid, and pupil formation belongs here. A configured `custom_mask_path` is
+  never resampled: it must already match the requested shape.
+- `shack_hartmann.optical_blur_fwhm_pixels` now means genuine focal-plane optical
+  blur only, and is applied on the oversampled grid so sub-pixel widths stay
+  physical. A measured `optical_blur_kernel_path` is supplied on the native pixel
+  pitch and still applies after pixel integration.
+- The HAKA example raises `fft_oversampling` from 2 to 4, the minimum that
+  represents the OCAM2K's measured 0.37-pixel charge diffusion.
 - Fixed arbitrary Shack--Hartmann spot sampling so normalized plate scales no
   longer snap to a nearby integer FFT grid. Integer-compatible geometries retain
   the FFT path; arbitrary and undersampled quadcell modes use a sampled DFT at
