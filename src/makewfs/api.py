@@ -222,6 +222,41 @@ class WavefrontSensor:
         """Expose one detector frame after uniformly averaging temporal OPD samples."""
         total_start = perf_counter()
         optical_start = total_start
+        batched = getattr(self.engine, "render_integrated", None)
+        if callable(batched):
+            # An engine that can render the whole exposure at once does so far
+            # more cheaply than one call per sample, because the per-call
+            # dispatch cost dominates the arithmetic. The sequential path below
+            # remains the reference and is still used by engines without it.
+            samples = list(
+                iter_phase_samples(phase_samples, self.config.input.shape, backend=self.backend)
+            )
+            if not samples:
+                raise ValueError("phase_samples must contain at least one sample")
+            result = batched(samples)
+            captured_rate, opd_rms = self.backend.scalars(
+                result.captured_rate_per_s, self._opd_rms(result.opd_m)
+            )
+            frame_metadata = self._frame_metadata(
+                launched_rate=result.launched_rate_per_s,
+                captured_rate=captured_rate,
+                opd_rms_m=opd_rms,
+                seed=seed,
+            )
+            frame_metadata["wfs_temporal_samples"] = len(samples)
+            optical_elapsed = perf_counter() - optical_start
+            detector_start = perf_counter()
+            frame = self.detector.expose(
+                result.photon_rate,
+                metadata=frame_metadata,
+                seed=seed,
+                spectral_photon_rate=result.spectral_photon_rate,
+                spectral_wavelengths_m=result.spectral_wavelengths_m,
+            )
+            frame.metadata["wfs_optical_render_s"] = optical_elapsed
+            frame.metadata["wfs_detector_expose_s"] = perf_counter() - detector_start
+            frame.metadata["wfs_total_expose_s"] = perf_counter() - total_start
+            return frame
         rate_sum: Any | None = None
         spectral_rate_sum: Any | None = None
         spectral_wavelengths_m: tuple[float, ...] | None = None
