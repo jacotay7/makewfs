@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from typing import Any, cast
 
 import numpy as np
@@ -292,17 +293,28 @@ class ShackHartmannEngine(SensorEngine):
         self,
         internal: NDArray[np.float64],
         state_group: tuple[int, ...],
+        *,
+        samples: int = 1,
     ) -> NDArray[Any]:
-        """Build one device batch for source states sharing FFT geometry."""
+        """Build one device batch for source states sharing FFT geometry.
+
+        With ``samples`` greater than one, ``internal`` carries a leading
+        temporal axis and the returned batch is ordered ``(sample, state)``.
+        """
         angles = self.backend.stack([self._field_angle_opd[index] for index in state_group])
-        total_opd = internal[None, ...] + angles
+        if samples > 1:
+            total_opd = (internal[:, None, ...] + angles[None, ...]).reshape(
+                samples * len(state_group), *internal.shape[1:]
+            )
+        else:
+            total_opd = internal[None, ...] + angles
         piston = total_opd[
             :,
             self._piston_index[0],
             self._piston_index[1],
         ][:, None, None]
         wavelengths = self.backend.asarray(
-            [self.source_states[index].wavelength_m for index in state_group],
+            [self.source_states[index].wavelength_m for index in state_group] * samples,
             dtype=self._real_dtype,
         )[:, None, None]
         phase = 2.0 * math.pi * (total_opd - piston) / wavelengths
@@ -315,8 +327,39 @@ class ShackHartmannEngine(SensorEngine):
         )
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
-        internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
-        internal = self._sample_to_lenslet_grid(internal)
+        return self._render_samples([wavefront])
+
+    def render_integrated(self, wavefronts: Sequence[NDArray[np.float64]]) -> OpticalResult:
+        """Render several temporal OPD samples as one uniformly weighted average.
+
+        Identical in result to rendering each sample and averaging the photon
+        rates, and much cheaper. The cost of a render is not its transforms --
+        those are a few percent -- but the fixed dispatch cost of the many small
+        elementwise operations around them, which is paid per call regardless of
+        how much data each call carries. Presenting every temporal sample to one
+        call amortises that cost over all of them.
+
+        The averaging is legitimate to do early because everything downstream of
+        the spot intensities is linear in them: reshaping into the mosaic,
+        scaling by source flux, and summing. Averaging the spots and then
+        scaling is therefore the same arithmetic as scaling and then averaging,
+        which is what the caller-side loop used to do.
+        """
+        if not wavefronts:
+            raise ValueError("render_integrated requires at least one sample")
+        return self._render_samples(wavefronts)
+
+    def _render_samples(self, wavefronts: Sequence[NDArray[np.float64]]) -> OpticalResult:
+        internal_samples = [
+            self._sample_to_lenslet_grid(
+                self.wavefront.opd(wavefront, target_shape=self.internal_shape)
+            )
+            for wavefront in wavefronts
+        ]
+        sample_count = len(internal_samples)
+        internal = (
+            internal_samples[0] if sample_count == 1 else self.backend.stack(internal_samples)
+        )
         states = self.source_states
         photon_rate = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
         spectral_photon_rate = (
@@ -331,7 +374,7 @@ class ShackHartmannEngine(SensorEngine):
         n = self.n_lenslets
         margin = self.settings.detector_margin_pixels
         for state_group in self._state_groups:
-            if len(state_group) == 1:
+            if sample_count == 1 and len(state_group) == 1:
                 subapertures = (
                     self._field(
                         internal,
@@ -343,11 +386,13 @@ class ShackHartmannEngine(SensorEngine):
                     .reshape(n * n, s, s)
                 )
             else:
+                # Leading axis is (sample, state), flattened into the batch the
+                # transform already accepts.
                 subapertures = (
-                    self._fields(internal, state_group)
-                    .reshape(len(state_group), n, s, n, s)
+                    self._fields(internal, state_group, samples=sample_count)
+                    .reshape(sample_count * len(state_group), n, s, n, s)
                     .transpose(0, 1, 3, 2, 4)
-                    .reshape(len(state_group) * n * n, s, s)
+                    .reshape(sample_count * len(state_group) * n * n, s, s)
                 )
             spots = spot_intensity(
                 subapertures,
@@ -363,11 +408,15 @@ class ShackHartmannEngine(SensorEngine):
                 backend=self.backend,
             )
             grouped_spots = spots.reshape(
+                sample_count,
                 len(state_group),
                 n * n,
                 self.settings.pixels_per_subaperture,
                 self.settings.pixels_per_subaperture,
             )
+            # The uniform temporal average, taken here rather than by the
+            # caller because everything below is linear in these spots.
+            grouped_spots = grouped_spots.mean(axis=0) if sample_count > 1 else grouped_spots[0]
             for group_index, state_index in enumerate(state_group):
                 state = states[state_index]
                 base_mosaic = (
@@ -399,11 +448,21 @@ class ShackHartmannEngine(SensorEngine):
                 captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
         if spectral_photon_rate is None:
             spectral_photon_rate = photon_rate[None, ...]
+        # The reported OPD is the exposure's mean, matching the mean photon rate
+        # the detector is handed; a single sample is its own mean.
+        opd = (
+            wavefronts[0]
+            if sample_count == 1
+            else self.backend.mean(
+                self.backend.stack([self.backend.asarray(sample) for sample in wavefronts]),
+                axis=0,
+            )
+        )
         return OpticalResult(
             photon_rate,
             self.source_rate,
             captured,
-            wavefront,
+            opd,
             spectral_photon_rate,
             self._wavelengths,
         )

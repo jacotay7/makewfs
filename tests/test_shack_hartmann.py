@@ -151,3 +151,54 @@ def test_expose_many_is_streaming_and_seeded() -> None:
     assert not np.array_equal(np.asarray(frames[0]), np.asarray(frames[1]))
     repeated = list(sensor.expose_many(phases, seeds=[11, 12]))
     assert np.array_equal(np.asarray(frames[0]), np.asarray(repeated[0]))
+
+
+def test_batched_render_matches_rendering_each_sample_separately() -> None:
+    """The batched exposure path must be the sequential one, not an approximation.
+
+    Rendering every temporal sample in one call is a performance change only:
+    it exists because the per-call dispatch cost dominates the arithmetic, not
+    because the arithmetic differs. Everything downstream of the spot
+    intensities is linear in them, which is what makes averaging them early
+    legitimate -- and this asserts that the linearity argument actually holds
+    through the mosaic, the flux scaling and the captured-rate accounting,
+    rather than only in principle.
+
+    The tolerance is float round-off from a different summation order, not a
+    modelling allowance.
+    """
+    sensor = _sensor()
+    engine = sensor.engine
+    generator = np.random.default_rng(11)
+    samples = [2e-7 * generator.standard_normal(sensor.config.input.shape) for _ in range(4)]
+
+    separate = [engine.render(sample) for sample in samples]
+    batched = engine.render_integrated(samples)
+
+    expected_rate = np.mean([np.asarray(r.photon_rate) for r in separate], axis=0)
+    np.testing.assert_allclose(np.asarray(batched.photon_rate), expected_rate, rtol=1e-5, atol=0.0)
+    expected_spectral = np.mean([np.asarray(r.spectral_photon_rate) for r in separate], axis=0)
+    np.testing.assert_allclose(
+        np.asarray(batched.spectral_photon_rate), expected_spectral, rtol=1e-5, atol=0.0
+    )
+    expected_captured = np.mean([float(r.captured_rate_per_s) for r in separate])
+    assert float(batched.captured_rate_per_s) == pytest.approx(expected_captured, rel=1e-5)
+    # The reported OPD is the exposure mean, matching the mean photon rate.
+    np.testing.assert_allclose(
+        np.asarray(batched.opd_m), np.mean(samples, axis=0), rtol=1e-6, atol=0.0
+    )
+
+
+def test_batched_render_of_one_sample_is_the_single_render() -> None:
+    sensor = _sensor()
+    engine = sensor.engine
+    sample = np.zeros(sensor.config.input.shape)
+    np.testing.assert_allclose(
+        np.asarray(engine.render_integrated([sample]).photon_rate),
+        np.asarray(engine.render(sample).photon_rate),
+    )
+
+
+def test_batched_render_rejects_an_empty_exposure() -> None:
+    with pytest.raises(ValueError, match="at least one sample"):
+        _sensor().engine.render_integrated([])

@@ -4,6 +4,24 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **A temporally integrated exposure now renders its samples in one pass.**
+  `ShackHartmannEngine.render_integrated` builds the fields for every
+  (temporal sample, source state) pair as a single batch, and
+  `expose_integrated` uses it when the engine provides it. The motivation is
+  not transform size: on a HAKA-scale configuration the transforms are about
+  four percent of a render, and the cost is dominated by the fixed dispatch
+  overhead of the many small elementwise operations around them, which is paid
+  per call however much data the call carries. Presenting the whole exposure at
+  once amortises that: the reference HAKA exposure drops from 13.7 ms to
+  11.2 ms.
+
+  Averaging the spot intensities before the mosaic is legitimate because
+  everything downstream of them -- mosaic assembly, flux scaling, and the
+  captured-rate accounting -- is linear in the spots, and there is a test
+  asserting the batched and sequential paths agree rather than leaving that as
+  an argument. Agreement is to float round-off from the changed summation
+  order, about 1e-7 relative in single precision, not bit-for-bit.
+
 - **Detector charge diffusion now reaches the Shack--Hartmann spots.** The
   measured OCAM2K value was previously carried as
   `shack_hartmann.optical_blur_fwhm_pixels` and applied *after* pixel
