@@ -84,6 +84,11 @@ sensors use native orthonormal FFT scaling, a fixed illuminated piston reference
 and batched metadata scalar transfers. The GPU detector improvements described
 in `getframes` are included in every end-to-end row.
 
+Persistent Shack--Hartmann engines also cache half-sample ramps, sampled-DFT
+kernels, field-stop masks, and backend blur kernels. This targets geometry-heavy
+field-stop and arbitrary-sampling cases; the dominant plain large-FFT path keeps
+the same transform workload and should not be expected to change materially.
+
 Pyramid behavior still shows the GPU crossover clearly: launch overhead makes
 the tiny unmodulated case slower, eight modulation points provide a 2.36x gain,
 and the 32-point float64 case reaches 27.2x. The broadband LGS case has nine

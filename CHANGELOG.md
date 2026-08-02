@@ -4,6 +4,11 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Persistent Shack--Hartmann sensors now cache propagation geometry.** Half-sample
+  FFT ramps, sampled-DFT kernels, field-stop masks, and backend blur kernels are
+  built once per compatible source geometry instead of once per frame. The ordinary
+  large FFT path is intentionally unchanged; matched local timings improved the
+  geometry-heavy field-stop/DFT paths by roughly 6--20% with optical parity tests.
 - **A temporally integrated exposure now renders its samples in one pass.**
   `ShackHartmannEngine.render_integrated` builds the fields for every
   (temporal sample, source state) pair as a single batch, and

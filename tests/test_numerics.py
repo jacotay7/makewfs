@@ -11,12 +11,20 @@ from makewfs.backend import (
     centered_fft_intensity,
     centered_ifft2,
     complex_dtype,
+    cpu_backend,
     real_dtype,
 )
 from makewfs.config import SourceConfig, SpiderConfig, TelescopeConfig
 from makewfs.pupil import make_pupil
 from makewfs.radiometry import source_rate_per_s
-from makewfs.sampling import block_sum, crop_center, load_blur_kernel, pad_center, spot_intensity
+from makewfs.sampling import (
+    _SpotPropagationPlan,
+    block_sum,
+    crop_center,
+    load_blur_kernel,
+    pad_center,
+    spot_intensity,
+)
 
 
 def test_centered_fft_roundtrip_and_dtype() -> None:
@@ -53,6 +61,35 @@ def test_spot_integration_preserves_float32_batch_precision() -> None:
         workers=1,
     )
     assert spots.dtype == np.float32
+
+
+def test_cached_spot_propagation_plan_preserves_optics() -> None:
+    rng = np.random.default_rng(19)
+    field = (rng.normal(size=(3, 8, 8)) + 1j * rng.normal(size=(3, 8, 8))).astype(np.complex128)
+    kwargs = {
+        "pixels": 4,
+        "samples_per_lenslet": 8,
+        "sampling": 0.91,
+        "oversampling": 2,
+        "workers": 1,
+        "field_stop_radius_lambda_over_d": 0.8,
+    }
+    plan = _SpotPropagationPlan.build(
+        field_dtype=field.dtype,
+        optical_blur_kernel=None,
+        charge_diffusion_kernel=None,
+        backend=cpu_backend(),
+        pixels=kwargs["pixels"],
+        samples_per_lenslet=kwargs["samples_per_lenslet"],
+        sampling=kwargs["sampling"],
+        oversampling=kwargs["oversampling"],
+        field_stop_radius_lambda_over_d=kwargs["field_stop_radius_lambda_over_d"],
+    )
+    reference = spot_intensity(field, **kwargs)
+    cached = spot_intensity(field, _plan=plan, **kwargs)
+    np.testing.assert_allclose(cached, reference, rtol=1e-13, atol=1e-13)
+    with pytest.raises(ValueError, match="does not match"):
+        spot_intensity(field, _plan=plan, **{**kwargs, "field_stop_radius_lambda_over_d": None})
 
 
 def test_even_quadcell_is_centered_on_four_pixels_for_flat_wavefront() -> None:

@@ -15,7 +15,12 @@ from ..detector import charge_diffusion_fwhm_px
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
-from ..sampling import load_blur_kernel, spot_intensity, spot_sampling_geometry
+from ..sampling import (
+    _SpotPropagationPlan,
+    load_blur_kernel,
+    spot_intensity,
+    spot_sampling_geometry,
+)
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
@@ -175,6 +180,7 @@ class ShackHartmannEngine(SensorEngine):
             wavelength_index[state.wavelength_m] for state in self.source_states
         )
         self._state_groups = self._build_state_groups()
+        self._spot_plans = self._build_spot_plans()
 
     def _build_state_groups(self) -> tuple[tuple[int, ...], ...]:
         """Group GPU states that share one exact focal-plane FFT geometry."""
@@ -190,6 +196,39 @@ class ShackHartmannEngine(SensorEngine):
             )
             groups.setdefault(geometry, []).append(index)
         return tuple(tuple(indices) for indices in groups.values())
+
+    def _build_spot_plans(self) -> tuple[_SpotPropagationPlan, ...]:
+        """Cache geometry-only propagation arrays for each source state."""
+        plans: dict[tuple[str, int | float, float | None], _SpotPropagationPlan] = {}
+        keys: list[tuple[str, int | float, float | None]] = []
+        field_stop = self.settings.field_stop_radius_lambda_over_d
+        for sampling in self._state_spot_sampling:
+            geometry = spot_sampling_geometry(
+                pixels=self.settings.pixels_per_subaperture,
+                samples_per_lenslet=self.samples_per_lenslet,
+                sampling=sampling,
+                oversampling=self.config.numerics.fft_oversampling,
+            )
+            # For an ordinary FFT without a field stop, sampling does not enter
+            # the transform geometry. Sharing that plan avoids duplicate ramps.
+            sampling_key = (
+                float(sampling) if geometry[0] == "dft" or field_stop is not None else None
+            )
+            key = (geometry[0], geometry[1], sampling_key)
+            keys.append(key)
+            if key not in plans:
+                plans[key] = _SpotPropagationPlan.build(
+                    pixels=self.settings.pixels_per_subaperture,
+                    samples_per_lenslet=self.samples_per_lenslet,
+                    sampling=sampling,
+                    oversampling=self.config.numerics.fft_oversampling,
+                    field_dtype=self._complex_dtype,
+                    field_stop_radius_lambda_over_d=field_stop,
+                    optical_blur_kernel=self._optical_blur_kernel,
+                    charge_diffusion_kernel=self._charge_diffusion_kernel,
+                    backend=self.backend,
+                )
+        return tuple(plans[key] for key in keys)
 
     def _resolve_charge_diffusion_kernel(self) -> NDArray[np.float64] | None:
         """Ask ``getframes`` for the configured sensor's charge-diffusion kernel.
@@ -405,6 +444,7 @@ class ShackHartmannEngine(SensorEngine):
                 optical_blur_fwhm_pixels=self.settings.optical_blur_fwhm_pixels,
                 optical_blur_kernel=self._optical_blur_kernel,
                 charge_diffusion_kernel=self._charge_diffusion_kernel,
+                _plan=self._spot_plans[state_group[0]],
                 backend=self.backend,
             )
             grouped_spots = spots.reshape(

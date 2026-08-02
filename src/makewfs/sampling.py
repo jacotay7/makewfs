@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -124,6 +125,145 @@ def block_sum(
     return cast(NDArray[Any], resolved.sum(reduced_x, axis=-2))
 
 
+@dataclass
+class _SpotPropagationPlan:
+    """Cached backend-resident geometry for repeated spot propagation.
+
+    The optical transform still receives a fresh field and output on every call,
+    but all geometry-only arrays are constructed once for a persistent sensor.
+    Keeping this private avoids making backend/device arrays part of the public
+    configuration model.
+    """
+
+    backend: ArrayBackend
+    pixels: int
+    samples_per_lenslet: int
+    sampling: float
+    oversampling: int
+    field_dtype: np.dtype[Any]
+    geometry: str
+    geometry_value: int | float
+    high_resolution_pixels: int
+    field_stop_radius_lambda_over_d: float | None
+    half_sample: Any | None = None
+    dft_kernel: Any | None = None
+    field_stop_mask: Any | None = None
+    optical_blur_kernel: Any | None = None
+    charge_diffusion_kernel: Any | None = None
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        pixels: int,
+        samples_per_lenslet: int,
+        sampling: float,
+        oversampling: int,
+        field_dtype: Any,
+        field_stop_radius_lambda_over_d: float | None,
+        optical_blur_kernel: NDArray[np.float64] | None,
+        charge_diffusion_kernel: NDArray[np.float64] | None,
+        backend: ArrayBackend,
+    ) -> _SpotPropagationPlan:
+        """Build backend-resident geometry once for one optical state."""
+        geometry, geometry_value = spot_sampling_geometry(
+            pixels=pixels,
+            samples_per_lenslet=samples_per_lenslet,
+            sampling=sampling,
+            oversampling=oversampling,
+        )
+        high_resolution_pixels = pixels * oversampling
+        plan = cls(
+            backend=backend,
+            pixels=pixels,
+            samples_per_lenslet=samples_per_lenslet,
+            sampling=float(sampling),
+            oversampling=oversampling,
+            field_dtype=np.dtype(field_dtype),
+            geometry=geometry,
+            geometry_value=geometry_value,
+            high_resolution_pixels=high_resolution_pixels,
+            field_stop_radius_lambda_over_d=(
+                None
+                if field_stop_radius_lambda_over_d is None
+                else float(field_stop_radius_lambda_over_d)
+            ),
+            optical_blur_kernel=(
+                None if optical_blur_kernel is None else backend.asarray(optical_blur_kernel)
+            ),
+            charge_diffusion_kernel=(
+                None
+                if charge_diffusion_kernel is None
+                else backend.asarray(charge_diffusion_kernel)
+            ),
+        )
+        if geometry == "fft":
+            nfft = int(geometry_value)
+            if high_resolution_pixels % 2 == 0:
+                coordinate = backend.arange(nfft, dtype=np.float64)
+                plan.half_sample = backend.exp(-1j * math.pi * coordinate / nfft)
+        else:
+            detector_coordinate = (
+                backend.arange(high_resolution_pixels, dtype=np.float64)
+                - (high_resolution_pixels - 1) / 2.0
+            ) / (sampling * oversampling)
+            pupil_coordinate = backend.arange(samples_per_lenslet, dtype=np.float64)
+            kernel = backend.exp(
+                -2j
+                * math.pi
+                * detector_coordinate[:, None]
+                * pupil_coordinate[None, :]
+                / samples_per_lenslet
+            )
+            plan.dft_kernel = backend.astype(kernel, plan.field_dtype)
+        if field_stop_radius_lambda_over_d is not None:
+            coordinates = backend.arange(high_resolution_pixels, dtype=np.float64)
+            y, x = backend.meshgrid(coordinates, coordinates, indexing="ij")
+            radius_lambda_over_d = backend.hypot(
+                x - (high_resolution_pixels - 1) / 2.0,
+                y - (high_resolution_pixels - 1) / 2.0,
+            ) / (oversampling * sampling)
+            plan.field_stop_mask = radius_lambda_over_d <= field_stop_radius_lambda_over_d
+        return plan
+
+    def validate(
+        self,
+        field: NDArray[Any],
+        *,
+        pixels: int,
+        samples_per_lenslet: int,
+        sampling: float,
+        oversampling: int,
+        backend: ArrayBackend,
+        field_stop_radius_lambda_over_d: float | None,
+        optical_blur_kernel: NDArray[np.float64] | None,
+        charge_diffusion_kernel: NDArray[np.float64] | None,
+    ) -> None:
+        """Reject accidental use of a plan for a different physical geometry."""
+        if (
+            self.backend is not backend
+            or self.pixels != pixels
+            or self.samples_per_lenslet != samples_per_lenslet
+            or self.oversampling != oversampling
+            or self.field_dtype != np.dtype(field.dtype)
+            or (
+                self.field_stop_radius_lambda_over_d
+                != (
+                    None
+                    if field_stop_radius_lambda_over_d is None
+                    else float(field_stop_radius_lambda_over_d)
+                )
+            )
+            or ((self.optical_blur_kernel is None) != (optical_blur_kernel is None))
+            or ((self.charge_diffusion_kernel is None) != (charge_diffusion_kernel is None))
+            or (
+                (self.geometry == "dft" or self.field_stop_mask is not None)
+                and self.sampling != float(sampling)
+            )
+        ):
+            raise ValueError("spot propagation plan does not match the requested geometry")
+
+
 def spot_intensity(
     field: NDArray[Any],
     *,
@@ -136,6 +276,7 @@ def spot_intensity(
     optical_blur_fwhm_pixels: float = 0.0,
     optical_blur_kernel: NDArray[np.float64] | None = None,
     charge_diffusion_kernel: NDArray[np.float64] | None = None,
+    _plan: _SpotPropagationPlan | None = None,
     backend: ArrayBackend | None = None,
 ) -> NDArray[Any]:
     """Propagate lenslet fields and integrate onto ``pixels`` detector pixels.
@@ -156,25 +297,42 @@ def spot_intensity(
     pixel-area integration that collects the diffused charge.
     """
     resolved = backend or cpu_backend()
-    geometry, geometry_value = spot_sampling_geometry(
+    plan = _plan or _SpotPropagationPlan.build(
         pixels=pixels,
         samples_per_lenslet=samples_per_lenslet,
         sampling=sampling,
         oversampling=oversampling,
+        field_dtype=field.dtype,
+        field_stop_radius_lambda_over_d=field_stop_radius_lambda_over_d,
+        optical_blur_kernel=optical_blur_kernel,
+        charge_diffusion_kernel=charge_diffusion_kernel,
+        backend=resolved,
     )
-    high_resolution_pixels = pixels * oversampling
+    plan.validate(
+        field,
+        pixels=pixels,
+        samples_per_lenslet=samples_per_lenslet,
+        sampling=sampling,
+        oversampling=oversampling,
+        backend=resolved,
+        field_stop_radius_lambda_over_d=field_stop_radius_lambda_over_d,
+        optical_blur_kernel=optical_blur_kernel,
+        charge_diffusion_kernel=charge_diffusion_kernel,
+    )
+    geometry = plan.geometry
+    geometry_value = plan.geometry_value
+    high_resolution_pixels = plan.high_resolution_pixels
     if geometry == "fft":
         nfft = int(geometry_value)
         padded = pad_center(field, (nfft, nfft), backend=resolved)
-        if high_resolution_pixels % 2 == 0:
+        if plan.half_sample is not None:
             # An even detector has its optical axis on the boundary shared by its
             # central four pixels. Evaluate the Fourier transform at half-integer
             # frequency samples so equal-area integration is exactly symmetric
             # around that boundary. The pupil-plane phase ramp performs the
             # half-sample Fourier shift without interpolating intensity or changing
             # flux. Its sign only selects the equivalent half-pixel sampling branch.
-            coordinate = resolved.arange(nfft, dtype=np.float64)
-            half_sample = resolved.exp(-1j * math.pi * coordinate / nfft)
+            half_sample = plan.half_sample
             padded *= half_sample[None, :, None] * half_sample[None, None, :]
         intensity = centered_fft_intensity(
             padded,
@@ -193,30 +351,12 @@ def spot_intensity(
         # points. This preserves arbitrary normalized sampling, including
         # quadcell pixels wider than lambda/D, without silently snapping the
         # physical scale to a nearby integer FFT grid.
-        detector_coordinate = (
-            resolved.arange(high_resolution_pixels, dtype=np.float64)
-            - (high_resolution_pixels - 1) / 2.0
-        ) / (sampling * oversampling)
-        pupil_coordinate = resolved.arange(samples_per_lenslet, dtype=np.float64)
-        kernel = resolved.exp(
-            -2j
-            * math.pi
-            * detector_coordinate[:, None]
-            * pupil_coordinate[None, :]
-            / samples_per_lenslet
-        )
-        kernel = resolved.astype(kernel, field.dtype)
-        transformed = resolved.matmul(resolved.matmul(kernel, field), kernel.T)
+        assert plan.dft_kernel is not None
+        transformed = resolved.matmul(resolved.matmul(plan.dft_kernel, field), plan.dft_kernel.T)
         ideal_nfft = samples_per_lenslet * sampling * oversampling
         cropped = resolved.abs(transformed / ideal_nfft) ** 2
-    if field_stop_radius_lambda_over_d is not None:
-        coordinates = resolved.arange(high_resolution_pixels, dtype=np.float64)
-        y, x = resolved.meshgrid(coordinates, coordinates, indexing="ij")
-        radius_lambda_over_d = resolved.hypot(
-            x - (high_resolution_pixels - 1) / 2.0,
-            y - (high_resolution_pixels - 1) / 2.0,
-        ) / (oversampling * sampling)
-        cropped = cropped * (radius_lambda_over_d <= field_stop_radius_lambda_over_d)
+    if plan.field_stop_mask is not None:
+        cropped = cropped * plan.field_stop_mask
     if optical_blur_kernel is not None and optical_blur_fwhm_pixels > 0.0:
         raise ValueError("provide either optical_blur_fwhm_pixels or optical_blur_kernel")
     if optical_blur_fwhm_pixels > 0.0:
@@ -238,15 +378,15 @@ def spot_intensity(
                 f"{math.ceil(0.5 * 2.3548200450309493 / optical_blur_fwhm_pixels)}."
             )
         cropped = resolved.gaussian_filter(cropped, sigma=(0.0, sigma, sigma))
-    if charge_diffusion_kernel is not None:
+    if plan.charge_diffusion_kernel is not None:
         # Detector-owned operator, applied last in the focal plane: charge
         # diffuses in the silicon and only then is collected per pixel below.
-        cropped = resolved.convolve(cropped, resolved.asarray(charge_diffusion_kernel)[None, ...])
+        cropped = resolved.convolve(cropped, plan.charge_diffusion_kernel[None, ...])
     native = block_sum(cropped, oversampling, backend=resolved)
-    if optical_blur_kernel is not None:
+    if plan.optical_blur_kernel is not None:
         # A measured kernel is supplied on the native pixel pitch, so it is the
         # one blur that belongs after pixel integration.
-        native = resolved.convolve(native, resolved.asarray(optical_blur_kernel)[None, ...])
+        native = resolved.convolve(native, plan.optical_blur_kernel[None, ...])
     # Keep the precision produced by the complex FFT through pixel integration.
     # Sensor-level accumulation intentionally converts to the configured photon
     # rate dtype, but this avoids promoting the large spot batch prematurely.
