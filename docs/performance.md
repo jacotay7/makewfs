@@ -126,6 +126,16 @@ Each returned detector frame also records `wfs_optical_render_s`,
 diagnostics for a closed-loop driver, not scheduling guarantees or controller
 abstractions.
 
+Sequential pipeline owners may provide a backend-native `uint32` `out=` array
+to `WavefrontSensor.expose()` or `expose_integrated()`. The detector adapter uses
+a reusable `getframes.DetectorWorkspace` only for this explicit path, preserving
+independent frame lifetimes for ordinary calls. The returned `Frame.data` is the
+exact destination and remains valid only until the caller reuses it. On the local
+i7-10700, the physical OCAM2K 240×240 detector / 228×228 ROI case improved
+1.205× and cut traced peak allocation by 49.5%. Isolated Quadro P620 detector
+timing and a three-pair full AO-loop trial were throughput-neutral, so the
+supported GPU graph does not enable the destination automatically.
+
 Representative Shack–Hartmann configurations are provided under
 `benchmarks/configs/`:
 

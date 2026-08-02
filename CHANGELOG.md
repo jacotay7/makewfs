@@ -4,6 +4,12 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- `WavefrontSensor.expose()` and `expose_integrated()` now accept an optional
+  caller-owned detector `out` array. The detector adapter pairs it with
+  `getframes.DetectorWorkspace`, including wavelength-resolved exposures, so a
+  high-rate owner can keep one stable contiguous ADU destination. Ordinary calls
+  retain independent frame lifetimes; only explicit `out` calls alias the
+  caller's storage.
 - **Persistent Shack--Hartmann sensors now cache propagation geometry.** Half-sample
   FFT ramps, sampled-DFT kernels, field-stop masks, and backend blur kernels are
   built once per compatible source geometry instead of once per frame. The ordinary

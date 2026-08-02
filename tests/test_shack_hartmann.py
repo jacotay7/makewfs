@@ -64,6 +64,18 @@ def test_seeded_detector_frame_repeats() -> None:
     assert np.array_equal(first, second)
 
 
+def test_caller_owned_detector_output_is_exact_and_seeded() -> None:
+    sensor = _sensor()
+    phase = np.zeros(sensor.config.input.shape)
+    reference = sensor.expose(phase, seed=4)
+    out = np.empty(sensor.engine.output_shape, dtype=np.uint32)
+
+    frame = sensor.expose(phase, seed=4, out=out)
+
+    assert frame.data is out
+    np.testing.assert_array_equal(frame.data, reference.data)
+
+
 def test_frame_records_optical_and_detector_timings() -> None:
     sensor = _sensor()
     frame = sensor.expose(np.zeros(sensor.config.input.shape), seed=3)

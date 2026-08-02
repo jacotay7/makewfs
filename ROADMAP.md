@@ -719,6 +719,11 @@ accepts only wavefront plus config.
   input size, modulation/wavelength samples, construction time, warm latency,
   throughput, and Python-level peak memory. The snapshot documents that C-level
   allocator accounting remains a future metric.
+- [x] Thread the public `getframes.DetectorWorkspace` and caller-owned ADU
+  destination through scalar/spectral and temporal detector handoffs. Preserve
+  default independent frame lifetimes; validate exact seeded output and CPU/GPU
+  storage. Local physical-ROI evidence improves CPU latency 17.0%; the neutral
+  Quadro P620 result remains opt-in and is not claimed as a GPU speedup.
 
 **Exit:** CPU behavior is measured and optimized, and SH/PWFS can run through the
 detector on GPU without an architectural rewrite.

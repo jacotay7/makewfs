@@ -75,6 +75,8 @@ class DetectorAdapter:
         self.config = config
         self.optical_shape = optical_shape
         self.device = device
+        workspace_type = getattr(gf, "DetectorWorkspace", None)
+        self._workspace = None if workspace_type is None else workspace_type()
 
     def _detector_array(self, value: Any) -> Any:
         """Preserve device arrays; normalise CPU inputs to NumPy."""
@@ -85,6 +87,7 @@ class DetectorAdapter:
         photon_rate: NDArray[Any],
         *,
         seed: int | None,
+        out: Any | None,
     ) -> Any:
         kwargs: dict[str, Any] = {
             "seed": seed,
@@ -92,6 +95,14 @@ class DetectorAdapter:
             "binning": self.config.binning,
             "binning_mode": self.config.binning_mode,
         }
+        if out is not None:
+            if self._workspace is None:
+                raise RuntimeError(
+                    "caller-owned detector output requires a getframes version "
+                    "with DetectorWorkspace support"
+                )
+            kwargs["workspace"] = self._workspace
+            kwargs["out"] = out
         return self.camera.expose(
             self._detector_array(photon_rate),
             self.config.exposure_s,
@@ -107,8 +118,9 @@ class DetectorAdapter:
         seed: int | None,
         spectral_photon_rate: NDArray[Any] | None = None,
         spectral_wavelengths_m: tuple[float, ...] | None = None,
+        out: Any | None = None,
     ) -> Any:
-        """Run the existing detector signal chain."""
+        """Run the existing detector signal chain into optional caller-owned storage."""
         if (
             spectral_photon_rate is not None
             and spectral_wavelengths_m is not None
@@ -116,6 +128,19 @@ class DetectorAdapter:
         ):
             cube = self._detector_array(spectral_photon_rate)
             wavelengths_nm = np.asarray(spectral_wavelengths_m) * 1e9
+            spectral_kwargs: dict[str, Any] = {}
+            if out is not None:
+                if self._workspace is None:
+                    raise RuntimeError(
+                        "caller-owned detector output requires a getframes version "
+                        "with DetectorWorkspace support"
+                    )
+                if "workspace" not in inspect.signature(self.camera.expose_spectral).parameters:
+                    raise RuntimeError(
+                        "caller-owned spectral detector output requires a getframes "
+                        "version with expose_spectral(workspace=..., out=...) support"
+                    )
+                spectral_kwargs = {"workspace": self._workspace, "out": out}
             frame = self.camera.expose_spectral(
                 cube,
                 wavelengths_nm,
@@ -125,11 +150,13 @@ class DetectorAdapter:
                 binning_mode=self.config.binning_mode,
                 seed=seed,
                 include_truth=self.config.include_truth,
+                **spectral_kwargs,
             )
         else:
             frame = self._expose_camera(
                 self._detector_array(photon_rate),
                 seed=seed,
+                out=out,
             )
         frame.metadata.update(metadata)
         frame.metadata["detector_binning"] = self.config.binning

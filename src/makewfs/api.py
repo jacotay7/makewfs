@@ -176,8 +176,14 @@ class WavefrontSensor:
         """
         return float(getattr(self.detector.camera.config, "charge_diffusion_fwhm_px", 0.0))
 
-    def expose(self, wavefront: ArrayLike, *, seed: int | None = None) -> Any:
-        """Render one wavefront and expose it through the configured detector."""
+    def expose(
+        self,
+        wavefront: ArrayLike,
+        *,
+        seed: int | None = None,
+        out: Any | None = None,
+    ) -> Any:
+        """Render one wavefront into optional caller-owned detector storage."""
         total_start = perf_counter()
         optical_start = total_start
         result = self._render(wavefront)
@@ -200,6 +206,7 @@ class WavefrontSensor:
                 None if result.spectral_photon_rate is None else result.spectral_photon_rate
             ),
             spectral_wavelengths_m=result.spectral_wavelengths_m,
+            out=out,
         )
         detector_elapsed = perf_counter() - detector_start
         frame.metadata["wfs_optical_render_s"] = optical_elapsed
@@ -217,9 +224,13 @@ class WavefrontSensor:
             yield self.expose(phase, seed=seed)
 
     def expose_integrated(
-        self, phase_samples: ArrayLike | Iterable[ArrayLike], *, seed: int | None = None
+        self,
+        phase_samples: ArrayLike | Iterable[ArrayLike],
+        *,
+        seed: int | None = None,
+        out: Any | None = None,
     ) -> Any:
-        """Expose one detector frame after uniformly averaging temporal OPD samples."""
+        """Expose temporally averaged OPD into optional caller-owned detector storage."""
         total_start = perf_counter()
         optical_start = total_start
         batched = getattr(self.engine, "render_integrated", None)
@@ -252,6 +263,7 @@ class WavefrontSensor:
                 seed=seed,
                 spectral_photon_rate=result.spectral_photon_rate,
                 spectral_wavelengths_m=result.spectral_wavelengths_m,
+                out=out,
             )
             frame.metadata["wfs_optical_render_s"] = optical_elapsed
             frame.metadata["wfs_detector_expose_s"] = perf_counter() - detector_start
@@ -312,6 +324,7 @@ class WavefrontSensor:
             seed=seed,
             spectral_photon_rate=average_spectral_rate,
             spectral_wavelengths_m=spectral_wavelengths_m,
+            out=out,
         )
         frame.metadata["wfs_optical_render_s"] = optical_elapsed
         frame.metadata["wfs_detector_expose_s"] = perf_counter() - detector_start

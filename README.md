@@ -57,6 +57,9 @@ The corresponding pyramid starter is at
 For an ideal photon-rate map, use `wfs.photon_rate(opd_m)`; for one detector
 exposure containing several temporal OPD samples, use
 `wfs.expose_integrated(samples)`.
+High-rate sequential owners may pass a backend-native `uint32` `out=` array to
+`expose()` or `expose_integrated()`; the returned frame then aliases that explicit
+caller-owned destination.
 
 For closed-loop work, construct the sensor once and call `expose()` with each
 new residual wavefront. The only per-frame inputs are the wavefront and,

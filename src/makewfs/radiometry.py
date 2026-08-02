@@ -28,7 +28,7 @@ def source_rate_per_s(source: SourceConfig, telescope: TelescopeConfig) -> float
         central_obstruction=telescope.central_obscuration_ratio,
         band=band,
     )
-    return optical.photon_rate_from_magnitude(source.magnitude)
+    return float(optical.photon_rate_from_magnitude(source.magnitude))
 
 
 __all__ = ["source_rate_per_s"]

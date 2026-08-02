@@ -66,7 +66,8 @@ write a failing integration test/design note, use the conditional gates in
 
 ## Stable contracts to protect
 
-- The per-frame runtime inputs are the wavefront and an optional noise seed. All
+- The physical per-frame runtime inputs are the wavefront and an optional noise
+  seed. An optional caller-owned `out` array controls storage lifetime only. All
   instrument/source/detector choices live in versioned config.
 - OPD metres are the canonical internal wavefront quantity. Phase-radian input
   must declare its reference wavelength; units are never inferred.

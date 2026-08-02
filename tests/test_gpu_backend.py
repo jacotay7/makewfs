@@ -53,6 +53,11 @@ def test_shack_hartmann_gpu_matches_cpu_and_keeps_detector_frame_on_device() -> 
     assert np.asarray(frame).shape == cpu_sensor.engine.output_shape
     assert frame.metadata["wfs_input_opd_rms_m"] == 0.0
 
+    out = cupy.empty(gpu_sensor.engine.output_shape, dtype=cupy.uint32)
+    into = gpu_sensor.expose(device_opd, seed=41, out=out)
+    assert into.data is out
+    assert bool(cupy.array_equal(frame.data, into.data))
+
 
 @pytest.mark.gpu
 def test_pyramid_gpu_matches_cpu_and_integrated_stack_stays_on_device_until_detector() -> None:
@@ -69,7 +74,9 @@ def test_pyramid_gpu_matches_cpu_and_integrated_stack_stays_on_device_until_dete
     gpu_rate = gpu_sensor.photon_rate(cupy.asarray(zero))
     np.testing.assert_allclose(cupy.asnumpy(gpu_rate), cpu_rate, rtol=5e-5, atol=5e-4)
 
-    frame = gpu_sensor.expose_integrated(device_samples, seed=42)
+    out = cupy.empty(gpu_sensor.engine.output_shape, dtype=cupy.uint32)
+    frame = gpu_sensor.expose_integrated(device_samples, seed=42, out=out)
+    assert frame.data is out
     assert isinstance(frame.data, cupy.ndarray)
     assert np.asarray(frame).shape == cpu_sensor.engine.output_shape
     assert frame.metadata["wfs_temporal_samples"] == 2
