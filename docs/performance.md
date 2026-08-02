@@ -10,16 +10,61 @@ for throughput and memory; float64 is the reference path. Benchmark cold
 construction separately from warm frames and record Python, NumPy, SciPy, and
 hardware versions.
 
-The common two-times Shack--Hartmann oversampling path integrates detector
-pixels with direct strided sums. Temporally integrated exposures accumulate
-photon-rate, spectral-rate, and OPD arrays incrementally, avoiding a second
-full-frame stack. These are mathematically equivalent allocation/reduction
-optimizations; temporal samples are still rendered as separate intensities.
+The array-reference Shack--Hartmann path integrates the common two-times
+oversampling case with direct strided sums. Temporally integrated exposures
+batch their fields and avoid a caller-side optical render for every sample.
+These are mathematically equivalent allocation/reduction optimizations.
 
-On GPU, Shack--Hartmann source states that resolve to the same FFT size are
-propagated in one device batch. State accumulation order and the CPU reference
-remain unchanged. A configured wavelength-scaled field stop keeps states
-sequential because its mask differs with sampling. On a Quadro P620, the
+## First-use-JIT Shack--Hartmann execution
+
+Compatible sampled-DFT Shack--Hartmann configurations on CUDA automatically use
+a shape-specialized compiled executor. The persistent sensor generates a CUDA C
+kernel for its precision, temporal sample count, lenslet geometry, detector
+sampling, field stop, margin, wavelength count, and detector-owned charge
+diffusion footprint. CuPy compiles it on the first launch and caches the binary
+both in the process and on disk. A later process can therefore reuse the disk
+cache, but a new geometry or isolated cache pays the compilation cost again.
+
+The kernel fuses phase formation, separable DFT propagation, field-stop masking,
+temporal intensity averaging, pixel integration, mosaic assembly, and spectral
+and total photon-rate accumulation; the executor then performs one captured-flux
+reduction. When charge diffusion is configured, its focal-plane convolution and
+native-pixel integration are composed once at plan construction into one exact
+linear operator. This retains the zero-padded focal boundary while removing the
+repeated convolution traversal from every lenslet, wavelength, and temporal
+sample. Wavelength/source states still launch and accumulate in their declared
+order, so incoherent intensity and spectral-QE inputs are preserved.
+
+The readable array implementation remains the reference and automatic fallback
+for CPU execution, FFT-resolved spot geometries, continuous optical Gaussian
+blur, measured native-pixel optical kernels, and geometries exceeding portable
+CUDA block/shared-memory limits. Compiled renders allocate independent public
+rate outputs on every call; cached plan storage is immutable and never aliases a
+returned result.
+
+An isolated-cache Quadro P620 benchmark of the physically complete HAKA example
+(57x57 lenslets, 4x4 detector pixels, four temporal samples, eight wavelengths,
+4x focal sampling, and the measured 9x9 OCAM2K charge-diffusion kernel) measured
+24.85 ms compiled versus 569.67 ms reference p50: **22.93x faster** and a 95.64%
+latency reduction. The cold first use took 3.176 s. Photon-rate, spectral-rate,
+and captured-flux disagreements were respectively 4.85e-8, 9.74e-8, and
+4.71e-8 relative. Reproduce the matched alternating-order measurement with:
+
+```bash
+CUPY_CACHE_DIR=/tmp/makewfs-isolated-cache \
+  python benchmarks/benchmark_compiled_sh_executor.py \
+  --haka --frames 20 --temporal-samples 4
+```
+
+The versioned record is
+`benchmarks/haka-compiled-sh-executor-quadro-p620.json`. It is an owner-isolated
+hardware measurement, not an end-to-end or portable latency guarantee.
+
+In the array fallback on GPU, Shack--Hartmann source states that resolve to the
+same FFT size are propagated in one device batch. State accumulation order and
+the CPU reference remain unchanged. A configured wavelength-scaled field stop
+keeps states sequential because its mask differs with sampling. On a Quadro
+P620, the
 eight-state, four-temporal-sample HAKA-class path groups the first five
 wavelengths and leaves the other three single. A matched, alternating-order
 64-frame benchmark measured 37.19 ms sequential versus 36.39 ms grouped median

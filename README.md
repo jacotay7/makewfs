@@ -49,6 +49,11 @@ python -m pip install "makewfs[gpu]"
 Set `device = "gpu"` under `[numerics]` and pass a CuPy OPD array for the
 device-resident path. `frame.data` is then a CuPy ADU array; use
 `getframes.to_numpy(frame.data)` only at an intentional host boundary.
+Compatible sampled-DFT Shack--Hartmann geometries are specialized and compiled
+on their first use, then reuse CuPy's process and disk kernel caches. The first
+render can therefore be much slower than steady state; construct and warm each
+fixed sensor before measuring or entering a real-time loop. Unsupported optical
+features automatically retain the array-reference implementation.
 
 The repository includes a runnable starter configuration at
 [`examples/configs/shack_hartmann_minimal.toml`](examples/configs/shack_hartmann_minimal.toml).

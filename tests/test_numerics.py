@@ -25,6 +25,7 @@ from makewfs.sampling import (
     pad_center,
     spot_intensity,
 )
+from makewfs.sensors._shack_hartmann_cuda import _fused_integration_weights
 
 
 def test_centered_fft_roundtrip_and_dtype() -> None:
@@ -61,6 +62,29 @@ def test_spot_integration_preserves_float32_batch_precision() -> None:
         workers=1,
     )
     assert spots.dtype == np.float32
+
+
+def test_fused_diffusion_and_pixel_integration_matches_reference() -> None:
+    from scipy.ndimage import convolve
+
+    pixels = 3
+    oversampling = 2
+    high_pixels = pixels * oversampling
+    intensity = np.arange(high_pixels**2, dtype=np.float64).reshape(high_pixels, high_pixels)
+    # Deliberately asymmetric: this verifies convolution orientation as well as
+    # the zero-padded focal-plane boundary and native-pixel collection.
+    kernel = np.arange(1.0, 10.0).reshape(3, 3)
+    weights = _fused_integration_weights(
+        kernel,
+        pixels=pixels,
+        oversampling=oversampling,
+        dtype=np.dtype(np.float64),
+    )
+
+    expected = block_sum(convolve(intensity, kernel, mode="constant"), oversampling)
+    actual = (weights @ intensity.ravel()).reshape(pixels, pixels)
+
+    np.testing.assert_array_equal(actual, expected)
 
 
 def test_cached_spot_propagation_plan_preserves_optics() -> None:

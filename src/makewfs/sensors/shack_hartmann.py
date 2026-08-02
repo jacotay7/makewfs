@@ -24,6 +24,10 @@ from ..sampling import (
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
+from ._shack_hartmann_cuda import (
+    _compiled_executor_rejection,
+    _CompiledShackHartmannExecutor,
+)
 
 
 class ShackHartmannEngine(SensorEngine):
@@ -181,6 +185,9 @@ class ShackHartmannEngine(SensorEngine):
         )
         self._state_groups = self._build_state_groups()
         self._spot_plans = self._build_spot_plans()
+        self._compiled_executor_enabled = True
+        self._compiled_executors: dict[int, _CompiledShackHartmannExecutor] = {}
+        self._compiled_executor_rejections: dict[int, str] = {}
 
     def _build_state_groups(self) -> tuple[tuple[int, ...], ...]:
         """Group GPU states that share one exact focal-plane FFT geometry."""
@@ -399,6 +406,24 @@ class ShackHartmannEngine(SensorEngine):
         internal = (
             internal_samples[0] if sample_count == 1 else self.backend.stack(internal_samples)
         )
+        opd = (
+            wavefronts[0]
+            if sample_count == 1
+            else self.backend.mean(
+                self.backend.stack([self.backend.asarray(sample) for sample in wavefronts]),
+                axis=0,
+            )
+        )
+        compiled = self._render_compiled(internal, sample_count)
+        if compiled is not None:
+            return OpticalResult(
+                compiled.photon_rate,
+                self.source_rate,
+                compiled.captured_rate_per_s,
+                opd,
+                compiled.spectral_photon_rate,
+                self._wavelengths,
+            )
         states = self.source_states
         photon_rate = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
         spectral_photon_rate = (
@@ -488,16 +513,6 @@ class ShackHartmannEngine(SensorEngine):
                 captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
         if spectral_photon_rate is None:
             spectral_photon_rate = photon_rate[None, ...]
-        # The reported OPD is the exposure's mean, matching the mean photon rate
-        # the detector is handed; a single sample is its own mean.
-        opd = (
-            wavefronts[0]
-            if sample_count == 1
-            else self.backend.mean(
-                self.backend.stack([self.backend.asarray(sample) for sample in wavefronts]),
-                axis=0,
-            )
-        )
         return OpticalResult(
             photon_rate,
             self.source_rate,
@@ -506,6 +521,25 @@ class ShackHartmannEngine(SensorEngine):
             spectral_photon_rate,
             self._wavelengths,
         )
+
+    def _render_compiled(self, internal: Any, sample_count: int) -> Any | None:
+        """Use a first-call-JIT CUDA plan when this exact geometry supports it."""
+        if not self._compiled_executor_enabled:
+            return None
+        executor = self._compiled_executors.get(sample_count)
+        if executor is not None:
+            batched_internal = internal[None, ...] if sample_count == 1 else internal
+            return executor.render(batched_internal)
+        if sample_count in self._compiled_executor_rejections:
+            return None
+        rejection = _compiled_executor_rejection(self, sample_count)
+        if rejection is not None:
+            self._compiled_executor_rejections[sample_count] = rejection
+            return None
+        executor = _CompiledShackHartmannExecutor(self, sample_count)
+        self._compiled_executors[sample_count] = executor
+        batched_internal = internal[None, ...] if sample_count == 1 else internal
+        return executor.render(batched_internal)
 
 
 __all__ = ["ShackHartmannEngine"]

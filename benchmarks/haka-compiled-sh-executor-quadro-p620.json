@@ -1,0 +1,57 @@
+{
+  "configuration": {
+    "signature": {
+      "dtype_name": "float32",
+      "field_stop": false,
+      "focal_kernel_size": 9,
+      "lenslets": 57,
+      "margin": 0,
+      "oversampling": 4,
+      "pixels": 4,
+      "pupil_samples": 4,
+      "sample_count": 4,
+      "wavelengths": 8
+    },
+    "source": "keck_haka_physically_complete",
+    "source_states": 8
+  },
+  "equivalence": {
+    "captured_rate_relative_error": 4.7115598770861995e-08,
+    "photon_rate_relative_rms": 4.851935367451527e-08,
+    "spectral_rate_relative_rms": 9.738573625906985e-08
+  },
+  "first_result_captured_rate_per_s": 73412223.94205873,
+  "first_use_ms": 3176.2970549898455,
+  "hardware": {
+    "cupy": "14.1.1",
+    "gpu": "Quadro P620",
+    "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
+    "python": "3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:19:41) [GCC 14.3.0]"
+  },
+  "method": {
+    "alternating_variant_order": true,
+    "cuda_synchronized_after_each_render": true,
+    "cupy_cache_dir": "/tmp/makewfs-jit-benchmark-20260801",
+    "first_use_includes_plan_build_and_raw_kernel_first_launch": true,
+    "frames_per_variant": 20,
+    "seed": 91,
+    "temporal_samples": 4
+  },
+  "results": {
+    "compiled": {
+      "count": 20,
+      "p50_ms": 24.84886800084496,
+      "p95_ms": 26.298566448531346,
+      "p99_ms": 27.627919699443733
+    },
+    "reference": {
+      "count": 20,
+      "p50_ms": 569.6672050034977,
+      "p95_ms": 604.0512227940781,
+      "p99_ms": 606.6719125611417
+    }
+  },
+  "schema_version": 1,
+  "steady_state_reduction_fraction": 0.956380027176231,
+  "steady_state_speedup": 22.925277923490388
+}

@@ -140,6 +140,9 @@ Follow the target layout in `ROADMAP.md`:
 - `config.py` parses and validates; it does not propagate optics.
 - `wavefront.py`, `pupil.py`, and `sampling.py` hold shared numerical rules.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
+  `_shack_hartmann_cuda.py` is a private first-use-JIT execution plan for exact
+  compatible CUDA geometries; `shack_hartmann.py` remains the readable physics
+  reference and must stay as the automatic feature-complete fallback.
 - `radiometry.py` produces source photon budgets using public `getframes` tools.
 - `detector.py` is a narrow adapter to `getframes.Camera.expose` and the
   optional public `expose_spectral` cube API.

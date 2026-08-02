@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +31,25 @@ def _gpu_config(name: str) -> WFSConfig:
     data = _config(name).to_dict()
     data["numerics"]["device"] = "gpu"
     return WFSConfig.from_dict(data)
+
+
+def _compiled_dft_config(*, dtype: str = "float32") -> WFSConfig:
+    config = _config("shack_hartmann_minimal.toml")
+    assert config.shack_hartmann is not None
+    return replace(
+        config,
+        numerics=replace(
+            config.numerics,
+            device="gpu",
+            dtype=dtype,
+            pupil_samples_per_lenslet=4,
+        ),
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            pixels_per_subaperture=4,
+            spot_sampling_pixels_per_lambda_over_d=0.91,
+        ),
+    )
 
 
 @pytest.mark.gpu
@@ -149,3 +169,169 @@ def test_broadband_sh_gpu_state_batch_matches_sequential_execution() -> None:
         rtol=5e-6,
         atol=5e-5,
     )
+
+
+@pytest.mark.gpu
+def test_compiled_sh_float32_integrated_matches_reference_and_reuses_plan() -> None:
+    cupy = _cupy()
+    config = _compiled_dft_config()
+    engine = WavefrontSensor(config).engine
+    samples = cupy.random.RandomState(21).normal(0.0, 1.5e-7, (3, *config.input.shape))
+    wavefronts = [samples[index] for index in range(3)]
+
+    compiled = engine.render_integrated(wavefronts)
+    executor = engine._compiled_executors[3]
+    first_rate = compiled.photon_rate.copy()
+    repeated = engine.render_integrated(wavefronts)
+    assert engine._compiled_executors[3] is executor
+    assert not cupy.shares_memory(compiled.photon_rate, repeated.photon_rate)
+    assert bool(cupy.array_equal(compiled.photon_rate, first_rate))
+
+    engine._compiled_executor_enabled = False
+    reference = engine.render_integrated(wavefronts)
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.photon_rate),
+        cupy.asnumpy(reference.photon_rate),
+        rtol=2e-6,
+        atol=1e-5,
+    )
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.spectral_photon_rate),
+        cupy.asnumpy(reference.spectral_photon_rate),
+        rtol=2e-6,
+        atol=1e-5,
+    )
+    assert float(compiled.captured_rate_per_s) == pytest.approx(
+        float(reference.captured_rate_per_s), rel=2e-6
+    )
+
+
+@pytest.mark.gpu
+def test_compiled_sh_float64_single_sample_matches_reference_and_piston() -> None:
+    cupy = _cupy()
+    config = _compiled_dft_config(dtype="float64")
+    engine = WavefrontSensor(config).engine
+    opd = cupy.random.RandomState(22).normal(0.0, 8.0e-8, config.input.shape)
+
+    compiled = engine.render(opd)
+    piston = engine.render(opd + 2.3e-6)
+    assert 1 in engine._compiled_executors
+    np.testing.assert_allclose(
+        cupy.asnumpy(piston.photon_rate),
+        cupy.asnumpy(compiled.photon_rate),
+        rtol=2e-12,
+        atol=1e-8,
+    )
+
+    engine._compiled_executor_enabled = False
+    reference = engine.render(opd)
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.photon_rate),
+        cupy.asnumpy(reference.photon_rate),
+        rtol=2e-12,
+        atol=1e-8,
+    )
+
+
+@pytest.mark.gpu
+def test_compiled_sh_preserves_field_stop_and_multi_state_spectral_sum() -> None:
+    cupy = _cupy()
+    data = load_config(
+        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml"
+    ).to_dict()
+    data["numerics"].update({"device": "gpu", "dtype": "float32", "pupil_samples_per_lenslet": 4})
+    data["shack_hartmann"].update(
+        {
+            "pixels_per_subaperture": 4,
+            "spot_sampling_pixels_per_lambda_over_d": 0.91,
+            "field_stop_radius_lambda_over_d": 1.5,
+            "detector_margin_pixels": 2,
+        }
+    )
+    config = WFSConfig.from_dict(data)
+    engine = WavefrontSensor(config).engine
+    opd = cupy.random.RandomState(23).normal(0.0, 1.0e-7, config.input.shape)
+
+    compiled = engine.render(opd)
+    assert 1 in engine._compiled_executors
+    assert compiled.photon_rate.shape == (36, 36)
+    assert not bool(cupy.any(compiled.photon_rate[:2]))
+    assert not bool(cupy.any(compiled.photon_rate[-2:]))
+    assert not bool(cupy.any(compiled.photon_rate[:, :2]))
+    assert not bool(cupy.any(compiled.photon_rate[:, -2:]))
+    engine._compiled_executor_enabled = False
+    reference = engine.render(opd)
+
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.photon_rate),
+        cupy.asnumpy(reference.photon_rate),
+        rtol=3e-6,
+        atol=1e-5,
+    )
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.spectral_photon_rate),
+        cupy.asnumpy(reference.spectral_photon_rate),
+        rtol=3e-6,
+        atol=1e-5,
+    )
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.photon_rate),
+        cupy.asnumpy(compiled.spectral_photon_rate.sum(axis=0)),
+        rtol=2e-15,
+        atol=1e-8,
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    ("dtype", "rtol", "atol"),
+    (("float32", 2e-6, 1e-5), ("float64", 2e-12, 1e-8)),
+)
+def test_compiled_sh_applies_detector_owned_charge_diffusion(
+    dtype: str, rtol: float, atol: float
+) -> None:
+    cupy = _cupy()
+    getframes = pytest.importorskip("getframes")
+    config = _compiled_dft_config(dtype=dtype)
+    camera = getframes.load_preset("generic_cmos").replace(
+        resolution=(32, 32), charge_diffusion_fwhm_px=0.8
+    )
+    config = replace(
+        config,
+        detector=replace(config.detector, preset=None, inline=camera.to_dict()),
+    )
+    engine = WavefrontSensor(config).engine
+    opd = cupy.random.RandomState(24).normal(0.0, 1.0e-7, config.input.shape)
+
+    compiled = engine.render(opd)
+    assert engine._charge_diffusion_kernel is not None
+    assert 1 in engine._compiled_executors
+    engine._compiled_executor_enabled = False
+    reference = engine.render(opd)
+
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.photon_rate),
+        cupy.asnumpy(reference.photon_rate),
+        rtol=rtol,
+        atol=atol,
+    )
+
+
+@pytest.mark.gpu
+def test_compiled_sh_records_feature_fallback_once() -> None:
+    cupy = _cupy()
+    config = _compiled_dft_config()
+    assert config.shack_hartmann is not None
+    config = replace(
+        config,
+        shack_hartmann=replace(config.shack_hartmann, optical_blur_fwhm_pixels=0.8),
+    )
+    engine = WavefrontSensor(config).engine
+    opd = cupy.zeros(config.input.shape)
+
+    first = engine.render(opd)
+    second = engine.render(opd)
+
+    assert not engine._compiled_executors
+    assert engine._compiled_executor_rejections == {1: "continuous optical blur"}
+    assert bool(cupy.array_equal(first.photon_rate, second.photon_rate))

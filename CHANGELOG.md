@@ -4,6 +4,17 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Compatible GPU Shack--Hartmann optics now use a first-use-JIT compiled
+  executor.** CuPy specializes one CUDA kernel for the fixed lenslet, temporal,
+  spectral, precision, field-stop, and detector-sampling geometry, then reuses
+  its process and disk caches. It fuses sampled-DFT propagation through photon
+  mosaics and composes detector-owned focal charge diffusion with native-pixel
+  integration once at startup. The array implementation remains the exact
+  reference/fallback for CPU, FFT, continuous/native optical blur, and oversized
+  CUDA geometries. A cold isolated-cache, alternating 20-frame physical HAKA
+  benchmark on a Quadro P620 measured 24.85 ms versus 569.67 ms p50 (22.93x),
+  after a 3.176 s first-use compile, with photon/spectral/captured-rate relative
+  disagreements below 1e-7.
 - `WavefrontSensor.expose()` and `expose_integrated()` now accept an optional
   caller-owned detector `out` array. The detector adapter pairs it with
   `getframes.DetectorWorkspace`, including wavelength-resolved exposures, so a

@@ -724,6 +724,13 @@ accepts only wavefront plus config.
   default independent frame lifetimes; validate exact seeded output and CPU/GPU
   storage. Local physical-ROI evidence improves CPU latency 17.0%; the neutral
   Quadro P620 result remains opt-in and is not claimed as a GPU speedup.
+- [x] Add a first-use-JIT, fixed-geometry CUDA executor for compatible sampled-DFT
+  Shack--Hartmann optics while retaining the array implementation as the
+  reference/fallback. Preserve both precision pairs, temporal/source/wavelength
+  incoherent intensity sums, field stops, detector margins, focal charge
+  diffusion, spectral maps, captured flux, and independent output lifetimes.
+  The isolated physical HAKA Quadro P620 record improves p50 22.93x after a
+  separately reported 3.176 s cold compile.
 
 **Exit:** CPU behavior is measured and optimized, and SH/PWFS can run through the
 detector on GPU without an architectural rewrite.
