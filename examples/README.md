@@ -5,6 +5,12 @@ packages with `python -m pip install -e '.[examples,interop]'` from the
 repository root. Every raster panel carries a colorbar with units, and each
 script accepts `--help` for output and resolution controls.
 
+- `showcase.py` animates four sensor configurations (20×20 SH, 60×60 SH,
+  modulated pyramid, broadband LGS SH) watching one wind-blown atmosphere, each
+  overlaid with its measured end-to-end throughput, and writes the animated
+  **WebP** used in the README. It has its own flags (`--device`, `--frames`,
+  `--residual-scale`, `--out`) and picks up a GPU automatically when CuPy is
+  installed.
 - `quickstart.py` renders one configured Shack–Hartmann exposure.
 - `compare_sensors.py` applies the same OPD to the SH and pyramid configurations.
 - `moving_atmosphere.py` animates frozen-flow OPD frames from `pyturb` through

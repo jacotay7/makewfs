@@ -1,5 +1,6 @@
 site_name: makewfs
 site_description: Configuration-driven adaptive-optics wavefront sensor images
+site_url: https://jacotay7.github.io/makewfs/
 repo_url: https://github.com/jacotay7/makewfs
 theme:
   name: material

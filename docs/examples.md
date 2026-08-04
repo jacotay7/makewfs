@@ -6,6 +6,8 @@ for the command list.
 
 The most complete current workflows are:
 
+- `showcase.py`: four sensor configurations on one wind-blown atmosphere, each
+  overlaid with its measured end-to-end throughput, written as an animated WebP;
 - `moving_atmosphere.py`: `pyturb` OPD frames into a persistent sensor and
   `getframes` detector;
 - `magnitude_series.py`: one detector configuration across NGS magnitudes;

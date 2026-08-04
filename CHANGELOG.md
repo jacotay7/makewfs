@@ -4,6 +4,25 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **`examples/showcase.py`** renders an animated WebP of four sensor
+  configurations -- 20x20 SH, 60x60 SH, a modulated pyramid, and a broadband
+  range-sampled LGS SH -- watching one wind-blown `pyturb` atmosphere, each panel
+  overlaid with the end-to-end throughput that configuration sustained on the
+  running machine. The clip is the README header image. The atmosphere uses
+  `engine="extrude"` so a long clip never replays turbulence a periodic spectral
+  screen would have wrapped.
+- **The README follows the documentation-first structure** used across the
+  sibling projects: docs link, showcase clip, install, quickstart, benchmarks,
+  then the feature list.
+- **Refreshed `benchmarks/device-results.{json,md}`** on the RTX 5090 / Ryzen 9
+  9950X3D reference machine against makewfs 1.0.0, getframes 2.1.1, pyturb 1.0.0,
+  NumPy 2.2.6, and CuPy 14.1.1.
+- **Benchmark provenance now records the CuPy version** when CuPy is installed
+  under a CUDA-specific wheel name (`cupy-cuda12x`/`cupy-cuda11x`); the metadata
+  block previously reported `cupy: null` on exactly the machines that had
+  produced the GPU column.
+- `mkdocs.yml` declares `site_url`, so the published documentation emits
+  canonical links and a sitemap.
 - **Compatible GPU Shack--Hartmann optics now use a first-use-JIT compiled
   executor.** CuPy specializes one CUDA kernel for the fixed lenslet, temporal,
   spectral, precision, field-stop, and detector-sampling geometry, then reuses
