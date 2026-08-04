@@ -141,7 +141,10 @@ def test_pyturb_gpu_opd_flows_to_shack_hartmann_adu_without_host_copy() -> None:
 def test_broadband_sh_gpu_state_batch_matches_sequential_execution() -> None:
     cupy = _cupy()
     data = load_config(
-        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml"
+        Path(__file__).parents[1]
+        / "benchmarks"
+        / "configs"
+        / "shack_hartmann_quadrature_9sample.toml"
     ).to_dict()
     data["numerics"]["device"] = "gpu"
     config = WFSConfig.from_dict(data)
@@ -237,7 +240,10 @@ def test_compiled_sh_float64_single_sample_matches_reference_and_piston() -> Non
 def test_compiled_sh_preserves_field_stop_and_multi_state_spectral_sum() -> None:
     cupy = _cupy()
     data = load_config(
-        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml"
+        Path(__file__).parents[1]
+        / "benchmarks"
+        / "configs"
+        / "shack_hartmann_quadrature_9sample.toml"
     ).to_dict()
     data["numerics"].update({"device": "gpu", "dtype": "float32", "pupil_samples_per_lenslet": 4})
     data["shack_hartmann"].update(

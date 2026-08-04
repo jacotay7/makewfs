@@ -11,7 +11,7 @@
 **Configuration-driven adaptive-optics wavefront-sensor images.**
 
 <p align="center">
-  <img src="examples/makewfs_showcase.webp" width="503" alt="Animated wavefront sensor showcase: Shack-Hartmann, high-order Shack-Hartmann, modulated pyramid and broadband LGS sensors watching one wind-blown atmosphere, with live throughput.">
+  <img src="examples/makewfs_showcase.webp" width="503" alt="Animated wavefront sensor showcase: Shack-Hartmann, high-order Shack-Hartmann, modulated pyramid and range-elongated sodium LGS sensors watching one wind-blown atmosphere, with live throughput.">
 </p>
 
 `makewfs` turns a pupil-plane phase/OPD map into the image an adaptive-optics
@@ -71,15 +71,22 @@ invocation are [versioned with the benchmarks](benchmarks/device-results.json):
 
 | Workflow | Output | Work samples | CPU (frames/s) | GPU (frames/s) | Speedup |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 20×20 SH, float32 | 160×160 | 1 | 125 | 1,949 | 15.60× |
-| 60×60 SH, float64 | 360×360 | 1 | 18 | 893 | 48.51× |
-| Broadband/range-sampled LGS SH | 64×64 | 9 | 186 | 778 | 4.19× |
-| Pyramid, 8-point modulation, float32 | 80×80 | 8 | 668 | 1,635 | 2.45× |
-| Pyramid, 32-point modulation, float64 | 108×108 | 32 | 25 | 918 | 36.68× |
+| 20×20 SH, float32 | 160×160 | 1 | 127 | 2,042 | 16.13× |
+| 60×60 SH, float64 | 360×360 | 1 | 18 | 899 | 50.11× |
+| 9-sample quadrature SH | 64×64 | 9 | 186 | 780 | 4.20× |
+| Pyramid, 8-point modulation, float32 | 80×80 | 8 | 659 | 1,646 | 2.50× |
+| Pyramid, 32-point modulation, float64 | 108×108 | 32 | 24 | 924 | 37.94× |
 
 Higher is better. A tiny unmodulated 54×54 pyramid case remains CPU-faster
-(3,541 versus 1,583 frames/s) because GPU launch overhead dominates its small
-optical workload. Compatible sampled-DFT Shack–Hartmann geometries are compiled
+(3,526 versus 1,605 frames/s) because GPU launch overhead dominates its small
+optical workload. The 9-sample row
+(`shack_hartmann_quadrature_9sample.toml`) is a deliberate quadrature *load* — three
+wavelengths crossed with three beacon ranges — not a physical beacon: a sodium
+LGS is monochromatic at the 589 nm D2 line, broadened by only ~0.003 nm, so its
+spectral axis exists there purely to exercise the polychromatic path. The
+showcase clip above instead runs a physically correct narrowband beacon sampled
+across the sodium layer's depth, which is where spot elongation actually comes
+from. Compatible sampled-DFT Shack–Hartmann geometries are compiled
 on first use, so warm each fixed sensor before measuring or entering a real-time
 loop. Reproduce the table with
 

@@ -6,7 +6,7 @@ repository root. Every raster panel carries a colorbar with units, and each
 script accepts `--help` for output and resolution controls.
 
 - `showcase.py` animates four sensor configurations (20×20 SH, 60×60 SH,
-  modulated pyramid, broadband LGS SH) watching one wind-blown atmosphere, each
+  modulated pyramid, range-elongated sodium LGS SH) watching one wind-blown atmosphere, each
   overlaid with its measured end-to-end throughput, and writes the animated
   **WebP** used in the README. It has its own flags (`--device`, `--frames`,
   `--residual-scale`, `--out`) and picks up a GPU automatically when CuPy is

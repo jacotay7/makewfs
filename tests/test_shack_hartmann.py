@@ -98,7 +98,10 @@ def test_detector_binning_changes_frame_shape_but_preserves_optical_truth() -> N
 
 def test_wavelength_resolved_qe_applies_per_pixel_spectral_weights(tmp_path: Path) -> None:
     config = WavefrontSensor.from_toml(
-        Path(__file__).parents[1] / "benchmarks" / "configs" / "shack_hartmann_broadband_lgs.toml"
+        Path(__file__).parents[1]
+        / "benchmarks"
+        / "configs"
+        / "shack_hartmann_quadrature_9sample.toml"
     ).config
     qe_path = tmp_path / "qe.txt"
     qe_path.write_text("580 0.1\n590 0.5\n600 0.9\n", encoding="utf-8")

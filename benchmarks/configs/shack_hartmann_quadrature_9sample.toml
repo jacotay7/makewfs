@@ -1,3 +1,11 @@
+# A nine-sample quadrature load: three wavelengths crossed with three beacon
+# ranges. The spectral axis exists to exercise the polychromatic path, NOT to
+# model a beacon -- a sodium LGS returns the 589 nm D2 line broadened by roughly
+# 0.003 nm, some three orders of magnitude narrower than the 585-595 nm sweep
+# below. Spot elongation comes from the range spread and the off-axis launch,
+# not from colour. For beacon physics see examples/showcase.py (monochromatic,
+# sampled through the sodium layer's depth); for a genuine broadband source see
+# examples/realistic_broadband.py, which uses a natural guide star.
 schema_version = 1
 
 [input]

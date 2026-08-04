@@ -10,9 +10,9 @@ Generated from `benchmarks/device-results.json`. Higher frames/s is better; timi
 
 | Configuration | Sensor | Output | Work samples | CPU (frames/s) | GPU (frames/s) | Speedup |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| shack_hartmann_20x20_float32.toml | shack_hartmann | 160x160 | 1 | 124.9 | 1,949.2 | 15.60x |
-| shack_hartmann_60x60_float64.toml | shack_hartmann | 360x360 | 1 | 18.4 | 893.3 | 48.51x |
-| shack_hartmann_broadband_lgs.toml | shack_hartmann | 64x64 | 9 | 185.8 | 778.4 | 4.19x |
-| pyramid_40_float32.toml | pyramid | 54x54 | 1 | 3,540.5 | 1,582.6 | 0.45x |
-| pyramid_60_mod8_float32.toml | pyramid | 80x80 | 8 | 667.5 | 1,635.1 | 2.45x |
-| pyramid_80_mod32_float64.toml | pyramid | 108x108 | 32 | 25.0 | 918.0 | 36.68x |
+| shack_hartmann_20x20_float32.toml | shack_hartmann | 160x160 | 1 | 126.5 | 2,041.8 | 16.13x |
+| shack_hartmann_60x60_float64.toml | shack_hartmann | 360x360 | 1 | 17.9 | 899.3 | 50.11x |
+| shack_hartmann_quadrature_9sample.toml | shack_hartmann | 64x64 | 9 | 186.0 | 780.4 | 4.20x |
+| pyramid_40_float32.toml | pyramid | 54x54 | 1 | 3,526.4 | 1,604.7 | 0.46x |
+| pyramid_60_mod8_float32.toml | pyramid | 80x80 | 8 | 659.0 | 1,645.9 | 2.50x |
+| pyramid_80_mod32_float64.toml | pyramid | 108x108 | 32 | 24.3 | 923.6 | 37.94x |

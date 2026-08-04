@@ -96,7 +96,7 @@ def main() -> int:
         ),
         _ratio(
             entries,
-            "shack_hartmann_broadband_lgs.toml",
+            "shack_hartmann_quadrature_9sample.toml",
             "shack_hartmann_minimal.toml",
             key="warm_optical_frame_s",
             limit=args.max_source_state_ratio,

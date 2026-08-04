@@ -5,8 +5,8 @@ All notable changes to `makewfs` are documented here.
 ## [Unreleased]
 
 - **`examples/showcase.py`** renders an animated WebP of four sensor
-  configurations -- 20x20 SH, 60x60 SH, a modulated pyramid, and a broadband
-  range-sampled LGS SH -- watching one wind-blown `pyturb` atmosphere, each panel
+  configurations -- 20x20 SH, 60x60 SH, a modulated pyramid, and a
+  range-elongated sodium LGS SH -- watching one wind-blown `pyturb` atmosphere, each panel
   overlaid with the end-to-end throughput that configuration sustained on the
   running machine. The clip is the README header image. The atmosphere uses
   `engine="extrude"` so a long clip never replays turbulence a periodic spectral
@@ -14,6 +14,23 @@ All notable changes to `makewfs` are documented here.
 - **The README follows the documentation-first structure** used across the
   sibling projects: docs link, showcase clip, install, quickstart, benchmarks,
   then the feature list.
+- **Renamed `benchmarks/configs/shack_hartmann_broadband_lgs.toml` to
+  `shack_hartmann_quadrature_9sample.toml`.** "Broadband LGS" is a contradiction:
+  a sodium beacon returns the 589 nm D2 line broadened by roughly 0.003 nm,
+  while the config sweeps 585--595 nm, about three orders of magnitude wider.
+  Its spectral axis is a quadrature *load* for the polychromatic path, not
+  beacon physics, and the new name says so; the config's optical content and its
+  benchmark numbers are unchanged, so results remain comparable across the
+  rename. The README, `docs/performance.md`, and a new header comment in the
+  config itself all state the distinction. Benchmark artifacts recorded before
+  this change (`benchmarks/reference-results.json`,
+  `benchmarks/reference-table.md`) still refer to the old filename.
+  `examples/showcase.py` now runs a monochromatic 589 nm beacon sampled at five
+  altitudes through the sodium layer, which is where spot elongation actually
+  comes from; `examples/realistic_broadband.py` remains the genuine broadband
+  demonstration, on a natural guide star.
+- **`docs/performance.md` carries the refreshed CPU/GPU table** and its matching
+  environment, which had drifted from `benchmarks/device-results.md`.
 - **Refreshed `benchmarks/device-results.{json,md}`** on the RTX 5090 / Ryzen 9
   9950X3D reference machine against makewfs 1.0.0, getframes 2.1.1, pyturb 1.0.0,
   NumPy 2.2.6, and CuPy 14.1.1.

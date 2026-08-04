@@ -11,9 +11,10 @@ frozen-flow wavefront:
                                geometry where each subaperture is near r0
   3. Pyramid, 8-pt modulation -- float32, 80x80 detector; four pupil images
                                whose intensity difference encodes the slope
-  4. Broadband LGS SH       -- three wavelengths x three sodium ranges, with a
-                               side-launched beacon, so the spots show
-                               range-dependent elongation
+  4. Sodium LGS SH          -- a monochromatic 589 nm beacon sampled at five
+                               altitudes through the sodium layer, launched
+                               off-axis, so the spots elongate radially away
+                               from the launch point
 
 The wavefront comes from `pyturb` (frozen flow), the optics from `makewfs`, and
 the ADU from `getframes` -- the full atmosphere -> optics -> detector path. Each
@@ -88,11 +89,39 @@ def _modulated_pyramid(config):
     )
 
 
+def _sodium_lgs(config):
+    """A monochromatic sodium beacon sampled across the sodium layer's depth.
+
+    `shack_hartmann_quadrature_9sample.toml` sweeps 585-595 nm, which is a useful
+    nine-sample load for the benchmark but not sodium physics: the D2 return is
+    the 589 nm line, Doppler-broadened to a few GHz -- about 0.003 nm, some
+    three orders of magnitude narrower than that sweep. Spot elongation comes
+    from the beacon's *range* spread and the off-axis launch, not from colour,
+    so this panel drops to the single D2 line and instead samples five altitudes
+    through a ~10 km thick sodium layer.
+    """
+    return replace(
+        config,
+        sensor=replace(config.sensor, wavelength_m=589.16e-9),
+        source=replace(
+            config.source,
+            wavelengths_m=(),
+            wavelength_weights=(),
+            lgs_ranges_m=(88000.0, 89000.0, 90000.0, 91000.0, 92000.0),
+            lgs_range_weights=(0.1, 0.2, 0.4, 0.2, 0.1),
+        ),
+    )
+
+
 PANELS = (
     ("Shack-Hartmann 20x20", BENCH_CONFIGS / "shack_hartmann_20x20_float32.toml", None),
     ("Shack-Hartmann 60x60", BENCH_CONFIGS / "shack_hartmann_60x60_float64.toml", None),
     ("Pyramid, 8-pt modulation", EXAMPLE_CONFIGS / "pyramid_minimal.toml", _modulated_pyramid),
-    ("Broadband LGS SH", BENCH_CONFIGS / "shack_hartmann_broadband_lgs.toml", None),
+    (
+        "Sodium LGS SH, elongated",
+        BENCH_CONFIGS / "shack_hartmann_quadrature_9sample.toml",
+        _sodium_lgs,
+    ),
 )
 
 

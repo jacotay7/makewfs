@@ -98,9 +98,9 @@ each backend.
 
 ## CPU versus GPU reference throughput
 
-The July 2026 development reference used an AMD Ryzen 9 9950X3D and NVIDIA RTX
-5090 with Python 3.12, NumPy 2.2.6, SciPy 1.16.3, CuPy 13.6.0, `getframes`
-2.1.0, and `pyturb` 1.0.0. Each row constructs one persistent sensor, performs
+The August 2026 development reference used an AMD Ryzen 9 9950X3D and NVIDIA RTX
+5090 with Python 3.12, NumPy 2.2.6, SciPy 1.16.3, CuPy 14.1.1, `getframes`
+2.1.1, and `pyturb` 1.0.0. Each row constructs one persistent sensor, performs
 an untimed end-to-end warm-up, and records 100 frames. A zero-OPD array enters on
 the selected device; optics, detector stochastic samples, truth, and ADU remain
 there. Every frame receives a distinct deterministic detector-noise seed. CUDA
@@ -111,18 +111,27 @@ excluded from frames/s.
 three-wavelength by three-range LGS case and 8 or 32 for the modulated pyramid
 cases.
 
+```{note}
+`shack_hartmann_quadrature_9sample.toml` crosses three wavelengths with three beacon
+ranges to reach nine work samples. That spectral axis is a deliberate quadrature
+*load*, not sodium physics: a sodium beacon returns the 589 nm D2 line broadened
+by roughly 0.003 nm, some three orders of magnitude narrower than the config's
+585–595 nm sweep. Spot elongation comes from the range spread and the off-axis
+launch, not from colour. Use `examples/showcase.py`, which samples a
+monochromatic beacon across the sodium layer's depth, as the physical reference.
+```
+
 | Configuration | Sensor | Output | Work samples | CPU (frames/s) | GPU (frames/s) | Speedup |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `shack_hartmann_20x20_float32.toml` | SH | 160x160 | 1 | 143.4 | 2,011.2 | 14.03x |
-| `shack_hartmann_60x60_float64.toml` | SH | 360x360 | 1 | 26.3 | 945.2 | 35.94x |
-| `shack_hartmann_broadband_lgs.toml` | SH | 64x64 | 9 | 99.8 | 557.1 | 5.58x |
-| `pyramid_40_float32.toml` | pyramid | 54x54 | 1 | 3,569.8 | 1,541.1 | 0.43x |
-| `pyramid_60_mod8_float32.toml` | pyramid | 80x80 | 8 | 668.5 | 1,579.4 | 2.36x |
-| `pyramid_80_mod32_float64.toml` | pyramid | 108x108 | 32 | 33.3 | 903.9 | 27.18x |
+| `shack_hartmann_20x20_float32.toml` | SH | 160x160 | 1 | 126.5 | 2,041.8 | 16.13x |
+| `shack_hartmann_60x60_float64.toml` | SH | 360x360 | 1 | 17.9 | 899.3 | 50.11x |
+| `shack_hartmann_quadrature_9sample.toml` | SH | 64x64 | 9 | 186.0 | 780.4 | 4.20x |
+| `pyramid_40_float32.toml` | pyramid | 54x54 | 1 | 3,526.4 | 1,604.7 | 0.46x |
+| `pyramid_60_mod8_float32.toml` | pyramid | 80x80 | 8 | 659.0 | 1,645.9 | 2.50x |
+| `pyramid_80_mod32_float64.toml` | pyramid | 108x108 | 32 | 24.3 | 923.6 | 37.94x |
 
-Higher frames/s is better. Relative to the first end-to-end GPU snapshot on the
-same machine, these kernels are 1.19x–1.73x faster on CPU and 1.42x–2.58x faster
-on GPU. Static source/range geometry, modulation phasors, interpolation grids,
+Higher frames/s is better. Static source/range geometry, modulation phasors,
+interpolation grids,
 normalizers, and monochromatic spectral views are cached. SH uses an
 intensity-only centered FFT that removes an irrelevant input permutation; both
 sensors use native orthonormal FFT scaling, a fixed illuminated piston reference,
@@ -135,9 +144,9 @@ field-stop and arbitrary-sampling cases; the dominant plain large-FFT path keeps
 the same transform workload and should not be expected to change materially.
 
 Pyramid behavior still shows the GPU crossover clearly: launch overhead makes
-the tiny unmodulated case slower, eight modulation points provide a 2.36x gain,
-and the 32-point float64 case reaches 27.2x. The broadband LGS case has nine
-incoherent source states but a small 64x64 detector and gains 5.58x.
+the tiny unmodulated case slower, eight modulation points provide a 2.50x gain,
+and the 32-point float64 case reaches 37.9x. The nine-sample quadrature case has
+nine incoherent source states but a small 64x64 detector, so it gains only 4.20x.
 
 The [rendered snapshot](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.md)
 and [raw JSON](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.json)
@@ -153,7 +162,7 @@ python benchmarks/run.py --frames 10 --output benchmark-results.json
 python benchmarks/run.py --device both --frames 100 \
   --config benchmarks/configs/shack_hartmann_20x20_float32.toml \
   --config benchmarks/configs/shack_hartmann_60x60_float64.toml \
-  --config benchmarks/configs/shack_hartmann_broadband_lgs.toml \
+  --config benchmarks/configs/shack_hartmann_quadrature_9sample.toml \
   --config benchmarks/configs/pyramid_40_float32.toml \
   --config benchmarks/configs/pyramid_60_mod8_float32.toml \
   --config benchmarks/configs/pyramid_80_mod32_float64.toml \
@@ -188,8 +197,8 @@ Representative Shack–Hartmann configurations are provided under
 python benchmarks/run.py --representative --frames 3 --output benchmark-results.json
 ```
 
-They cover 20×20 float32 and 60×60 float64 lenslet grids, a broadband
-range-resolved SH source, and 40/60/80-pixel pyramid cases with 1/8/32
+They cover 20×20 float32 and 60×60 float64 lenslet grids, a nine-sample
+spectrally and range-resolved SH source, and 40/60/80-pixel pyramid cases with 1/8/32
 modulation samples while keeping the minimal SH and pyramid smoke cases in the
 default benchmark run.
 
@@ -213,6 +222,6 @@ python benchmarks/profile_warm.py --frames 3 --output profile-results.json
 
 CI also runs `benchmarks/check_regression.py` on the representative report. It
 checks generous same-run ratios for 60x60 versus 20x20 SH, the nine-state
-broadband LGS case versus minimal SH, and 32-sample versus unmodulated pyramid
+quadrature LGS case versus minimal SH, and 32-sample versus unmodulated pyramid
 optics. These are order-of-magnitude regression alarms, not portable latency
 promises; inspect the full JSON report for machine-specific performance work.
