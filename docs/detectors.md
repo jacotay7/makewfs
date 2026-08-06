@@ -31,6 +31,19 @@ a QE curve, the scalar path is retained. `makewfs>=1.0` requires
 `getframes>=2.1.1`, the first released detector version with this spectral cube
 and truth contract.
 
+## Sky and thermal background
+
+`detector.background_photon_rate_per_s` adds a uniform incident background in
+photons/s/pixel, handed to `getframes` as its `background` term. It is light:
+it collects charge over the exposure and carries shot noise, unlike detector
+dark current, which the camera preset already owns separately.
+
+`makewfs` deliberately does not compute it. Turning a sky surface brightness in
+mag/arcsec^2 into a rate per detector pixel needs the field stop's solid angle
+and the instrument's plate scale, which are properties of the instrument design
+rather than of the wavefront sensor's optics. The caller computes the number;
+this field carries it into the detector.
+
 ## Correlated double sampling
 
 Nondestructive-readout IR arrays — SAPHIRA in a C-RED One, and the hybrid arrays

@@ -97,6 +97,7 @@ class DetectorAdapter:
             "include_truth": self.config.include_truth,
             "binning": self.config.binning,
             "binning_mode": self.config.binning_mode,
+            "background": self.config.background_photon_rate_per_s,
         }
         if out is not None:
             if self._workspace is None:
@@ -144,6 +145,7 @@ class DetectorAdapter:
             self.config.exposure_s,
             self.config.temperature_c,
             pedestal_interval_s=self.config.cds_pedestal_interval_s,
+            background=self.config.background_photon_rate_per_s,
             seed=seed,
             include_truth=self.config.include_truth,
         )
@@ -174,6 +176,7 @@ class DetectorAdapter:
                     self.config.exposure_s,
                     self.config.temperature_c,
                     pedestal_interval_s=self.config.cds_pedestal_interval_s,
+                    background=self.config.background_photon_rate_per_s,
                     seed=seed,
                     include_truth=self.config.include_truth,
                 )
@@ -198,6 +201,7 @@ class DetectorAdapter:
                     self.config.temperature_c,
                     binning=self.config.binning,
                     binning_mode=self.config.binning_mode,
+                    background=self.config.background_photon_rate_per_s,
                     seed=seed,
                     include_truth=self.config.include_truth,
                     **spectral_kwargs,

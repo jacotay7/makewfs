@@ -620,6 +620,7 @@ class DetectorConfig:
     roi: _DetectorROIConfig | None = None
     readout_mode: str = "integrate"
     cds_pedestal_interval_s: float = 0.0
+    background_photon_rate_per_s: float = 0.0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> DetectorConfig:
@@ -636,6 +637,7 @@ class DetectorConfig:
             "roi",
             "readout_mode",
             "cds_pedestal_interval_s",
+            "background_photon_rate_per_s",
         }
         _strict(data, allowed, "detector")
         preset = None if data.get("preset") is None else str(data["preset"])
@@ -666,6 +668,11 @@ class DetectorConfig:
         if raw_roi is not None and not isinstance(raw_roi, Mapping):
             raise ConfigError("detector.roi: expected a table")
         roi = None if raw_roi is None else _DetectorROIConfig.from_dict(raw_roi)
+        background = _finite(
+            data.get("background_photon_rate_per_s", 0.0),
+            "detector.background_photon_rate_per_s",
+            minimum=0,
+        )
         readout_mode = str(data.get("readout_mode", "integrate"))
         if readout_mode not in {"integrate", "cds"}:
             raise ConfigError("detector.readout_mode: expected 'integrate' or 'cds'")
@@ -714,6 +721,7 @@ class DetectorConfig:
             roi=roi,
             readout_mode=readout_mode,
             cds_pedestal_interval_s=pedestal_interval,
+            background_photon_rate_per_s=background,
         )
 
 

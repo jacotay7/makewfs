@@ -4,6 +4,14 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **`detector.background_photon_rate_per_s`** adds a uniform incident sky or
+  thermal background in photons/s/pixel, passed to the `getframes` `background`
+  term on every readout path including correlated double sampling and the
+  spectral variants. It is light, so it collects charge and carries shot noise;
+  detector dark current remains the camera preset's own. `makewfs` does not
+  compute the rate, because converting a sky surface brightness to a rate per
+  pixel needs the field stop and plate scale, which belong to the instrument.
+
 - **The Keck example's photon budget covers arbitrary passbands, and no longer
   extrapolates its extinction curve silently.** `broadband_budget` gained
   `band_min_nm`, `band_max_nm`, `quadrature_order`, and `extinction_paths`, so a

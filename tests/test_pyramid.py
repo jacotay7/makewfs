@@ -164,3 +164,17 @@ def test_pyramid_cds_refuses_caller_owned_output() -> None:
             seed=1,
             out=np.zeros(shape, dtype=np.uint32),
         )
+
+
+def test_pyramid_background_adds_signal_and_its_shot_noise() -> None:
+    """Sky background is light: it collects charge and carries shot noise."""
+    dark = _cds_pyramid_config(readout_mode="cds")
+    lit = replace(dark, detector=replace(dark.detector, background_photon_rate_per_s=2.0e6))
+    flat = np.zeros(dark.input.shape)
+    without = np.asarray(WavefrontSensor(dark).expose(flat, seed=7).data, dtype=float)
+    with_sky = np.asarray(WavefrontSensor(lit).expose(flat, seed=7).data, dtype=float)
+    # 2e6 photons/s/pixel over 1/3500 s at QE ~0.8 is a few hundred electrons,
+    # so the level rises everywhere, including outside the four pupils.
+    assert np.median(with_sky) > np.median(without) + 10.0
+    # And it is light, not an offset: the extra charge brings extra shot noise.
+    assert with_sky.std() > without.std()

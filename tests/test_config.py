@@ -500,3 +500,28 @@ def test_segment_gap_requires_segment_count() -> None:
         base=Path.cwd(),
     )
     assert telescope.segments_across_pupil == 4
+
+
+def test_detector_background_defaults_to_zero_and_round_trips() -> None:
+    data = _minimal_tables()
+    detector = data["detector"]
+    assert isinstance(detector, dict)
+    assert WFSConfig.from_dict(data).detector.background_photon_rate_per_s == 0.0
+    detector["background_photon_rate_per_s"] = 1234.5
+    config = WFSConfig.from_dict(data)
+    assert config.detector.background_photon_rate_per_s == 1234.5
+    assert WFSConfig.from_dict(config.to_dict()).digest == config.digest
+    # Incident background is physical intent, so it must move the digest.
+    del detector["background_photon_rate_per_s"]
+    assert WFSConfig.from_dict(data).digest != config.digest
+
+
+def test_detector_background_rejects_a_negative_rate() -> None:
+    with pytest.raises(ConfigError, match="background_photon_rate_per_s"):
+        DetectorConfig.from_dict(
+            {
+                "preset": "generic_cmos",
+                "exposure_s": 1e-3,
+                "background_photon_rate_per_s": -1.0,
+            }
+        )
