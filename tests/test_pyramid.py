@@ -91,3 +91,76 @@ def test_pyramid_rejects_range_resolved_lgs() -> None:
     )
     with pytest.raises(NotImplementedError, match="Shack-Hartmann"):
         WavefrontSensor(replace(config, source=source))
+
+
+def _cds_pyramid_config(**detector_changes: object):
+    """The pyramid example on a C-RED One, which is how a real PWFS is read."""
+    config = WavefrontSensor.from_toml(CONFIG).config
+    detector = replace(
+        config.detector,
+        preset="first_light_imaging_cred_one",
+        exposure_s=1.0 / 1750.0,
+        temperature_c=-188.55,
+        **detector_changes,  # type: ignore[arg-type]
+    )
+    return replace(config, detector=detector)
+
+
+def test_pyramid_cds_returns_a_signed_bias_free_difference() -> None:
+    """CDS must differ from an integrating read in sign convention and pedestal."""
+    flat = np.zeros(WavefrontSensor.from_toml(CONFIG).config.input.shape)
+    integrating = WavefrontSensor(_cds_pyramid_config(readout_mode="integrate"))
+    cds = WavefrontSensor(_cds_pyramid_config(readout_mode="cds"))
+
+    raw = np.asarray(integrating.expose(flat, seed=3).data)
+    difference = np.asarray(cds.expose(flat, seed=3).data)
+
+    assert raw.dtype == np.uint32
+    assert difference.dtype == np.int32
+    assert difference.shape == raw.shape
+    # The measured C-RED One pedestal is ~21,000 ADU; differencing removes it and
+    # the fixed structure that rides on it, leaving a signed near-zero frame.
+    assert np.median(raw) > 15000.0
+    assert abs(np.median(difference)) < 250.0
+    assert difference.min() < 0
+    assert difference.std() < 0.2 * raw.std()
+
+
+def test_pyramid_cds_preserves_the_four_pupils_and_repeats_on_seed() -> None:
+    config = _cds_pyramid_config(readout_mode="cds")
+    sensor = WavefrontSensor(config)
+    settings = config.pyramid
+    assert settings is not None
+    tilt_free = np.zeros(config.input.shape)
+
+    first = np.asarray(sensor.expose(tilt_free, seed=11).data)
+    second = np.asarray(sensor.expose(tilt_free, seed=11).data)
+    np.testing.assert_array_equal(first, second)
+
+    half = (settings.pixels_across_pupil + settings.pupil_separation_pixels) // 2
+    quadrants = [
+        first[:half, :half].sum(),
+        first[:half, half:].sum(),
+        first[half:, :half].sum(),
+        first[half:, half:].sum(),
+    ]
+    # A flat wavefront still splits equally across the four faces after CDS.
+    assert np.allclose(quadrants, np.mean(quadrants), rtol=0.05)
+
+
+def test_pyramid_cds_records_readout_mode_in_frame_metadata() -> None:
+    sensor = WavefrontSensor(_cds_pyramid_config(readout_mode="cds"))
+    frame = sensor.expose(np.zeros(sensor.config.input.shape), seed=5)
+    assert frame.metadata["detector_readout_mode"] == "cds"
+    assert frame.metadata["readout_mode"] == "global_reset_cds"
+
+
+def test_pyramid_cds_refuses_caller_owned_output() -> None:
+    sensor = WavefrontSensor(_cds_pyramid_config(readout_mode="cds"))
+    shape = sensor.expose(np.zeros(sensor.config.input.shape), seed=1).data.shape
+    with pytest.raises(RuntimeError, match="caller-owned"):
+        sensor.expose(
+            np.zeros(sensor.config.input.shape),
+            seed=1,
+            out=np.zeros(shape, dtype=np.uint32),
+        )

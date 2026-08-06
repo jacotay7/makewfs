@@ -145,7 +145,11 @@ Follow the target layout in `ROADMAP.md`:
   reference and must stay as the automatic feature-complete fallback.
 - `radiometry.py` produces source photon budgets using public `getframes` tools.
 - `detector.py` is a narrow adapter to `getframes.Camera.expose` and the
-  optional public `expose_spectral` cube API.
+  optional public `expose_spectral` cube API, plus the
+  `correlated_double_sample[_spectral]` readout selected by
+  `detector.readout_mode = "cds"`. Note that `detector.exposure_s` is always the
+  read-to-read integration, never the frame period: in CDS the frame period is
+  twice it, because the reset and pedestal read collect no signal.
 - `api.py` owns the user facade and caching lifecycle.
 - `validation/` produces theory/reference evidence; `benchmarks/` measures speed;
   neither is imported by the runtime package.

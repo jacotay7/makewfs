@@ -248,6 +248,76 @@ def test_detector_roi_rejects_invalid_values(roi, match) -> None:  # type: ignor
         DetectorConfig.from_dict({"preset": "generic_cmos", "exposure_s": 1, "roi": roi})
 
 
+def test_detector_readout_mode_defaults_and_round_trips() -> None:
+    data = _minimal_tables()
+    detector = data["detector"]
+    assert isinstance(detector, dict)
+
+    default = WFSConfig.from_dict(data)
+    assert default.detector.readout_mode == "integrate"
+    assert default.detector.cds_pedestal_interval_s == 0.0
+    assert WFSConfig.from_dict(default.to_dict()).digest == default.digest
+
+    detector["readout_mode"] = "cds"
+    detector["cds_pedestal_interval_s"] = 2.0e-5
+    cds = WFSConfig.from_dict(data)
+    assert cds.detector.readout_mode == "cds"
+    assert cds.detector.cds_pedestal_interval_s == 2.0e-5
+    assert cds.to_dict()["detector"]["readout_mode"] == "cds"
+    assert WFSConfig.from_dict(cds.to_dict()).digest == cds.digest
+    # The readout mode is physical intent, so it must move the digest.
+    assert cds.digest != default.digest
+
+
+@pytest.mark.parametrize(
+    "detector,match",
+    [
+        (
+            {"preset": "generic_cmos", "exposure_s": 1e-3, "readout_mode": "fowler"},
+            "readout_mode",
+        ),
+        (
+            {
+                "preset": "generic_cmos",
+                "exposure_s": 1e-3,
+                "readout_mode": "cds",
+                "binning": 2,
+            },
+            "binning",
+        ),
+        (
+            {
+                "preset": "generic_cmos",
+                "exposure_s": 1e-3,
+                "readout_mode": "cds",
+                "cds_pedestal_interval_s": 1e-3,
+            },
+            "shorter than",
+        ),
+        (
+            {
+                "preset": "generic_cmos",
+                "exposure_s": 1e-3,
+                "cds_pedestal_interval_s": 1e-5,
+            },
+            "only meaningful",
+        ),
+        (
+            {
+                "preset": "generic_cmos",
+                "exposure_s": 1e-3,
+                "readout_mode": "cds",
+                "cds_pedestal_interval_s": -1e-5,
+            },
+            "cds_pedestal_interval_s",
+        ),
+    ],
+)
+def test_detector_readout_mode_rejects_invalid_combinations(detector, match) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ConfigError, match=match):
+        DetectorConfig.from_dict(detector)
+
+
 def test_source_magnitude_and_lgs_constraints() -> None:
     with pytest.raises(ConfigError, match="band"):
         SourceConfig.from_dict({"normalization": "magnitude", "magnitude": 12})

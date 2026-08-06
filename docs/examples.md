@@ -18,6 +18,8 @@ The most complete current workflows are:
 - `closed_loop_injection.py`: external residual update at the closed-loop API
   boundary;
 - `detector_choices.py`: identical ideal maps through several getframes presets.
+- `cds_readout.py`: an H-band pyramid frame read both as an ordinary integration
+  and as correlated double sampling on a C-RED One.
 - `keck_haka/`: Keck II HAKA open-loop video across guide-star magnitudes 5--15,
   with a 57x57 Shack-Hartmann, 4x4 pixels per subaperture, OCAM2K mode lookup,
   `pyturb` Maunakea turbulence, a V-normalized 6600 K spectrum over 400--950 nm,

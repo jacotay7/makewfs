@@ -89,6 +89,9 @@ class DetectorAdapter:
         seed: int | None,
         out: Any | None,
     ) -> Any:
+        if self.config.readout_mode == "cds":
+            self._reject_caller_owned_cds_output(out)
+            return self._correlated_double_sample(photon_rate, seed=seed)
         kwargs: dict[str, Any] = {
             "seed": seed,
             "include_truth": self.config.include_truth,
@@ -110,6 +113,41 @@ class DetectorAdapter:
             **kwargs,
         )
 
+    @staticmethod
+    def _reject_caller_owned_cds_output(out: Any | None) -> None:
+        """Refuse a caller-owned buffer rather than silently ignoring it.
+
+        Correlated double sampling allocates the signed difference of two reads,
+        so there is no single unsigned buffer for the caller to own. Say so
+        instead of writing the frame somewhere the caller is not looking.
+        """
+        if out is not None:
+            raise RuntimeError(
+                "detector.readout_mode = 'cds' does not support caller-owned output "
+                "storage; the returned frame is a freshly allocated signed difference"
+            )
+
+    def _require_cds_support(self, method: str) -> Any:
+        """Return the camera's CDS entry point, or explain which version is needed."""
+        entry_point = getattr(self.camera, method, None)
+        if entry_point is None:
+            raise RuntimeError(
+                f"detector.readout_mode = 'cds' requires a getframes version with "
+                f"Camera.{method} support"
+            )
+        return entry_point
+
+    def _correlated_double_sample(self, photon_rate: NDArray[Any], *, seed: int | None) -> Any:
+        """Read one two-read global-reset ramp and return its difference."""
+        return self._require_cds_support("correlated_double_sample")(
+            self._detector_array(photon_rate),
+            self.config.exposure_s,
+            self.config.temperature_c,
+            pedestal_interval_s=self.config.cds_pedestal_interval_s,
+            seed=seed,
+            include_truth=self.config.include_truth,
+        )
+
     def expose(
         self,
         photon_rate: NDArray[Any],
@@ -128,30 +166,42 @@ class DetectorAdapter:
         ):
             cube = self._detector_array(spectral_photon_rate)
             wavelengths_nm = np.asarray(spectral_wavelengths_m) * 1e9
-            spectral_kwargs: dict[str, Any] = {}
-            if out is not None:
-                if self._workspace is None:
-                    raise RuntimeError(
-                        "caller-owned detector output requires a getframes version "
-                        "with DetectorWorkspace support"
-                    )
-                if "workspace" not in inspect.signature(self.camera.expose_spectral).parameters:
-                    raise RuntimeError(
-                        "caller-owned spectral detector output requires a getframes "
-                        "version with expose_spectral(workspace=..., out=...) support"
-                    )
-                spectral_kwargs = {"workspace": self._workspace, "out": out}
-            frame = self.camera.expose_spectral(
-                cube,
-                wavelengths_nm,
-                self.config.exposure_s,
-                self.config.temperature_c,
-                binning=self.config.binning,
-                binning_mode=self.config.binning_mode,
-                seed=seed,
-                include_truth=self.config.include_truth,
-                **spectral_kwargs,
-            )
+            if self.config.readout_mode == "cds":
+                self._reject_caller_owned_cds_output(out)
+                frame = self._require_cds_support("correlated_double_sample_spectral")(
+                    cube,
+                    wavelengths_nm,
+                    self.config.exposure_s,
+                    self.config.temperature_c,
+                    pedestal_interval_s=self.config.cds_pedestal_interval_s,
+                    seed=seed,
+                    include_truth=self.config.include_truth,
+                )
+            else:
+                spectral_kwargs: dict[str, Any] = {}
+                if out is not None:
+                    if self._workspace is None:
+                        raise RuntimeError(
+                            "caller-owned detector output requires a getframes version "
+                            "with DetectorWorkspace support"
+                        )
+                    if "workspace" not in inspect.signature(self.camera.expose_spectral).parameters:
+                        raise RuntimeError(
+                            "caller-owned spectral detector output requires a getframes "
+                            "version with expose_spectral(workspace=..., out=...) support"
+                        )
+                    spectral_kwargs = {"workspace": self._workspace, "out": out}
+                frame = self.camera.expose_spectral(
+                    cube,
+                    wavelengths_nm,
+                    self.config.exposure_s,
+                    self.config.temperature_c,
+                    binning=self.config.binning,
+                    binning_mode=self.config.binning_mode,
+                    seed=seed,
+                    include_truth=self.config.include_truth,
+                    **spectral_kwargs,
+                )
         else:
             frame = self._expose_camera(
                 self._detector_array(photon_rate),
@@ -161,6 +211,7 @@ class DetectorAdapter:
         frame.metadata.update(metadata)
         frame.metadata["detector_binning"] = self.config.binning
         frame.metadata["detector_binning_mode"] = self.config.binning_mode
+        frame.metadata["detector_readout_mode"] = self.config.readout_mode
         frame.metadata["wfs_device"] = self.device
         return frame
 

@@ -53,3 +53,6 @@ script accepts `--help` for output and resolution controls.
   measured/arbitrary finite-source morphology without changing the API.
 
 Use `--help` on each script for output and resolution controls.
+- `cds_readout.py`: the same H-band pyramid frame read as an ordinary integration
+  and as correlated double sampling on a C-RED One, showing the reset and
+  fixed-bias structure that differencing removes.

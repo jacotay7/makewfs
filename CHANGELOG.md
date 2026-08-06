@@ -4,6 +4,20 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Correlated double sampling as a selectable detector readout mode.**
+  `detector.readout_mode = "cds"` routes the adapter to the released
+  `getframes.Camera.correlated_double_sample[_spectral]` instead of
+  `expose[_spectral]`, returning the signed `int32` difference of the two reads
+  of one global-reset ramp. This is how nondestructive-readout IR arrays such as
+  the C-RED One are actually operated, and it is the natural readout for a
+  pyramid sensor on one. Ownership is unchanged: `makewfs` still supplies only a
+  photon-rate map and every noise term stays in `getframes`.
+  `detector.cds_pedestal_interval_s` models a finite reset-to-pedestal-read
+  delay. Note that `exposure_s` is the read-to-read integration, not the frame
+  period: a C-RED One at its 1750 Hz maximum CDS rate integrates for 1/3500 s,
+  because the other half of the frame period is the reset and pedestal read.
+  CDS rejects `binning > 1` and caller-owned `out` storage rather than silently
+  ignoring them. See `examples/cds_readout.py`.
 - **`examples/showcase.py`** renders an animated WebP of four sensor
   configurations -- 20x20 SH, 60x60 SH, a modulated pyramid, and a
   range-elongated sodium LGS SH -- watching one wind-blown `pyturb` atmosphere, each panel

@@ -618,6 +618,8 @@ class DetectorConfig:
     include_truth: bool
     qe_curve_path: str | None = None
     roi: _DetectorROIConfig | None = None
+    readout_mode: str = "integrate"
+    cds_pedestal_interval_s: float = 0.0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> DetectorConfig:
@@ -632,6 +634,8 @@ class DetectorConfig:
             "include_truth",
             "qe_curve_path",
             "roi",
+            "readout_mode",
+            "cds_pedestal_interval_s",
         }
         _strict(data, allowed, "detector")
         preset = None if data.get("preset") is None else str(data["preset"])
@@ -662,6 +666,39 @@ class DetectorConfig:
         if raw_roi is not None and not isinstance(raw_roi, Mapping):
             raise ConfigError("detector.roi: expected a table")
         roi = None if raw_roi is None else _DetectorROIConfig.from_dict(raw_roi)
+        readout_mode = str(data.get("readout_mode", "integrate"))
+        if readout_mode not in {"integrate", "cds"}:
+            raise ConfigError("detector.readout_mode: expected 'integrate' or 'cds'")
+        pedestal_interval = _finite(
+            data.get("cds_pedestal_interval_s", 0.0),
+            "detector.cds_pedestal_interval_s",
+            minimum=0,
+        )
+        binning_value = _positive_int(data.get("binning", 1), "detector.binning")
+        if readout_mode == "cds":
+            # Correlated double sampling differences two reads of one global-reset
+            # ramp. getframes exposes that as its own readout path, which has no
+            # charge-domain binning stage, so a binned CDS request would silently
+            # mean something other than what it says.
+            if binning_value != 1:
+                raise ConfigError(
+                    "detector.binning: correlated double sampling does not support "
+                    "detector binning; set detector.binning = 1"
+                )
+            if pedestal_interval >= _finite(
+                data.get("exposure_s"), "detector.exposure_s", minimum=0
+            ):
+                raise ConfigError(
+                    "detector.cds_pedestal_interval_s: the reset-to-pedestal-read delay "
+                    "must be shorter than detector.exposure_s"
+                )
+        elif pedestal_interval != 0.0:
+            # Zero stays acceptable so a to_dict/from_dict round trip of an
+            # ordinary integrating detector does not have to strip the field.
+            raise ConfigError(
+                "detector.cds_pedestal_interval_s: only meaningful when "
+                "detector.readout_mode = 'cds'"
+            )
         return cls(
             preset=preset,
             inline=inline,
@@ -669,12 +706,14 @@ class DetectorConfig:
             temperature_c=None
             if data.get("temperature_c") is None
             else _finite(data["temperature_c"], "detector.temperature_c"),
-            binning=_positive_int(data.get("binning", 1), "detector.binning"),
+            binning=binning_value,
             binning_mode=mode,
             precision=precision,
             include_truth=include_truth,
             qe_curve_path=qe_curve_path,
             roi=roi,
+            readout_mode=readout_mode,
+            cds_pedestal_interval_s=pedestal_interval,
         )
 
 

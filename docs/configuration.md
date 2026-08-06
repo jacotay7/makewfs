@@ -109,6 +109,8 @@ kernel file hash and all normalized states are included in frame provenance.
 | `detector.binning_mode` | `"digital"` or `"on_chip"` (default `"digital"`). |
 | `detector.precision` | `"float32"` or `"float64"` (default `"float64"`). |
 | `detector.include_truth` | Boolean (default `true`) controlling detector truth arrays. |
+| `detector.readout_mode` | `"integrate"` (default) or `"cds"`. `"integrate"` runs the ordinary `getframes` exposure and returns unsigned ADU. `"cds"` runs correlated double sampling — one global-reset ramp, pedestal read, integration, signal read — and returns the **signed** `int32` difference. Requires `detector.binning = 1`, is incompatible with caller-owned `out` storage, and needs a `getframes` with `Camera.correlated_double_sample`. |
+| `detector.cds_pedestal_interval_s` | Non-negative reset-to-pedestal-read delay in seconds (default `0.0`). Only meaningful with `readout_mode = "cds"`, and must be shorter than `detector.exposure_s`. It does not change the measured signal — `exposure_s` is the read-to-read integration — only the interval the pedestal read's own bias/noise terms are evaluated at. |
 | `detector.qe_curve_path` | Optional configuration-relative two-column `wavelength_nm qe` curve passed to `getframes`; enables wavelength-resolved QE for broadband optical cubes. |
 | `detector.roi` | Optional full-detector ROI table with non-negative `left_px`/`top_px` and positive `width_px`/`height_px`. Its shape must match the optical mosaic. |
 | `numerics.dtype` | Optical real precision, `"float32"` or `"float64"` (default `"float64"`). |
