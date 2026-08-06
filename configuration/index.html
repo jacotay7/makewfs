@@ -1,0 +1,1756 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven adaptive-optics wavefront sensor images">
+      
+      
+      
+        <link rel="canonical" href="https://jacotay7.github.io/makewfs/configuration/">
+      
+      
+        <link rel="prev" href="../concepts/">
+      
+      
+        <link rel="next" href="../units-and-coordinates/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Configuration - makewfs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="makewfs" class="md-header__button md-logo" aria-label="makewfs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            makewfs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jacotay7/makewfs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="makewfs" class="md-nav__button md-logo" aria-label="makewfs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    makewfs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jacotay7/makewfs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-key-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete key reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete key reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telescope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        telescope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensor-detector-and-numerics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sensor, detector, and numerics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-normalization-and-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source normalization and morphology
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detector-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detector choices
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../units-and-coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Units and coordinates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide-stars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide stars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shack-hartmann/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shack-Hartmann
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../detectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detectors and radiometry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_20" id="__nav_20_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-units-coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Units and coordinates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-flux-normalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flux normalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-public-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-backend-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-key-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete key reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete key reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telescope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        telescope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensor-detector-and-numerics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sensor, detector, and numerics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-normalization-and-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source normalization and morphology
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detector-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detector choices
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration">Configuration</h1>
+<p>TOML is the canonical configuration format. A complete example is shipped at
+<code>examples/configs/shack_hartmann_minimal.toml</code>.</p>
+<p>The root requires <code>schema_version = 1</code> and has these tables:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code></td>
+<td>quantity, units, array shape, physical extent, static OPD</td>
+</tr>
+<tr>
+<td><code>telescope</code></td>
+<td>pupil diameter, obstruction, spiders, custom mask</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>NGS/LGS, photon rate or magnitude, field angle, throughput</td>
+</tr>
+<tr>
+<td><code>sensor</code></td>
+<td>sensor kind and sensing wavelength</td>
+</tr>
+<tr>
+<td><code>shack_hartmann</code></td>
+<td>lenslet and spot sampling</td>
+</tr>
+<tr>
+<td><code>pyramid</code></td>
+<td>pupil separation and modulation</td>
+</tr>
+<tr>
+<td><code>detector</code></td>
+<td><code>getframes</code> preset, exposure, temperature, binning</td>
+</tr>
+<tr>
+<td><code>numerics</code></td>
+<td>device, dtype, FFT oversampling/workers, internal sampling</td>
+</tr>
+</tbody>
+</table>
+<p>Unknown keys and conflicting normalization choices are errors. File paths are
+resolved relative to the TOML file. The normalized configuration has a short
+SHA-256 <code>digest</code> used in frame provenance. All lengths are metres unless the
+key explicitly says <code>arcsec</code>, <code>deg</code>, or <code>pixels</code>.</p>
+<h2 id="complete-key-reference">Complete key reference</h2>
+<p>The loader rejects omitted required keys, unknown keys, non-finite values, and
+values outside the ranges below. Defaults are shown in parentheses.</p>
+<p>At the root, <code>schema_version = 1</code> is required. An optional <code>[metadata]</code> table
+accepts arbitrary designer notes and is preserved in the normalized
+configuration; it does not affect optical propagation except through the
+configuration digest.</p>
+<h3 id="input"><code>input</code></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning and constraints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quantity</code></td>
+<td><code>"opd"</code> or <code>"phase"</code> (default <code>"opd"</code>).</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>Must be <code>"m"</code> for OPD or <code>"rad"</code> for phase; units are never inferred.</td>
+</tr>
+<tr>
+<td><code>shape</code></td>
+<td>Required <code>[height, width]</code>, positive integers. Every dynamic input has this shape.</td>
+</tr>
+<tr>
+<td><code>grid_extent_m</code></td>
+<td>Required physical width/height of the input grid, positive.</td>
+</tr>
+<tr>
+<td><code>reference_wavelength_m</code></td>
+<td>Required positive wavelength when <code>quantity = "phase"</code>; otherwise unused.</td>
+</tr>
+<tr>
+<td><code>static_opd_path</code></td>
+<td>Optional <code>.npy</code>, <code>.npz</code>, or FITS OPD map with exactly <code>shape</code>; resolved relative to the TOML file.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="telescope"><code>telescope</code></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning and constraints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pupil_diameter_m</code></td>
+<td>Required positive entrance-pupil diameter.</td>
+</tr>
+<tr>
+<td><code>central_obscuration_ratio</code></td>
+<td>Inner radius divided by outer radius, <code>[0, 1)</code>, default <code>0</code>.</td>
+</tr>
+<tr>
+<td><code>spiders</code></td>
+<td>Array of <code>{angle_deg, width_fraction}</code> tables (default <code>[]</code>); angle is measured from +x and width is a fraction of a half-turn, <code>[0, 1]</code>.</td>
+</tr>
+<tr>
+<td><code>pupil_rotation_deg</code></td>
+<td>Rotation applied to spider angles, default <code>0</code>.</td>
+</tr>
+<tr>
+<td><code>custom_mask_path</code></td>
+<td>Optional <code>.npy</code>, <code>.npz</code>, or FITS amplitude mask; values must be finite in <code>[0, 1]</code> and match the internal sensor grid.</td>
+</tr>
+<tr>
+<td><code>segments_across_pupil</code></td>
+<td>Optional square segment count (integer ≥2), used with analytic segment gaps.</td>
+</tr>
+<tr>
+<td><code>segment_gap_fraction</code></td>
+<td>Gap width as a fraction of segment pitch, <code>[0, 0.99]</code> (default <code>0</code>); nonzero values require <code>segments_across_pupil</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="source"><code>source</code></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning and constraints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>"ngs"</code> or <code>"lgs"</code> (default <code>"ngs"</code>).</td>
+</tr>
+<tr>
+<td><code>normalization</code></td>
+<td><code>"detector_photon_rate"</code> or <code>"magnitude"</code> (default <code>"detector_photon_rate"</code>).</td>
+</tr>
+<tr>
+<td><code>detector_photon_rate_per_s</code></td>
+<td>Non-negative total photons/s at the detector surface before QE; required for direct-rate mode.</td>
+</tr>
+<tr>
+<td><code>magnitude</code></td>
+<td>Finite magnitude; required for magnitude mode. LGS must not use magnitude mode.</td>
+</tr>
+<tr>
+<td><code>magnitude_system</code></td>
+<td><code>"vega"</code> or <code>"ab"</code> (default <code>"vega"</code>); used with <code>band</code>.</td>
+</tr>
+<tr>
+<td><code>band</code></td>
+<td>Required band name for magnitude mode, passed to <code>getframes</code> radiometry.</td>
+</tr>
+<tr>
+<td><code>throughput</code></td>
+<td>Scalar optical throughput in <code>[0, 1]</code> (default <code>1</code>), used by magnitude radiometry.</td>
+</tr>
+<tr>
+<td><code>field_angle_arcsec</code></td>
+<td>Source centroid <code>[x, y]</code> in arcsec (default <code>[0, 0]</code>).</td>
+</tr>
+<tr>
+<td><code>angular_fwhm_arcsec</code></td>
+<td>Non-negative Gaussian source FWHM (default <code>0</code>); nonzero values require quadrature order at least 2.</td>
+</tr>
+<tr>
+<td><code>angular_quadrature_order</code></td>
+<td>Positive deterministic source quadrature order (default <code>3</code>).</td>
+</tr>
+<tr>
+<td><code>angular_kernel_path</code></td>
+<td>Optional three-column <code>x_arcsec y_arcsec weight</code> source kernel; mutually exclusive with nonzero FWHM and resolved relative to the TOML file.</td>
+</tr>
+<tr>
+<td><code>wavelengths_m</code></td>
+<td>Optional positive wavelength nodes. Empty means the sensor wavelength.</td>
+</tr>
+<tr>
+<td><code>wavelength_weights</code></td>
+<td>Optional non-negative weights matching <code>wavelengths_m</code>; normalized internally.</td>
+</tr>
+<tr>
+<td><code>lgs_ranges_m</code></td>
+<td>Optional positive sodium range nodes; only valid for LGS. Empty means a thin layer at the configured mean.</td>
+</tr>
+<tr>
+<td><code>lgs_range_weights</code></td>
+<td>Optional non-negative weights matching <code>lgs_ranges_m</code>; normalized internally.</td>
+</tr>
+<tr>
+<td><code>lgs_launch_position_m</code></td>
+<td>LGS launch <code>[x, y]</code> in the entrance-pupil plane (default <code>[0, 0]</code>); only valid for LGS.</td>
+</tr>
+<tr>
+<td><code>sed_path</code></td>
+<td>Optional two-column <code>wavelength_nm value</code> source spectrum, non-negative and increasing.</td>
+</tr>
+<tr>
+<td><code>transmission_path</code></td>
+<td>Optional two-column <code>wavelength_nm value</code> transmission curve in <code>[0, 1]</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>SED and transmission curves use trapezoid quadrature on their common wavelength
+nodes. The resulting normalized wavelength, source-angle, and (for SH) range
+states are recorded in provenance.</p>
+<p>An angular kernel is an arbitrary incoherent source morphology. Its offsets are
+added to <code>field_angle_arcsec</code>, its non-negative weights are normalized, and each
+sample is propagated independently. For example:</p>
+<div class="highlight"><pre><span></span><code># x_arcsec  y_arcsec  relative_weight
+-0.15       0.00      1
+ 0.00       0.00      2
+ 0.15       0.00      1
+</code></pre></div>
+<p>This is useful for measured binary-guide-star or resolved-source profiles. The
+kernel file hash and all normalized states are included in frame provenance.</p>
+<h3 id="sensor-detector-and-numerics"><code>sensor</code>, <code>detector</code>, and <code>numerics</code></h3>
+<table>
+<thead>
+<tr>
+<th>Table/key</th>
+<th>Meaning and constraints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sensor.kind</code></td>
+<td>Required <code>"shack_hartmann"</code> or <code>"pyramid"</code>.</td>
+</tr>
+<tr>
+<td><code>sensor.wavelength_m</code></td>
+<td>Required positive reference sensing wavelength.</td>
+</tr>
+<tr>
+<td><code>detector.preset</code></td>
+<td>Existing <code>getframes</code> camera preset; mutually exclusive with <code>detector.camera</code>.</td>
+</tr>
+<tr>
+<td><code>detector.camera</code></td>
+<td>Inline <code>getframes.CameraConfig</code> dictionary; mutually exclusive with <code>preset</code>.</td>
+</tr>
+<tr>
+<td><code>detector.exposure_s</code></td>
+<td>Required non-negative exposure time.</td>
+</tr>
+<tr>
+<td><code>detector.temperature_c</code></td>
+<td>Optional detector temperature in °C.</td>
+</tr>
+<tr>
+<td><code>detector.binning</code></td>
+<td>Positive integer passed to <code>getframes</code>.</td>
+</tr>
+<tr>
+<td><code>detector.binning_mode</code></td>
+<td><code>"digital"</code> or <code>"on_chip"</code> (default <code>"digital"</code>).</td>
+</tr>
+<tr>
+<td><code>detector.precision</code></td>
+<td><code>"float32"</code> or <code>"float64"</code> (default <code>"float64"</code>).</td>
+</tr>
+<tr>
+<td><code>detector.include_truth</code></td>
+<td>Boolean (default <code>true</code>) controlling detector truth arrays.</td>
+</tr>
+<tr>
+<td><code>detector.readout_mode</code></td>
+<td><code>"integrate"</code> (default) or <code>"cds"</code>. <code>"integrate"</code> runs the ordinary <code>getframes</code> exposure and returns unsigned ADU. <code>"cds"</code> runs correlated double sampling — one global-reset ramp, pedestal read, integration, signal read — and returns the <strong>signed</strong> <code>int32</code> difference. Requires <code>detector.binning = 1</code>, is incompatible with caller-owned <code>out</code> storage, and needs a <code>getframes</code> with <code>Camera.correlated_double_sample</code>.</td>
+</tr>
+<tr>
+<td><code>detector.cds_pedestal_interval_s</code></td>
+<td>Non-negative reset-to-pedestal-read delay in seconds (default <code>0.0</code>). Only meaningful with <code>readout_mode = "cds"</code>, and must be shorter than <code>detector.exposure_s</code>. It does not change the measured signal — <code>exposure_s</code> is the read-to-read integration — only the interval the pedestal read's own bias/noise terms are evaluated at.</td>
+</tr>
+<tr>
+<td><code>detector.qe_curve_path</code></td>
+<td>Optional configuration-relative two-column <code>wavelength_nm qe</code> curve passed to <code>getframes</code>; enables wavelength-resolved QE for broadband optical cubes.</td>
+</tr>
+<tr>
+<td><code>detector.roi</code></td>
+<td>Optional full-detector ROI table with non-negative <code>left_px</code>/<code>top_px</code> and positive <code>width_px</code>/<code>height_px</code>. Its shape must match the optical mosaic.</td>
+</tr>
+<tr>
+<td><code>numerics.dtype</code></td>
+<td>Optical real precision, <code>"float32"</code> or <code>"float64"</code> (default <code>"float64"</code>).</td>
+</tr>
+<tr>
+<td><code>numerics.device</code></td>
+<td>Execution device, <code>"cpu"</code> (default) or <code>"gpu"</code>. GPU requires the <code>makewfs[gpu]</code> extra and a GPU-capable <code>getframes</code>; optical, truth, and ADU arrays stay device-resident.</td>
+</tr>
+<tr>
+<td><code>numerics.fft_oversampling</code></td>
+<td>Positive FFT integration oversampling (default <code>2</code>). Also scales the pyramid propagation grid so diffraction beyond the detector crop is discarded instead of wrapping onto the pupil rims.</td>
+</tr>
+<tr>
+<td><code>numerics.fft_workers</code></td>
+<td>Positive <code>scipy.fft</code> worker count (default <code>1</code>).</td>
+</tr>
+<tr>
+<td><code>numerics.pupil_samples_per_lenslet</code></td>
+<td>Optional integer ≥4 for SH internal pupil sampling; otherwise derived from input shape.</td>
+</tr>
+<tr>
+<td><code>numerics.pupil_supersampling</code></td>
+<td>Positive analytic pupil boundary sub-sampling factor (default <code>1</code>).</td>
+</tr>
+</tbody>
+</table>
+<p>For a device-resident atmosphere → WFS → detector loop:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[numerics]</span>
+<span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;gpu&quot;</span>
+<span class="n">dtype</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;float32&quot;</span>
+<span class="n">fft_oversampling</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<span class="n">fft_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w">  </span><span class="c1"># CPU-only FFT control; accepted but ignored by CuPy FFTs</span>
+</code></pre></div>
+<p><code>[shack_hartmann]</code> keys are:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning and constraints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lenslets_across_pupil</code></td>
+<td>Positive square lenslet count.</td>
+</tr>
+<tr>
+<td><code>pixels_per_subaperture</code></td>
+<td>Native detector pixels per lenslet, at least 2.</td>
+</tr>
+<tr>
+<td><code>spot_sampling_pixels_per_lambda_over_d</code></td>
+<td>Positive normalized sampling; mutually exclusive with physical relay fields. Values below 1 represent detector pixels wider than <code>lambda/D</code>.</td>
+</tr>
+<tr>
+<td><code>minimum_illuminated_fraction</code></td>
+<td>Validity threshold in <code>[0, 1]</code>.</td>
+</tr>
+<tr>
+<td><code>lenslet_fill_factor</code></td>
+<td>Square clear fill fraction in <code>[0, 1]</code> (default 1).</td>
+</tr>
+<tr>
+<td><code>lenslet_pitch_m</code></td>
+<td>Optional positive physical lenslet pitch. When omitted, the legacy telescope-pupil pitch is used.</td>
+</tr>
+<tr>
+<td><code>lenslet_focal_length_m</code></td>
+<td>Optional positive physical lenslet focal length.</td>
+</tr>
+<tr>
+<td><code>detector_pixel_pitch_m</code></td>
+<td>Optional positive detector pitch for physical sampling.</td>
+</tr>
+<tr>
+<td><code>relay_magnification</code></td>
+<td>Positive relay magnification (default 1).</td>
+</tr>
+<tr>
+<td><code>field_stop_radius_lambda_over_d</code></td>
+<td>Optional non-negative focal-plane field-stop radius.</td>
+</tr>
+<tr>
+<td><code>optical_blur_fwhm_pixels</code></td>
+<td>Gaussian blur FWHM in native pixels (default 0).</td>
+</tr>
+<tr>
+<td><code>optical_blur_kernel_path</code></td>
+<td>Optional measured odd-sized blur kernel path; mutually exclusive with Gaussian blur.</td>
+</tr>
+<tr>
+<td><code>detector_margin_pixels</code></td>
+<td>Non-negative zero-rate mosaic margin.</td>
+</tr>
+<tr>
+<td><code>lenslet_grid_rotation_deg</code></td>
+<td>Lenslet-frame rotation in degrees (default 0).</td>
+</tr>
+<tr>
+<td><code>lenslet_grid_offset_fraction</code></td>
+<td><code>[x, y]</code> offset in lenslet-pitch fractions (default <code>[0, 0]</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><code>[shack_hartmann]</code> requires positive <code>lenslets_across_pupil</code>, at least two
+<code>pixels_per_subaperture</code>, and <code>minimum_illuminated_fraction</code> in <code>[0, 1]</code>.
+Either positive <code>spot_sampling_pixels_per_lambda_over_d</code> or both
+<code>lenslet_focal_length_m</code> and <code>detector_pixel_pitch_m</code> must be supplied, but
+never both. The optional <code>lenslet_fill_factor</code> is in <code>[0, 1]</code>,
+<code>relay_magnification</code> is positive, <code>field_stop_radius_lambda_over_d</code> is
+non-negative when supplied, <code>optical_blur_fwhm_pixels</code> is non-negative, and
+<code>optical_blur_kernel_path</code> may reference a measured odd-sized, non-negative
+<code>.npy</code>, <code>.npz</code>, or FITS PSF kernel; it is normalized to unit sum and is
+mutually exclusive with <code>optical_blur_fwhm_pixels</code>. <code>detector_margin_pixels</code>
+is a non-negative integer. The optional
+<code>lenslet_grid_rotation_deg</code> rotates the lenslet coordinate frame, and
+<code>lenslet_grid_offset_fraction = [x, y]</code> shifts its origin by fractions of one
+subaperture pitch. These two controls use an explicit physical-coordinate
+resampling path; the default zero values retain the fast axis-aligned path.
+Integer-compatible focal grids use the batched FFT path. Arbitrary sampling,
+including undersampled quadcell modes, uses an exact sampled DFT at detector
+quadrature points so the configured plate scale is not rounded to an FFT bin.</p>
+<p><code>[pyramid]</code> requires <code>pixels_across_pupil</code> ≥ 8 and positive
+<code>pupil_separation_pixels</code>. <code>modulation_radius_lambda_over_d</code> is non-negative;
+zero radius requires exactly one sample, while nonzero modulation requires at
+least four <code>modulation_samples</code>. <code>detector_margin_pixels</code> is non-negative.</p>
+<p><code>numerics.pupil_supersampling</code> sub-samples analytic circular, annular, spider,
+and segment-gap boundaries before averaging each pupil pixel. Analytic features
+are rotated by <code>pupil_rotation_deg</code>; custom masks should be supplied already
+rotated because they are measured amplitude products. Custom masks may be
+<code>.npy</code>, <code>.npz</code>, or FITS arrays in <code>[0, 1]</code>.</p>
+<h2 id="source-normalization-and-morphology">Source normalization and morphology</h2>
+<p>For laboratory or already-calibrated flux, use:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[source]</span>
+<span class="n">kind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;ngs&quot;</span>
+<span class="n">normalization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;detector_photon_rate&quot;</span>
+<span class="n">detector_photon_rate_per_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.0e9</span>
+</code></pre></div>
+<p>The rate is photons/s at the detector surface before detector QE. For an NGS,
+the alternative is <code>normalization = "magnitude"</code> with <code>magnitude</code>, <code>band</code>, and
+<code>magnitude_system = "vega"</code> or <code>"ab"</code>; this uses <code>getframes</code> radiometry.
+LGS return flux must be supplied directly because laser return prediction is out
+of scope.</p>
+<p>Shack–Hartmann sampling can be expressed either directly in normalized units
+or with physical lenslet optics. Do not provide both forms:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[shack_hartmann]</span>
+<span class="n">lenslets_across_pupil</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">20</span>
+<span class="n">pixels_per_subaperture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span>
+<span class="n">minimum_illuminated_fraction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.25</span>
+<span class="n">lenslet_pitch_m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0002</span>
+<span class="n">lenslet_focal_length_m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.020</span>
+<span class="n">detector_pixel_pitch_m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">15e-6</span>
+<span class="n">relay_magnification</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span>
+</code></pre></div>
+<p>In physical mode, <code>makewfs</code> derives pixels per <code>lambda / D_subaperture</code> as
+<code>f_lenslet * wavelength * relay_magnification /
+(lenslet_pitch * detector_pixel_pitch)</code>. For backward compatibility,
+<code>lenslet_pitch_m</code> defaults to the entrance-pupil diameter divided by the
+lenslet count, but hardware models should provide the measured pitch explicitly.</p>
+<p><code>field_stop_radius_lambda_over_d</code> clips each subaperture's focal-plane field
+stop, <code>optical_blur_fwhm_pixels</code> applies a flux-spreading optical Gaussian
+before detector sampling, and <code>detector_margin_pixels</code> pads the assembled SH
+mosaic with zero-rate margins. These are optical settings; detector binning and
+noise remain in <code>[detector]</code>/<code>getframes</code>.</p>
+<p>Wavelength and source-size quadrature are optional. Weights are normalized, and
+intensities—not complex fields—are summed:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[source]</span>
+<span class="n">kind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;ngs&quot;</span>
+<span class="n">normalization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;detector_photon_rate&quot;</span>
+<span class="n">detector_photon_rate_per_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.0e9</span>
+<span class="n">wavelengths_m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">650e-9</span><span class="p">,</span><span class="w"> </span><span class="mf">700e-9</span><span class="p">,</span><span class="w"> </span><span class="mf">750e-9</span><span class="p">]</span>
+<span class="n">wavelength_weights</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.2</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">]</span>
+<span class="n">angular_fwhm_arcsec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.25</span>
+<span class="n">angular_quadrature_order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span>
+<span class="c1"># Optional two-column wavelength_nm / relative_value files:</span>
+<span class="c1"># sed_path = &quot;source_sed.txt&quot;</span>
+<span class="c1"># transmission_path = &quot;filter_transmission.txt&quot;</span>
+</code></pre></div>
+<p><code>field_angle_arcsec = [x, y]</code> is the source centroid. A finite FWHM uses a
+deterministic Gaussian quadrature around that centroid. By default the detector
+receives one summed photon-rate map and uses its scalar QE. For broadband
+scenes, <code>detector.qe_curve_path</code> enables wavelength-resolved exposure through
+the released <code>getframes&gt;=2.1.1</code> spectral cube API, preserving the incident cube
+and wavelength nodes in detector truth.</p>
+<p>For a sodium LGS, configure a detector-surface return rate and optional range
+profile. The range model is currently Shack–Hartmann-specific:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[source]</span>
+<span class="n">kind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;lgs&quot;</span>
+<span class="n">normalization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;detector_photon_rate&quot;</span>
+<span class="n">detector_photon_rate_per_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.0e8</span>
+<span class="n">lgs_ranges_m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">89000.0</span><span class="p">,</span><span class="w"> </span><span class="mf">90000.0</span><span class="p">,</span><span class="w"> </span><span class="mf">91000.0</span><span class="p">]</span>
+<span class="n">lgs_range_weights</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0.25</span><span class="p">]</span>
+<span class="n">lgs_launch_position_m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">]</span>
+</code></pre></div>
+<p>The supplied OPD is interpreted at the weighted mean range. Each range slice
+gets the geometric perspective offset for each lenslet; this captures image
+elongation but does not create range-resolved turbulent OPD. See the
+<a href="../guide-stars/">guide-star guide</a> for the approximation and <code>pyturb</code> handoff.</p>
+<h2 id="detector-choices">Detector choices</h2>
+<p><code>detector.preset</code> names any installed <code>getframes</code> preset, including OCAM2K,
+SAPHIRA, EMCCD, sCMOS, and generic teaching cameras. When the optical mosaic is
+a hardware ROI rather than the full sensor, preserve its full-detector origin:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[detector.roi]</span>
+<span class="n">left_px</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span>
+<span class="n">top_px</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span>
+<span class="n">width_px</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">228</span>
+<span class="n">height_px</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">228</span>
+</code></pre></div>
+<p>The ROI uses unbinned detector pixels, with <code>left_px</code>/<code>top_px</code> measured from the
+full sensor's upper-left corner. Its <code>(height_px, width_px)</code> must equal the ideal
+optical output shape. <code>makewfs</code> passes this geometry to <code>getframes</code>, which retains
+the preset's native sensor size, evaluates detector effects in full-detector
+coordinates, and returns the cropped image. Without <code>detector.roi</code>, a differing
+optical shape retains the legacy behavior of replacing the camera resolution.
+Detector binning and all noise physics remain in <code>getframes</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

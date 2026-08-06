@@ -1,0 +1,1369 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven adaptive-optics wavefront sensor images">
+      
+      
+      
+        <link rel="canonical" href="https://jacotay7.github.io/makewfs/performance/">
+      
+      
+        <link rel="prev" href="../gallery/">
+      
+      
+        <link rel="next" href="../troubleshooting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Performance - makewfs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#performance-and-precision" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="makewfs" class="md-header__button md-logo" aria-label="makewfs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            makewfs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Performance
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jacotay7/makewfs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="makewfs" class="md-nav__button md-logo" aria-label="makewfs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    makewfs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jacotay7/makewfs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../units-and-coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Units and coordinates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide-stars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide stars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shack-hartmann/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shack-Hartmann
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../detectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detectors and radiometry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-use-jit-shack-hartmann-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-use-JIT Shack--Hartmann execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-versus-gpu-reference-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU versus GPU reference throughput
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_20" id="__nav_20_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-units-coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Units and coordinates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-flux-normalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flux normalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-public-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-backend-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-use-jit-shack-hartmann-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-use-JIT Shack--Hartmann execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-versus-gpu-reference-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU versus GPU reference throughput
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="performance-and-precision">Performance and precision</h1>
+<p>Construct a <code>WavefrontSensor</code> once. Pupil masks, source quadrature, FFT geometry,
+pyramid masks, and the <code>getframes.Camera</code> adapter are built at construction;
+<code>photon_rate</code> and <code>expose</code> are the warm paths.</p>
+<p>The CPU implementation uses SciPy batched FFTs and supports <code>fft_workers</code> plus
+float32/complex64 or float64/complex128 optical arithmetic. Float32 is useful
+for throughput and memory; float64 is the reference path. Benchmark cold
+construction separately from warm frames and record Python, NumPy, SciPy, and
+hardware versions.</p>
+<p>The array-reference Shack--Hartmann path integrates the common two-times
+oversampling case with direct strided sums. Temporally integrated exposures
+batch their fields and avoid a caller-side optical render for every sample.
+These are mathematically equivalent allocation/reduction optimizations.</p>
+<h2 id="first-use-jit-shack-hartmann-execution">First-use-JIT Shack--Hartmann execution</h2>
+<p>Compatible sampled-DFT Shack--Hartmann configurations on CUDA automatically use
+a shape-specialized compiled executor. The persistent sensor generates a CUDA C
+kernel for its precision, temporal sample count, lenslet geometry, detector
+sampling, field stop, margin, wavelength count, and detector-owned charge
+diffusion footprint. CuPy compiles it on the first launch and caches the binary
+both in the process and on disk. A later process can therefore reuse the disk
+cache, but a new geometry or isolated cache pays the compilation cost again.</p>
+<p>The kernel fuses phase formation, separable DFT propagation, field-stop masking,
+temporal intensity averaging, pixel integration, mosaic assembly, and spectral
+and total photon-rate accumulation; the executor then performs one captured-flux
+reduction. When charge diffusion is configured, its focal-plane convolution and
+native-pixel integration are composed once at plan construction into one exact
+linear operator. This retains the zero-padded focal boundary while removing the
+repeated convolution traversal from every lenslet, wavelength, and temporal
+sample. Wavelength/source states still launch and accumulate in their declared
+order, so incoherent intensity and spectral-QE inputs are preserved.</p>
+<p>The readable array implementation remains the reference and automatic fallback
+for CPU execution, FFT-resolved spot geometries, continuous optical Gaussian
+blur, measured native-pixel optical kernels, and geometries exceeding portable
+CUDA block/shared-memory limits. Compiled renders allocate independent public
+rate outputs on every call; cached plan storage is immutable and never aliases a
+returned result.</p>
+<p>An isolated-cache Quadro P620 benchmark of the physically complete HAKA example
+(57x57 lenslets, 4x4 detector pixels, four temporal samples, eight wavelengths,
+4x focal sampling, and the measured 9x9 OCAM2K charge-diffusion kernel) measured
+24.85 ms compiled versus 569.67 ms reference p50: <strong>22.93x faster</strong> and a 95.64%
+latency reduction. The cold first use took 3.176 s. Photon-rate, spectral-rate,
+and captured-flux disagreements were respectively 4.85e-8, 9.74e-8, and
+4.71e-8 relative. Reproduce the matched alternating-order measurement with:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">CUPY_CACHE_DIR</span><span class="o">=</span>/tmp/makewfs-isolated-cache<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>benchmarks/benchmark_compiled_sh_executor.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--haka<span class="w"> </span>--frames<span class="w"> </span><span class="m">20</span><span class="w"> </span>--temporal-samples<span class="w"> </span><span class="m">4</span>
+</code></pre></div>
+<p>The versioned record is
+<code>benchmarks/haka-compiled-sh-executor-quadro-p620.json</code>. It is an owner-isolated
+hardware measurement, not an end-to-end or portable latency guarantee.</p>
+<p>In the array fallback on GPU, Shack--Hartmann source states that resolve to the
+same FFT size are propagated in one device batch. State accumulation order and
+the CPU reference remain unchanged. A configured wavelength-scaled field stop
+keeps states sequential because its mask differs with sampling. On a Quadro
+P620, the
+eight-state, four-temporal-sample HAKA-class path groups the first five
+wavelengths and leaves the other three single. A matched, alternating-order
+64-frame benchmark measured 37.19 ms sequential versus 36.39 ms grouped median
+optics time, a 2.16% reduction. The maximum relative ideal photon-rate
+difference was 5.1e-8. Reproduce it with:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>benchmarks/benchmark_sh_state_batching.py<span class="w"> </span>path/to/haka-resolved-wfs.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--frames<span class="w"> </span><span class="m">64</span><span class="w"> </span>--temporal-samples<span class="w"> </span><span class="m">4</span>
+</code></pre></div>
+<p>The versioned Quadro P620 record is
+<code>benchmarks/haka-sh-state-batching-quadro-p620.json</code>. It is a local matched
+measurement, not a portable latency guarantee.</p>
+<p>Install the optional CUDA extra, then set
+<code>numerics.device = "gpu"</code> in the WFS TOML:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;makewfs[gpu]&#39;</span>
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>-m<span class="w"> </span>gpu
+</code></pre></div>
+<p>Sensor allocations, reductions, FFTs, interpolation, blur hooks, photon-rate
+maps, detector stochastic samples, truth, and ADU remain on the device.
+<code>frame.data</code> is the zero-copy CuPy interface; <code>np.asarray(frame)</code>, FITS output,
+plotting, or <code>getframes.to_numpy</code> intentionally transfer to the host. CPU and GPU
+use independent random streams, so optical arrays are compared numerically while
+detector parity is validated statistically and seeded repetition is checked on
+each backend.</p>
+<h2 id="cpu-versus-gpu-reference-throughput">CPU versus GPU reference throughput</h2>
+<p>The August 2026 development reference used an AMD Ryzen 9 9950X3D and NVIDIA RTX
+5090 with Python 3.12, NumPy 2.2.6, SciPy 1.16.3, CuPy 14.1.1, <code>getframes</code>
+2.1.1, and <code>pyturb</code> 1.0.0. Each row constructs one persistent sensor, performs
+an untimed end-to-end warm-up, and records 100 frames. A zero-OPD array enters on
+the selected device; optics, detector stochastic samples, truth, and ADU remain
+there. Every frame receives a distinct deterministic detector-noise seed. CUDA
+is synchronized around timed regions; construction and host transfers are
+excluded from frames/s.</p>
+<p>“Work samples” is source states multiplied by modulation points: it is 9 for the
+three-wavelength by three-range LGS case and 8 or 32 for the modulated pyramid
+cases.</p>
+<div class="highlight"><pre><span></span><code>`shack_hartmann_quadrature_9sample.toml` crosses three wavelengths with three beacon
+ranges to reach nine work samples. That spectral axis is a deliberate quadrature
+*load*, not sodium physics: a sodium beacon returns the 589 nm D2 line broadened
+by roughly 0.003 nm, some three orders of magnitude narrower than the config&#39;s
+585–595 nm sweep. Spot elongation comes from the range spread and the off-axis
+launch, not from colour. Use `examples/showcase.py`, which samples a
+monochromatic beacon across the sodium layer&#39;s depth, as the physical reference.
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Sensor</th>
+<th style="text-align: right;">Output</th>
+<th style="text-align: right;">Work samples</th>
+<th style="text-align: right;">CPU (frames/s)</th>
+<th style="text-align: right;">GPU (frames/s)</th>
+<th style="text-align: right;">Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>shack_hartmann_20x20_float32.toml</code></td>
+<td>SH</td>
+<td style="text-align: right;">160x160</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">126.5</td>
+<td style="text-align: right;">2,041.8</td>
+<td style="text-align: right;">16.13x</td>
+</tr>
+<tr>
+<td><code>shack_hartmann_60x60_float64.toml</code></td>
+<td>SH</td>
+<td style="text-align: right;">360x360</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">17.9</td>
+<td style="text-align: right;">899.3</td>
+<td style="text-align: right;">50.11x</td>
+</tr>
+<tr>
+<td><code>shack_hartmann_quadrature_9sample.toml</code></td>
+<td>SH</td>
+<td style="text-align: right;">64x64</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">186.0</td>
+<td style="text-align: right;">780.4</td>
+<td style="text-align: right;">4.20x</td>
+</tr>
+<tr>
+<td><code>pyramid_40_float32.toml</code></td>
+<td>pyramid</td>
+<td style="text-align: right;">54x54</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3,526.4</td>
+<td style="text-align: right;">1,604.7</td>
+<td style="text-align: right;">0.46x</td>
+</tr>
+<tr>
+<td><code>pyramid_60_mod8_float32.toml</code></td>
+<td>pyramid</td>
+<td style="text-align: right;">80x80</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">659.0</td>
+<td style="text-align: right;">1,645.9</td>
+<td style="text-align: right;">2.50x</td>
+</tr>
+<tr>
+<td><code>pyramid_80_mod32_float64.toml</code></td>
+<td>pyramid</td>
+<td style="text-align: right;">108x108</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">24.3</td>
+<td style="text-align: right;">923.6</td>
+<td style="text-align: right;">37.94x</td>
+</tr>
+</tbody>
+</table>
+<p>Higher frames/s is better. Static source/range geometry, modulation phasors,
+interpolation grids,
+normalizers, and monochromatic spectral views are cached. SH uses an
+intensity-only centered FFT that removes an irrelevant input permutation; both
+sensors use native orthonormal FFT scaling, a fixed illuminated piston reference,
+and batched metadata scalar transfers. The GPU detector improvements described
+in <code>getframes</code> are included in every end-to-end row.</p>
+<p>Persistent Shack--Hartmann engines also cache half-sample ramps, sampled-DFT
+kernels, field-stop masks, and backend blur kernels. This targets geometry-heavy
+field-stop and arbitrary-sampling cases; the dominant plain large-FFT path keeps
+the same transform workload and should not be expected to change materially.</p>
+<p>Pyramid behavior still shows the GPU crossover clearly: launch overhead makes
+the tiny unmodulated case slower, eight modulation points provide a 2.50x gain,
+and the 32-point float64 case reaches 37.9x. The nine-sample quadrature case has
+nine incoherent source states but a small 64x64 detector, so it gains only 4.20x.</p>
+<p>The <a href="https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.md">rendered snapshot</a>
+and <a href="https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results.json">raw JSON</a>
+record exact configuration paths, command, revision, dirty-checkout flag,
+environment, timings, and detector-only rates. The checked-in snapshot records a
+specific local environment and is not a cross-hardware performance guarantee.</p>
+<p>The repository benchmark runner separates cold construction, warm optical
+frames, end-to-end frames, and detector-only frames:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>benchmarks/run.py<span class="w"> </span>--frames<span class="w"> </span><span class="m">10</span><span class="w"> </span>--output<span class="w"> </span>benchmark-results.json
+python<span class="w"> </span>benchmarks/run.py<span class="w"> </span>--device<span class="w"> </span>both<span class="w"> </span>--frames<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>benchmarks/configs/shack_hartmann_20x20_float32.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>benchmarks/configs/shack_hartmann_60x60_float64.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>benchmarks/configs/shack_hartmann_quadrature_9sample.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>benchmarks/configs/pyramid_40_float32.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>benchmarks/configs/pyramid_60_mod8_float32.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>benchmarks/configs/pyramid_80_mod32_float64.toml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>benchmarks/device-results.json
+python<span class="w"> </span>benchmarks/render_device_table.py<span class="w"> </span>benchmarks/device-results.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>benchmarks/device-results.md
+</code></pre></div>
+<p>Benchmark JSON includes source-state count, output shape, exact invocation,
+revision state, environment, methodology, and per-frame optical, end-to-end, and
+detector-only timings. CUDA is synchronized around timed regions.</p>
+<p>Each returned detector frame also records <code>wfs_optical_render_s</code>,
+<code>wfs_detector_expose_s</code>, and <code>wfs_total_expose_s</code>. These are lightweight
+diagnostics for a closed-loop driver, not scheduling guarantees or controller
+abstractions.</p>
+<p>Sequential pipeline owners may provide a backend-native <code>uint32</code> <code>out=</code> array
+to <code>WavefrontSensor.expose()</code> or <code>expose_integrated()</code>. The detector adapter uses
+a reusable <code>getframes.DetectorWorkspace</code> only for this explicit path, preserving
+independent frame lifetimes for ordinary calls. The returned <code>Frame.data</code> is the
+exact destination and remains valid only until the caller reuses it. On the local
+i7-10700, the physical OCAM2K 240×240 detector / 228×228 ROI case improved
+1.205× and cut traced peak allocation by 49.5%. Isolated Quadro P620 detector
+timing and a three-pair full AO-loop trial were throughput-neutral, so the
+supported GPU graph does not enable the destination automatically.</p>
+<p>Representative Shack–Hartmann configurations are provided under
+<code>benchmarks/configs/</code>:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>benchmarks/run.py<span class="w"> </span>--representative<span class="w"> </span>--frames<span class="w"> </span><span class="m">3</span><span class="w"> </span>--output<span class="w"> </span>benchmark-results.json
+</code></pre></div>
+<p>They cover 20×20 float32 and 60×60 float64 lenslet grids, a nine-sample
+spectrally and range-resolved SH source, and 40/60/80-pixel pyramid cases with 1/8/32
+modulation samples while keeping the minimal SH and pyramid smoke cases in the
+default benchmark run.</p>
+<p>The repository also keeps a dated reference snapshot with hardware, Python,
+dependency, precision, source-state, construction, warm-optics, and detector
+columns in
+<a href="https://github.com/jacotay7/makewfs/blob/main/benchmarks/reference-table.md"><code>benchmarks/reference-table.md</code></a>.
+Regenerate it on a new machine with:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>benchmarks/run.py<span class="w"> </span>--representative<span class="w"> </span>--frames<span class="w"> </span><span class="m">3</span><span class="w"> </span>--measure-memory<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>benchmarks/reference-results.json
+python<span class="w"> </span>benchmarks/render_table.py<span class="w"> </span>benchmarks/reference-results.json<span class="w"> </span>--output<span class="w"> </span>benchmarks/reference-table.md
+</code></pre></div>
+<p>For call-level hotspot inspection, write a compact cumulative <code>cProfile</code> report:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>benchmarks/profile_warm.py<span class="w"> </span>--frames<span class="w"> </span><span class="m">3</span><span class="w"> </span>--output<span class="w"> </span>profile-results.json
+</code></pre></div>
+<p>CI also runs <code>benchmarks/check_regression.py</code> on the representative report. It
+checks generous same-run ratios for 60x60 versus 20x20 SH, the nine-state
+quadrature LGS case versus minimal SH, and 32-sample versus unmodulated pyramid
+optics. These are order-of-magnitude regression alarms, not portable latency
+promises; inspect the full JSON report for machine-specific performance work.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
