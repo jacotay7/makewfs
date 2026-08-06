@@ -4,6 +4,21 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **The Keck example's photon budget covers arbitrary passbands, and no longer
+  extrapolates its extinction curve silently.** `broadband_budget` gained
+  `band_min_nm`, `band_max_nm`, `quadrature_order`, and `extinction_paths`, so a
+  near-infrared sensing arm can use the same budget as the visible one. Multiple
+  extinction tables are concatenated in wavelength, keeping the Gemini optical
+  measurement and the near-infrared continuum separately attributed, and a band
+  reaching past the last tabulated point now raises instead of silently taking
+  `numpy.interp`'s flat continuation. That check immediately caught the existing
+  HAKA configuration: its 400-950 nm band runs 50 nm past the optical curve, so
+  it had been clamping extinction at the 900 nm value. `mauna_kea_extinction_nir.csv`
+  supplies the J/H/K continuum, clearly marked as a stated assumption rather
+  than a measurement, and `KECK_ALUMINUM_MIRROR_REFLECTIVITY_NIR` records that
+  aluminium is about 0.97 per surface in the near infrared against 0.88 in the
+  visible -- a 30% flux difference over three reflections.
+
 - **Correlated double sampling as a selectable detector readout mode.**
   `detector.readout_mode = "cds"` routes the adapter to the released
   `getframes.Camera.correlated_double_sample[_spectral]` instead of

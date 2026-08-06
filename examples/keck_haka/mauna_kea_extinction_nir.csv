@@ -1,0 +1,47 @@
+# wavelength_nm,extinction_mag_per_airmass
+#
+# Mauna Kea near-infrared continuum extinction, for the J and H atmospheric
+# windows. This is a SEPARATE file from mauna_kea_extinction.csv on purpose:
+# that one is the Gemini-published *optical* curve and it stops at 900 nm, so
+# extending it here would misattribute these values to that measurement.
+#
+# Provenance and status: these are representative broadband continuum
+# coefficients for a dry Mauna Kea night, not a measured curve. Above about
+# 1 um the extinction is dominated by aerosol scattering (roughly 1/lambda)
+# plus telluric water absorption; Rayleigh scattering has fallen to a few
+# percent of its V-band value by 1.25 um. The values below follow that
+# continuum and deliberately describe the *windows* the J and H filters sit
+# in. They therefore UNDERSTATE the loss for a filter whose bandpass reaches
+# into the water bands at the window edges, and they do not vary with
+# precipitable water vapour, which in reality is the dominant night-to-night
+# term in the near infrared.
+#
+# Replace with a measured or ATRAN-modelled curve at the site's actual PWV
+# before quoting a photometric result from this. It is here so that a
+# near-infrared photon budget states an explicit, inspectable assumption
+# rather than silently reusing the last point of an optical curve.
+920,0.048
+950,0.045
+1000,0.040
+1100,0.032
+1150,0.028
+1200,0.024
+1250,0.022
+1300,0.021
+1350,0.022
+1400,0.030
+1450,0.035
+1500,0.024
+1550,0.019
+1600,0.017
+1650,0.016
+1700,0.016
+1750,0.017
+1800,0.020
+1900,0.035
+2000,0.030
+2100,0.026
+2200,0.024
+2300,0.026
+2400,0.032
+2500,0.040

@@ -79,6 +79,15 @@ HAKA_DOWNSTREAM_THROUGHPUT = 0.287
 KECK_ALUMINUM_MIRROR_REFLECTIVITY = 0.88
 KECK_TELESCOPE_MIRROR_COUNT = 3
 MAUNA_KEA_EXTINCTION_PATH = HERE / "mauna_kea_extinction.csv"
+# The optical curve above is a Gemini measurement that stops at 900 nm. A
+# near-infrared sensing arm passes this one instead; see its header for what it
+# is and is not.
+MAUNA_KEA_NIR_EXTINCTION_PATH = HERE / "mauna_kea_extinction_nir.csv"
+# Aluminium reflectivity rises into the near infrared: about 0.88 per surface
+# in the visible against roughly 0.97 at 1.2-1.7 um for a clean coating. Using
+# the visible number for three reflections in H would understate the flux by
+# about 30%.
+KECK_ALUMINUM_MIRROR_REFLECTIVITY_NIR = 0.97
 _H_PLANCK_J_S = 6.62607015e-34
 _C_LIGHT_M_S = 299792458.0
 _K_BOLTZMANN_J_K = 1.380649e-23
@@ -327,6 +336,13 @@ def broadband_budget(
     mirror_reflectivity: float = KECK_ALUMINUM_MIRROR_REFLECTIVITY,
     mirror_count: int = KECK_TELESCOPE_MIRROR_COUNT,
     throughput: float = HAKA_DOWNSTREAM_THROUGHPUT,
+    band_min_nm: float = HAKA_BAND_MIN_NM,
+    band_max_nm: float = HAKA_BAND_MAX_NM,
+    quadrature_order: int = HAKA_SPECTRAL_QUADRATURE_ORDER,
+    extinction_paths: tuple[Path, ...] = (
+        MAUNA_KEA_EXTINCTION_PATH,
+        MAUNA_KEA_NIR_EXTINCTION_PATH,
+    ),
 ) -> BroadbandBudget:
     """Build a Johnson-band-normalized 400--950 nm stellar photon quadrature.
 
@@ -372,12 +388,27 @@ def broadband_budget(
     )
     density_scale = bandpass.photon_flux(magnitude) / band_shape_integral
 
+    if not 0 < band_min_nm < band_max_nm:
+        raise ValueError("band limits must satisfy 0 < band_min_nm < band_max_nm")
     wavelengths_nm, quadrature = _gauss_legendre_interval(
-        HAKA_BAND_MIN_NM,
-        HAKA_BAND_MAX_NM,
-        HAKA_SPECTRAL_QUADRATURE_ORDER,
+        band_min_nm,
+        band_max_nm,
+        quadrature_order,
     )
-    extinction = np.loadtxt(MAUNA_KEA_EXTINCTION_PATH, delimiter=",", comments="#")
+    tables = [np.loadtxt(path, delimiter=",", comments="#") for path in extinction_paths]
+    if not tables:
+        raise ValueError("at least one extinction curve is required")
+    extinction = np.concatenate(tables, axis=0)
+    extinction = extinction[np.argsort(extinction[:, 0])]
+    covered_min = float(extinction[0, 0])
+    covered_max = float(extinction[-1, 0])
+    if band_min_nm < covered_min or band_max_nm > covered_max:
+        names = ", ".join(path.name for path in extinction_paths)
+        raise ValueError(
+            f"extinction curves ({names}) cover {covered_min:g}-{covered_max:g} nm "
+            f"but the requested band spans {band_min_nm:g}-{band_max_nm:g} nm; "
+            "supply a curve that covers it rather than extrapolating"
+        )
     extinction_mag_per_airmass = np.interp(
         wavelengths_nm,
         extinction[:, 0],
