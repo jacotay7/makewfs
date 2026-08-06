@@ -14,8 +14,12 @@ All notable changes to `makewfs` are documented here.
   `numpy.interp`'s flat continuation. That check immediately caught the existing
   HAKA configuration: its 400-950 nm band runs 50 nm past the optical curve, so
   it had been clamping extinction at the 900 nm value. `mauna_kea_extinction_nir.csv`
-  supplies the J/H/K continuum, clearly marked as a stated assumption rather
-  than a measurement, and `KECK_ALUMINUM_MIRROR_REFLECTIVITY_NIR` records that
+  supplies the measured J/H/K coefficients from Leggett et al. (2006, MNRAS
+  373, 781; UFTI on UKIRT over 21 photometric nights), held flat across each
+  MKO passband so integrating the table over that passband returns the
+  published number. The entries between the passbands sit in the 1.4 and 1.9 um
+  telluric water bands and are indicative only. `KECK_ALUMINUM_MIRROR_REFLECTIVITY_NIR`
+  records that
   aluminium is about 0.97 per surface in the near infrared against 0.88 in the
   visible -- a 30% flux difference over three reflections.
 

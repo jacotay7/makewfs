@@ -1,47 +1,56 @@
 # wavelength_nm,extinction_mag_per_airmass
 #
-# Mauna Kea near-infrared continuum extinction, for the J and H atmospheric
-# windows. This is a SEPARATE file from mauna_kea_extinction.csv on purpose:
-# that one is the Gemini-published *optical* curve and it stops at 900 nm, so
-# extending it here would misattribute these values to that measurement.
+# Mauna Kea near-infrared atmospheric extinction.
 #
-# Provenance and status: these are representative broadband continuum
-# coefficients for a dry Mauna Kea night, not a measured curve. Above about
-# 1 um the extinction is dominated by aerosol scattering (roughly 1/lambda)
-# plus telluric water absorption; Rayleigh scattering has fallen to a few
-# percent of its V-band value by 1.25 um. The values below follow that
-# continuum and deliberately describe the *windows* the J and H filters sit
-# in. They therefore UNDERSTATE the loss for a filter whose bandpass reaches
-# into the water bands at the window edges, and they do not vary with
-# precipitable water vapour, which in reality is the dominant night-to-night
-# term in the near infrared.
+# SOURCE: Leggett, Currie, Varricatt et al. (2006), "JHK observations of faint
+# standard stars in the Mauna Kea Observatories near-infrared photometric
+# system", MNRAS 373, 781. Measured with UFTI on UKIRT over 21 photometric
+# nights, giving mean coefficients of
 #
-# Replace with a measured or ATRAN-modelled curve at the site's actual PWV
-# before quoting a photometric result from this. It is here so that a
-# near-infrared photon budget states an explicit, inspectable assumption
-# rather than silently reusing the last point of an optical curve.
-920,0.048
-950,0.045
-1000,0.040
-1100,0.032
-1150,0.028
-1200,0.024
-1250,0.022
-1300,0.021
-1350,0.022
-1400,0.030
-1450,0.035
-1500,0.024
-1550,0.019
-1600,0.017
-1650,0.016
-1700,0.016
-1750,0.017
-1800,0.020
-1900,0.035
-2000,0.030
-2100,0.026
-2200,0.024
-2300,0.026
-2400,0.032
-2500,0.040
+#     J  0.047 +/- 0.024 mag/airmass  (range 0.012-0.090)
+#     H  0.029 +/- 0.020 mag/airmass  (range 0.000-0.072)
+#     K  0.052 +/- 0.028 mag/airmass  (range 0.000-0.124)
+#
+# The paper notes these exceed what water vapour alone accounts for, with the
+# balance attributed to aerosol scattering.
+#
+# This is a SEPARATE file from mauna_kea_extinction.csv on purpose: that one is
+# the Gemini-published *optical* curve and it stops at 900 nm. Extending it here
+# would misattribute these values to that measurement.
+#
+# HOW THIS TABLE IS BUILT. The values above are *band averages* over the MKO
+# filter passbands, which is the quantity that was measured. The table therefore
+# holds each measured coefficient flat across its own passband, so integrating
+# it over that passband returns the published number. It deliberately does NOT
+# try to resolve structure within a band.
+#
+# The entries BETWEEN the passbands sit in the 1.4 and 1.9 um telluric water
+# bands, where extinction is large and strongly dependent on precipitable water
+# vapour. Those values are indicative only -- enough to stop an interpolation
+# treating the water bands as transparent, not a model of them. Do not run a
+# photon budget over a passband that reaches into them and expect a meaningful
+# answer.
+#
+# The night-to-night scatter is large: the J range spans a factor of seven. A
+# study of faint-end performance should treat extinction as a variable, not as
+# the single mean this table encodes.
+#
+# The Gemini site quotes higher medians for the same summit (J 0.10, H 0.05,
+# K 0.07 mag/airmass). The difference is real and unresolved here; the
+# peer-reviewed UKIRT measurement is used because its provenance, sample, and
+# uncertainties are stated.
+920,0.050
+1000,0.050
+1100,0.055
+1150,0.047
+1250,0.047
+1350,0.047
+1420,0.600
+1490,0.029
+1650,0.029
+1780,0.029
+1900,1.000
+2000,0.052
+2200,0.052
+2400,0.052
+2500,0.100
