@@ -8,13 +8,13 @@ dynamic = ["version"]
 description = "Configuration-driven adaptive-optics wavefront sensor image simulation."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Jacob Taylor", email = "jacobataylor7@gmail.com" }]
 keywords = ["adaptive-optics", "wavefront-sensor", "shack-hartmann", "pyramid"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -27,7 +27,7 @@ classifiers = [
 dependencies = [
     "numpy>=1.23",
     "scipy>=1.10",
-    "getframes>=2.1.1",
+    "getframes>=2.2.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
 

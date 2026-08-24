@@ -15,8 +15,10 @@ Before changing anything:
 4. Identify the smallest unchecked roadmap item that contains the requested work
    and state its acceptance criteria.
 5. Inspect the public sibling API before proposing cross-repository work:
-   `/home/donkeykong/pyturb` for atmosphere and
-   `/home/donkeykong/getframes` for detector/radiometry.
+   [`pyturb`](https://github.com/jacotay7/pyturb) for atmosphere and
+   [`getframes`](https://github.com/jacotay7/getframes) for detector/radiometry.
+   Read them from the installed package or your own checkout — never hard-code a
+   filesystem path to a sibling repository, here or anywhere else in the repo.
 
 The repository is currently in the Shack-Hartmann and fixed-mask four-face
 pyramid stage, with deterministic source spectral/angular quadrature, measured
@@ -24,7 +26,7 @@ source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, and a documented SH sodium-range geometry
 model. It also includes a versioned labelled documentation gallery, benchmark
 reference snapshot, non-editable-wheel clean-room smoke evidence, released
-wavelength-resolved detector QE through `getframes>=2.1.1`, and public
+wavelength-resolved detector QE through `getframes>=2.2.0`, and public
 end-to-end CuPy execution with CPU parity tests. The GPU path uses
 `numerics.device = "gpu"` and the sibling `getframes` CuPy detector. Do not
 present range-resolved turbulent LGS OPD or broad independent-reference parity

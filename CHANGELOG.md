@@ -4,6 +4,19 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-24
+
+- Declared the license as a PEP 639 SPDX expression (`license = "MIT"` plus
+  `license-files`) instead of the deprecated `license = { text = "MIT" }` table,
+  and dropped the now-redundant `License ::` classifier. The built distribution
+  carries `License-Expression: MIT` and `License-File: LICENSE`. No change to the
+  license itself.
+
+- **Requires `getframes>=2.2.0`.** The `detector.readout_mode = "cds"` path calls
+  `getframes.Camera.correlated_double_sample[_spectral]`, which is released in
+  getframes 2.2.0; the previous `>=2.1.1` floor would have installed a getframes
+  without it and failed at first CDS readout rather than at resolve time.
+
 - **`detector.background_photon_rate_per_s`** adds a uniform incident sky or
   thermal background in photons/s/pixel, passed to the `getframes` `background`
   term on every readout path including correlated double sampling and the

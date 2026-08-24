@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from makewfs import ConfigError, __version__, load_config
+from makewfs import ConfigError, load_config
 from makewfs.config import (
     DetectorConfig,
     InputConfig,
@@ -26,7 +26,6 @@ def test_load_config_and_digest() -> None:
     assert config.sensor.kind == "shack_hartmann"
     assert config.input.shape == (128, 128)
     assert len(config.digest) == 16
-    assert __version__ == "1.0.0"
 
 
 def test_config_round_trip_preserves_digest() -> None:

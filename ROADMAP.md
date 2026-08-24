@@ -89,7 +89,7 @@ capability, then add it to the repository that owns that physics.
 
 The roadmap is based on an audit of the sibling repositories on 2026-07-19.
 
-### pyturb 1.0.0 (`/home/donkeykong/pyturb`)
+### pyturb 1.0.0
 
 - `Atmosphere.frames(dt=..., steps=...)` yields time and `(n, n)` OPD arrays in
   metres. `Atmosphere.opd(wavelength=...)` can instead return phase in radians.
@@ -106,10 +106,10 @@ for time_s, opd_m in atmosphere.frames(dt=config.exposure_s, steps=1000):
     frame = wfs.expose(opd_m)
 ```
 
-### getframes 2.1.1 (`/home/donkeykong/getframes`)
+### getframes 2.2.0
 
-The released sibling is now `getframes 2.1.1` (the audit baseline was 2.0.0).
-The 1.0 dependency constraint is `getframes>=2.1.1`.
+The released sibling is now `getframes 2.2.0` (the audit baseline was 2.0.0).
+The 1.1 dependency constraint is `getframes>=2.2.0`.
 
 - `Camera.expose(photon_rate, exposure, ...)` accepts a scalar or native-pixel
   photon-rate map and returns an array-like `Frame` in ADU with noise-free truth.

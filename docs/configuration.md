@@ -245,7 +245,7 @@ angular_quadrature_order = 3
 deterministic Gaussian quadrature around that centroid. By default the detector
 receives one summed photon-rate map and uses its scalar QE. For broadband
 scenes, `detector.qe_curve_path` enables wavelength-resolved exposure through
-the released `getframes>=2.1.1` spectral cube API, preserving the incident cube
+the released `getframes>=2.2.0` spectral cube API, preserving the incident cube
 and wavelength nodes in detector truth.
 
 For a sodium LGS, configure a detector-surface return rate and optional range

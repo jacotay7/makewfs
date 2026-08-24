@@ -60,7 +60,7 @@ python -m pytest -m interop
 ```
 
 The release clean-room check installs non-editable `makewfs` distributions with
-released `getframes>=2.1.1` and `pyturb>=1.0` in an isolated environment. It
+released `getframes>=2.2.0` and `pyturb>=1.0` in an isolated environment. It
 imports the installed packages, builds a small SH configuration, renders an
 ideal rate map, exposes one seeded detector frame, and verifies
 wavelength-resolved detector truth.

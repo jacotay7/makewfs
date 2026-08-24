@@ -27,9 +27,9 @@ keeps one optical photon-rate map per wavelength and calls
 `getframes.Camera.expose_spectral` once. QE is applied exactly once inside
 `getframes`; `FrameTruth.photon_rate` remains the integrated incident map while
 `FrameTruth.spectral_photon_rate` and `wavelengths_nm` preserve the cube. Without
-a QE curve, the scalar path is retained. `makewfs>=1.0` requires
-`getframes>=2.1.1`, the first released detector version with this spectral cube
-and truth contract.
+a QE curve, the scalar path is retained. `makewfs>=1.1` requires
+`getframes>=2.2.0`; the spectral cube and truth contract first shipped in
+`getframes` 2.1.1, and the correlated-double-sampling readout in 2.2.0.
 
 ## Sky and thermal background
 
