@@ -217,3 +217,8 @@ def test_batched_render_of_one_sample_is_the_single_render() -> None:
 def test_batched_render_rejects_an_empty_exposure() -> None:
     with pytest.raises(ValueError, match="at least one sample"):
         _sensor().engine.render_integrated([])
+
+
+def test_batched_integration_rejects_an_empty_exposure() -> None:
+    with pytest.raises(ValueError, match="at least one sample"):
+        _sensor().expose_integrated([])
