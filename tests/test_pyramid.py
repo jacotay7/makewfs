@@ -58,6 +58,28 @@ def test_pyramid_detector_seed_repeats() -> None:
     assert np.array_equal(first, second)
 
 
+def test_pyramid_temporal_integration_averages_ideal_maps() -> None:
+    """Pyramid sensors have no batched engine, so this is the sequential path."""
+    sensor = WavefrontSensor.from_toml(CONFIG)
+    assert not callable(getattr(sensor.engine, "render_integrated", None))
+    zero = np.zeros(sensor.config.input.shape)
+    tilted = zero.copy()
+    tilted[:, zero.shape[1] // 2 :] = 1e-7
+    expected = (sensor.photon_rate(zero) + sensor.photon_rate(tilted)) / 2.0
+    result = sensor.expose_integrated(np.stack([zero, tilted]), seed=5)
+    assert result.truth is not None
+    assert result.metadata["wfs_temporal_samples"] == 2
+    assert np.allclose(result.truth.photon_rate, expected, rtol=1e-5, atol=1e-8)
+    repeated = sensor.expose_integrated(np.stack([zero, tilted]), seed=5)
+    assert np.array_equal(np.asarray(result), np.asarray(repeated))
+
+
+def test_pyramid_temporal_integration_rejects_an_empty_exposure() -> None:
+    sensor = WavefrontSensor.from_toml(CONFIG)
+    with pytest.raises(ValueError, match="at least one sample"):
+        sensor.expose_integrated([])
+
+
 def test_pyramid_frame_records_face_order() -> None:
     sensor = WavefrontSensor.from_toml(CONFIG)
     frame = sensor.expose(np.zeros(sensor.config.input.shape), seed=2)
@@ -178,3 +200,28 @@ def test_pyramid_background_adds_signal_and_its_shot_noise() -> None:
     assert np.median(with_sky) > np.median(without) + 10.0
     # And it is light, not an offset: the extra charge brings extra shot noise.
     assert with_sky.std() > without.std()
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "valid_subapertures",
+        "subaperture_plate_scale_arcsec",
+        "subaperture_field_of_view_arcsec",
+    ],
+)
+def test_pyramid_rejects_shack_hartmann_only_geometry(method: str) -> None:
+    sensor = WavefrontSensor.from_toml(CONFIG)
+    with pytest.raises(ValueError, match="Shack--Hartmann"):
+        getattr(sensor, method)()
+
+
+def test_simulate_accepts_a_config_path_and_matches_a_seeded_exposure() -> None:
+    from makewfs import simulate
+
+    sensor = WavefrontSensor.from_toml(CONFIG)
+    phase = np.zeros(sensor.config.input.shape)
+    assert np.array_equal(
+        np.asarray(simulate(phase, CONFIG, seed=3)),
+        np.asarray(sensor.expose(phase, seed=3)),
+    )
