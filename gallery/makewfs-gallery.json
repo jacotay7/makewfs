@@ -1,0 +1,23 @@
+{
+  "seed": 1200,
+  "units": {
+    "input": "OPD metres converted to nm for display",
+    "ideal_images": "photons/s/native detector pixel",
+    "detector_frame": "ADU",
+    "modulation_response": "photon-rate difference"
+  },
+  "configs": {
+    "shack_hartmann": "examples/configs/shack_hartmann_minimal.toml",
+    "pyramid": "examples/configs/pyramid_minimal.toml",
+    "lgs": "examples/configs/lgs_thin_beacon.toml"
+  },
+  "digests": {
+    "shack_hartmann": "c2e27598cc4ad410",
+    "pyramid": "15fdd86ee7ba4399",
+    "lgs": "ef6d9f6629fb30e2"
+  },
+  "notes": [
+    "LGS return rate is supplied by configuration; only geometric elongation is modeled.",
+    "The pyramid panel uses an ideal fixed four-face mask."
+  ]
+}
