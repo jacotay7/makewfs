@@ -49,6 +49,49 @@ cross-axis leakage on both axes. See [Validation](validation.md) for the numeric
 tolerances and why the external-package gain is not expected to match machine
 precision.
 
+## Lenslet-field sampling
+
+Each lenslet field is represented by `s` samples across the lenslet pitch `d`.
+The Fraunhofer transform of a field sampled at pitch `d / s` is periodic, with
+period `s` lenslet `lambda/d`, while the detector window spans
+
+```text
+W = pixels_per_subaperture / spot_sampling_pixels_per_lambda_over_d   [lambda/d]
+```
+
+If `W > s`, the window integrates more than one period: every replica of the
+spot is summed as light, so the photon rate can exceed the configured source
+rate, and a spot tilted beyond `+-s/2 lambda/d` aliases into the wrong position
+because the phase step between samples exceeds pi. The continuous lenslet field
+has neither artefact. Spot sampling scales with wavelength, so `W` is largest at
+the shortest wavelength of a spectral quadrature, and a field stop of radius `r`
+limits it to `2 r`.
+
+The engine therefore propagates each lenslet at
+
+```text
+samples_per_lenslet = k * pupil_samples_per_lenslet,
+k = smallest integer with k * pupil_samples_per_lenslet >= W_max
+```
+
+The configured pupil grid is kept: each pupil cell's area-weighted transmission
+is held constant over its `k x k` refined sub-cells, so lenslet illumination,
+validity, and a custom mask (supplied on the configured grid) are unchanged. The
+OPD is interpolated linearly from the input grid onto the refined grid, which
+reproduces a tilt exactly. Configurations that already satisfy `s >= W_max`
+keep `k = 1` and are bit-for-bit unchanged. The resolved values are available as
+`sensor.engine.pupil_samples_per_lenslet`, `field_upsampling`,
+`samples_per_lenslet`, and `detector_window_lambda_over_d`.
+
+`s >= W` is the minimum for an unaliased model, not a convergence guarantee. A
+sampled field still carries a small amount of wing light from neighbouring
+periods into the window; for fully illuminated square lenslets the captured
+fraction is a few percent above the continuous `sinc^2` value when `s` is close
+to `W` (up to about 7% at `s / W = 1.1`) and about 1% or less at `s = 4 W` in
+the test cases (`tests/test_shack_hartmann_sampling.py`).
+Raise `numerics.pupil_samples_per_lenslet` when wing flux matters, for example
+for wide-field or quad-cell geometries; the cost grows with `s^2`.
+
 ## Current limitations
 
 The CPU path supports deterministic wavelength quadrature, finite NGS angular

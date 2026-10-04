@@ -39,6 +39,48 @@ def spot_sampling_geometry(
     return ("dft", float(sampling))
 
 
+def lenslet_field_upsampling(
+    *,
+    pupil_samples_per_lenslet: int,
+    window_lambda_over_d: float,
+) -> int:
+    """Return the smallest integer field refinement that avoids spot aliasing.
+
+    A lenslet field sampled at ``s`` points across the lenslet pitch ``d`` has a
+    Fraunhofer transform that is periodic every ``s`` lenslet ``lambda / d``:
+    the sampled kernel ``exp(-2 pi i u m / s)`` repeats when ``u`` advances by
+    ``s``. Integrating a detector window wider than one period therefore sums
+    replicas of the spot as if they were real light, which creates flux, and a
+    tilt beyond ``+-s/2`` aliases because the phase step between samples
+    exceeds pi. The window, ``pixels / sampling`` lenslet ``lambda / d``, must
+    not exceed the period. This returns the smallest integer ``k`` such that
+    ``k * s >= window``; ``1`` leaves an already adequate grid untouched.
+    Integer refinement keeps every configured pupil cell aligned with the
+    refined grid, so the configured pupil and lenslet tiling are preserved.
+
+    Parameters
+    ----------
+    pupil_samples_per_lenslet
+        Samples across one lenslet pitch on the configured pupil grid.
+    window_lambda_over_d
+        Widest detector window that light can reach, in lenslet ``lambda / d``
+        at the shortest propagated wavelength. Zero (a closed field stop) needs
+        no refinement.
+
+    Returns
+    -------
+    int
+        Positive integer refinement factor.
+    """
+    if pupil_samples_per_lenslet < 1:
+        raise ValueError("pupil_samples_per_lenslet must be positive")
+    if not math.isfinite(window_lambda_over_d) or window_lambda_over_d < 0.0:
+        raise ValueError("window_lambda_over_d must be finite and non-negative")
+    # The tolerance absorbs rounding in wavelength-scaled sampling, so a window
+    # that equals the period exactly does not trigger a needless refinement.
+    return max(1, math.ceil(window_lambda_over_d / pupil_samples_per_lenslet - 1e-9))
+
+
 def load_blur_kernel(path: str) -> NDArray[np.float64]:
     """Load and normalize a finite, odd-sized measured optical blur kernel."""
     source = Path(path)
@@ -396,6 +438,7 @@ def spot_intensity(
 __all__ = [
     "block_sum",
     "crop_center",
+    "lenslet_field_upsampling",
     "load_blur_kernel",
     "pad_center",
     "spot_intensity",

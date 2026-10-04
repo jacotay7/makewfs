@@ -7,7 +7,7 @@ hide an error shared by similar FFT implementations.
 | Layer | Shack-Hartmann evidence | Four-face pyramid evidence |
 | --- | --- | --- |
 | Invariants | non-negative intensity, piston invariance, flux bounds, axis/layout tests | non-negative intensity, piston invariance, quadrant symmetry, face order, flux bounds |
-| Analytic | square-aperture diffraction and absolute centroid displacement for a known OPD slope | small-signal push/pull antisymmetry and the modulation sensitivity/linearity trade |
+| Analytic | square-aperture diffraction, absolute centroid displacement for a known OPD slope, and windowed `sinc^2` flux of fully illuminated lenslets across spot samplings and fields of view (no aliased replicas) | small-signal push/pull antisymmetry and the modulation sensitivity/linearity trade |
 | Independent arithmetic | random small-grid spots and a full mosaic propagated by a direct DFT | random small-grid pupil → mask → pupil propagation using direct forward and inverse DFTs |
 | Independent packages | two-axis, multi-amplitude centroid curves against HCIPy and OOPAO | flat image and tip/tilt/focus response maps against HCIPy and OOPAO |
 
