@@ -50,7 +50,7 @@ configuration digest.
 | `central_obscuration_ratio` | Inner radius divided by outer radius, `[0, 1)`, default `0`. |
 | `spiders` | Array of `{angle_deg, width_fraction}` tables (default `[]`); angle is measured from +x and width is a fraction of a half-turn, `[0, 1]`. |
 | `pupil_rotation_deg` | Rotation applied to spider angles, default `0`. |
-| `custom_mask_path` | Optional `.npy`, `.npz`, or FITS amplitude mask; values must be finite in `[0, 1]` and match the internal sensor grid. |
+| `custom_mask_path` | Optional `.npy`, `.npz`, or FITS amplitude mask; values must be finite in `[0, 1]` and match the configured sensor pupil grid: `pixels_across_pupil` square for a pyramid, `lenslets_across_pupil * pupil_samples_per_lenslet` square for a Shack–Hartmann (before any automatic lenslet-field refinement). |
 | `segments_across_pupil` | Optional square segment count (integer ≥2), used with analytic segment gaps. |
 | `segment_gap_fraction` | Gap width as a fraction of segment pitch, `[0, 0.99]` (default `0`); nonzero values require `segments_across_pupil`. |
 
@@ -118,7 +118,7 @@ kernel file hash and all normalized states are included in frame provenance.
 | `numerics.device` | Execution device, `"cpu"` (default) or `"gpu"`. GPU requires the `makewfs[gpu]` extra and a GPU-capable `getframes`; optical, truth, and ADU arrays stay device-resident. |
 | `numerics.fft_oversampling` | Positive FFT integration oversampling (default `2`). Also scales the pyramid propagation grid so diffraction beyond the detector crop is discarded instead of wrapping onto the pupil rims. |
 | `numerics.fft_workers` | Positive `scipy.fft` worker count (default `1`). |
-| `numerics.pupil_samples_per_lenslet` | Optional integer ≥4 for SH internal pupil sampling; otherwise derived from input shape. |
+| `numerics.pupil_samples_per_lenslet` | Optional integer ≥4: samples per lenslet pitch of the SH pupil grid that holds the amplitude mask, a custom mask, and lenslet illumination. Default `max(8, ceil(max(input.shape) / lenslets_across_pupil))`. Each lenslet field is then propagated on an integer refinement of this grid that is at least as fine as the widest detector window in lenslet `lambda/d` (see [Lenslet-field sampling](shack-hartmann.md#lenslet-field-sampling)); a value already that fine is used unchanged. |
 | `numerics.pupil_supersampling` | Positive analytic pupil boundary sub-sampling factor (default `1`). |
 
 For a device-resident atmosphere → WFS → detector loop:
@@ -169,6 +169,15 @@ resampling path; the default zero values retain the fast axis-aligned path.
 Integer-compatible focal grids use the batched FFT path. Arbitrary sampling,
 including undersampled quadcell modes, uses an exact sampled DFT at detector
 quadrature points so the configured plate scale is not rounded to an FFT bin.
+
+A lenslet field sampled at `s` points per lenslet has a far field that repeats
+every `s` lenslet `lambda/d`, so the propagated sampling must satisfy
+`s >= pixels_per_subaperture / spot_sampling_pixels_per_lambda_over_d` at the
+shortest configured wavelength (or `2 * field_stop_radius_lambda_over_d` when
+that is smaller). The engine enforces this by refining each lenslet field by the
+smallest sufficient integer factor; it never changes the configured pupil grid.
+For example, 4 pixels at 0.25 pixel per `lambda/d` span a 16 `lambda/d` window,
+so `pupil_samples_per_lenslet = 6` is propagated at 18 samples per lenslet.
 
 `[pyramid]` requires `pixels_across_pupil` ≥ 8 and positive
 `pupil_separation_pixels`. `modulation_radius_lambda_over_d` is non-negative;

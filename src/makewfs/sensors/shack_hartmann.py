@@ -17,6 +17,7 @@ from ..pupil import make_pupil
 from ..radiometry import source_rate_per_s
 from ..sampling import (
     _SpotPropagationPlan,
+    lenslet_field_upsampling,
     load_blur_kernel,
     spot_intensity,
     spot_sampling_geometry,
@@ -51,16 +52,43 @@ class ShackHartmannEngine(SensorEngine):
         self.n_lenslets = self.settings.lenslets_across_pupil
         requested = config.numerics.pupil_samples_per_lenslet
         input_samples = max(config.input.shape) / self.n_lenslets
-        self.samples_per_lenslet = requested or max(8, math.ceil(input_samples))
+        self.source_states = iter_source_states(config)
+        self._state_spot_sampling = tuple(
+            self._spot_sampling(state.wavelength_m) for state in self.source_states
+        )
+        # The configured pupil grid holds the amplitude mask (including a
+        # custom mask, which must match it) and defines lenslet illumination.
+        self.pupil_samples_per_lenslet = requested or max(8, math.ceil(input_samples))
+        self.pupil_shape = (self.n_lenslets * self.pupil_samples_per_lenslet,) * 2
+        # Each lenslet is propagated on an integer refinement of that grid,
+        # fine enough that the sampled field's periodic far field does not
+        # repeat inside the detector window at the shortest wavelength. See
+        # ``lenslet_field_upsampling``; adequate grids keep a factor of one.
+        self.detector_window_lambda_over_d = self._widest_detector_window()
+        self.field_upsampling = lenslet_field_upsampling(
+            pupil_samples_per_lenslet=self.pupil_samples_per_lenslet,
+            window_lambda_over_d=self.detector_window_lambda_over_d,
+        )
+        self.samples_per_lenslet = self.pupil_samples_per_lenslet * self.field_upsampling
         self.internal_shape = (self.n_lenslets * self.samples_per_lenslet,) * 2
-        self.pupil = make_pupil(
+        pupil = make_pupil(
             config.telescope,
-            self.internal_shape,
+            self.pupil_shape,
             config.input.grid_extent_m,
             supersampling=config.numerics.pupil_supersampling,
             backend=self.backend,
             dtype=self._real_dtype,
         )
+        if self.field_upsampling > 1:
+            # Hold each configured pupil cell's area-weighted transmission
+            # constant over its refined sub-cells, so the illuminated area and
+            # lenslet illumination are exactly those of the configured grid.
+            pupil = self.backend.repeat(
+                self.backend.repeat(pupil, self.field_upsampling, axis=0),
+                self.field_upsampling,
+                axis=1,
+            )
+        self.pupil = pupil
         self.wavefront = WavefrontInput(
             config,
             load_static_opd(config),
@@ -147,7 +175,6 @@ class ShackHartmannEngine(SensorEngine):
         else:
             self._lgs_mean_range_m = None
         self.source_rate = source_rate_per_s(config.source, config.telescope)
-        self.source_states = iter_source_states(config)
         self.file_digests = referenced_file_digests(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         self._optical_blur_kernel = (
@@ -174,9 +201,6 @@ class ShackHartmannEngine(SensorEngine):
         self._piston_index = divmod(flat_piston_index, self.internal_shape[1])
         self._field_angle_opd = tuple(
             self._field_angle_for_state(state) for state in self.source_states
-        )
-        self._state_spot_sampling = tuple(
-            self._spot_sampling(state.wavelength_m) for state in self.source_states
         )
         self._wavelengths = tuple(dict.fromkeys(state.wavelength_m for state in self.source_states))
         wavelength_index = {value: index for index, value in enumerate(self._wavelengths)}
@@ -285,6 +309,21 @@ class ShackHartmannEngine(SensorEngine):
             mode="constant",
         )
         return cast(NDArray[np.float64], self.backend.asarray(sampled, dtype=self._real_dtype))
+
+    def _widest_detector_window(self) -> float:
+        """Return the widest window light can reach, in lenslet ``lambda / d``.
+
+        Spot sampling in pixels per ``lambda / d`` scales with wavelength, so the
+        shortest propagated wavelength sees the widest window. A configured
+        circular field stop of radius ``r`` admits nothing beyond a ``2 r`` wide
+        region, so it bounds the window too.
+        """
+        pixels = self.settings.pixels_per_subaperture
+        window = max(pixels / sampling for sampling in self._state_spot_sampling)
+        field_stop = self.settings.field_stop_radius_lambda_over_d
+        if field_stop is not None:
+            window = min(window, 2.0 * field_stop)
+        return window
 
     def _spot_sampling(self, wavelength_m: float) -> float:
         configured = self.settings.spot_sampling_pixels_per_lambda_over_d

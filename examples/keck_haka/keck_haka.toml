@@ -64,6 +64,10 @@ dtype = "float32"
 # applying nothing.
 fft_oversampling = 4
 fft_workers = 1
+# The generated 228x228 Keck mask sits on this 4-sample-per-lenslet grid. The
+# 4-pixel window spans 4 / (0.91 * 411 / 673) = 7.2 lambda/d at the bluest
+# quadrature node, so makewfs propagates each lenslet field at 8 samples to keep
+# the sampled far field from repeating inside the window.
 pupil_samples_per_lenslet = 4
 pupil_supersampling = 1
 

@@ -4,6 +4,35 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Fixed: Shack-Hartmann flux creation and ghost spots for wide subaperture
+  windows** ([#4](https://github.com/jacotay7/makewfs/issues/4)). A lenslet
+  field sampled at `s` points per lenslet has a far field that repeats every
+  `s` lenslet `lambda/d`; when the detector window
+  `pixels_per_subaperture / spot_sampling_pixels_per_lambda_over_d` exceeded
+  `s`, the sampled DFT summed the replicas as light. A 20x20 sensor with 4
+  pixels at 0.25 pixel per `lambda/d` and 6 pupil samples per lenslet returned
+  8.6 times the configured photon rate (79 times for 16 pixels at 0.32), and
+  tilts beyond `+-s/2 lambda/d` aliased to the wrong side. Each lenslet field is
+  now propagated on the smallest integer refinement of the configured pupil
+  grid that is at least as fine as the widest window, evaluated at the shortest
+  configured wavelength and bounded by any field stop. The configured grid,
+  custom masks, and lenslet illumination are unchanged; the OPD is interpolated
+  linearly onto the refined grid. Configurations that already satisfied the
+  rule are bit-for-bit unchanged, and the CPU reference path and the compiled
+  CUDA executor share the fix. The engine reports `pupil_samples_per_lenslet`,
+  `field_upsampling`, `samples_per_lenslet`, and
+  `detector_window_lambda_over_d`; see the new "Lenslet-field sampling"
+  section of the Shack-Hartmann guide.
+
+  **The Keck HAKA example changes.** Its 4 samples per lenslet were below the
+  4.4 `lambda/d` window at 673 nm and the 7.2 `lambda/d` window at its 411 nm
+  quadrature node, which captured 1.56 times the light at that node and 1.06
+  times the configured rate overall at zero OPD. It now propagates at 8 samples
+  per lenslet and captures 0.93 (about 12% less signal; warm optical render
+  1.29 to 1.66 ms on GPU, 671 to 751 ms on CPU). The checked-in HAKA
+  real-versus-simulation and LUT artifacts were produced before this fix and
+  have not been regenerated.
+
 ## [1.1.0] - 2026-08-24
 
 - Declared the license as a PEP 639 SPDX expression (`license = "MIT"` plus
