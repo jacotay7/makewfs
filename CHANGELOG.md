@@ -4,6 +4,37 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **CPU and GPU pyramids used different propagation grids for some
+  geometries** ([#15](https://github.com/jacotay7/makewfs/issues/15)). The FFT
+  size came from `scipy.fft.next_fast_len` on the CPU and
+  `cupyx.scipy.fft.next_fast_len` on the GPU, and SciPy also admits a factor
+  of 11. Whenever it picked one (requests such as 33, 66 or 99 samples), the
+  CPU padded to 33/66/99 while the GPU padded to 35/70/100, and the photon
+  rates differed by up to 46% (24-pixel pupil, 9-pixel separation, 12-point
+  modulation at 3 lambda/D). Both backends now use one rule: the smallest
+  length with no prime factor above 7, which equals CuPy's choice, so **GPU
+  results are unchanged** and CPU and GPU now agree to rounding.
+  - **Behaviour change on the CPU** for every pyramid whose old SciPy size had a
+    factor of 11: the grid grows by at most 9.1% and the rate changes. At the
+    default `fft_oversampling = 2` this affects detector widths
+    (`pixels_across_pupil + pupil_separation_pixels + 2 * detector_margin_pixels`)
+    of 11, 22, 33, 38, 43, 44, 55, 65, 66, 76, 77, 82, 88, 99, 109, 110,
+    113-115, 121, 129-132, 136, 137, 148, 151-154, 163-165, 176, 181, 197, 198,
+    217-220, 226-231, 241, 242, 246, 247, 263-269, 271-275 and 295-297 pixels
+    (up to 300). Overall, 1,342 of the requests 1-4096 change size.
+  - **Unaffected:** the shipped example and benchmark pyramids (grids of 288,
+    108, 160 and 216 samples) and every Shack-Hartmann configuration, whose FFT
+    sizes follow from the configured sampling.
+  - Frames now record the grid as `wfs_pyramid_fft_size_px`.
+- **The 2.1.0 GPU pyramid's CUDA graph could replay freed cuFFT memory.** It
+  used plans from CuPy's global plan cache, which evicts them once other
+  transforms fill it (for example many sensors or user FFTs in one process),
+  and replay then read freed memory (`cudaErrorIllegalAddress`). The pyramid
+  now owns its plans, built exactly as CuPy builds them, so results are
+  unchanged.
+
 ## [2.1.0] - 2026-10-07
 
 ### Performance

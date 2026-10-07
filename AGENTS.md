@@ -255,15 +255,18 @@ MPLBACKEND=Agg python examples/gallery.py
   fixed shapes and never synchronize with the host (no `scalar`, `.item()`,
   `to_host`, or data-dependent shapes). A failed capture silently falls back to
   eager execution and records why in `engine._graph.failure`; check it after
-  changing that method.
+  changing that method. Anything the graph uses must outlive it: its FFTs run
+  on the engine's own cuFFT plans (`plans=` in `fft_axis`), never CuPy's global
+  plan cache, which evicts and frees plans the graph still references.
 - The compiled SH kernel reads the OPD as float64; `_CompiledShackHartmannExecutor.render`
   widens a float32 lenslet-grid resample (exact). Its static thread and
   shared-memory checks cannot see register pressure, so construction also
   checks the compiled kernel's `max_threads_per_block` and falls back.
-- `ArrayBackend.next_fast_length` uses SciPy on the CPU and CuPy on the GPU,
-  which disagree when SciPy picks a factor of 11 (for example 33, 66, 99). The
-  pyramid's FFT size, and therefore its result, can then differ between
-  devices; parity tests use geometries where they agree.
+- Grid sizes set the physics, so they must never depend on the backend.
+  `backend.next_fast_length` is one 7-smooth rule for CPU and GPU (it equals
+  CuPy's `next_fast_len`); do not call `scipy.fft.next_fast_len` or
+  `cupyx.scipy.fft.next_fast_len` for a size. SciPy's admits 11, which made the
+  pyramid pad differently on the two devices before 2.1.1.
 
 ## Documentation and examples
 
