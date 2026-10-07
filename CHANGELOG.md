@@ -4,6 +4,12 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Tests: conformance with the AO stack conventions.** `tests/test_conformance.py`
+  runs [aocore](https://github.com/jacotay7/aocore)'s checks against both
+  sensors. Shack-Hartmann spots centre between pixels for a flat wavefront and
+  move towards +x for a +x OPD ramp, and pyramid images are centred
+  (CONVENTIONS.md 1.3 and 3.1). `aocore` joins the `dev` extra.
+
 - **Fixed: magnitude-normalized photon rates ignored spiders, segment gaps and
   custom masks.** The rate came from the analytic annulus area
   `pi / 4 D^2 (1 - eps^2)` and was then distributed over the sampled pupil's own
