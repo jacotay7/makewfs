@@ -4,6 +4,8 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-07
+
 ### Performance
 
 - **Pruned FFTs on CPU and GPU.** Shack-Hartmann spots and the pyramid
