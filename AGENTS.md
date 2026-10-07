@@ -93,8 +93,10 @@ write a failing integration test/design note, use the conditional gates in
   the analytic pupil evaluated on `input.shape`, or a custom mask area-averaged
   from the engine's `configured_pupil`); `wfs_input_opd_rms_unweighted_m` is the
   whole-grid quadratic mean with piston kept. Both are reduced on the device and
-  cross in the one `backend.scalars` batch. Any other RMS-like key must say its
-  variant in its name (`_unweighted`, `_tiptilt_removed`).
+  cross in the one `backend.scalars` batch, so do not swap in `aocore.rms` or
+  `aocore.rms_unweighted` there: they return host floats and would add a
+  synchronization each. Any other RMS-like key must say its variant in its
+  name (`_unweighted`, `_tiptilt_removed`).
 - The intended top-level API is `load_config`, `WavefrontSensor`, and `simulate`.
   Keep other implementation objects out of `makewfs.__init__` unless an API review
   explicitly accepts them.
@@ -161,8 +163,10 @@ Follow the target layout in `ROADMAP.md`:
   rotation and rectangular grids on the selected backend, none of which
   `aocore.Pupil` models. `backend.ArrayBackend` takes a dtype per array, explicit
   FFT workers and `ndimage` helpers, which `aocore.Backend` does not, and its
-  centred FFTs keep the `fftshift` convention. `sampling.block_sum` wraps
-  `aocore.block_sum` but keeps its own factor-two fast path.
+  centred FFTs keep the `fftshift` convention; `ArrayBackend.centered_coordinates`
+  builds aocore's coordinates directly on the device. `sampling.block_sum` is a
+  thin wrapper over `aocore.block_sum` (no local fast path since aocore 0.1.3,
+  which measured at least as fast at the SH call sites).
   `sampling.area_rebin` is exact-overlap area averaging between grids of the
   same extent and any shape ratio, which `aocore.block_sum` (integer factors
   only) does not cover.

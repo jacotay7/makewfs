@@ -46,6 +46,22 @@ See "Migrating to 2.0" in the stability guide.
   RMS they plot from each frame's `wfs_input_opd_rms_m` instead of a
   whole-grid `np.std`, so the numbers they print are pupil-weighted. The
   checked-in `makewfs_showcase.webp` was not regenerated.
+- **Requires `aocore>=0.1.3,<0.2`.** `makewfs.sampling.block_sum` drops its
+  own factor-two shortcut and delegates every factor to `aocore.block_sum`,
+  whose strided CPU adds and single CuPy kernel measured at least as fast on
+  the spot stacks the Shack-Hartmann actually bins (for example
+  `(400, 16, 16)` float32: CPU 112 vs 173 us, Quadro P620 65 vs 94 us;
+  `(3600, 12, 12)` float64: CPU 0.90 vs 1.27 ms, GPU 98 vs 173 us). The
+  additions happen in a different order, so Shack-Hartmann float32 images
+  differ from 1.2.0 by float32 rounding (at most about 1e-7 relative) and
+  float64 ones by about 2e-16; pyramid images are bit-for-bit unchanged.
+  Pixel-centre coordinates for the input, pupil and DFT detector grids are
+  now built on the selected device by `aocore.centered_coordinates`
+  (`ArrayBackend.centered_coordinates`), with identical values.
+- The input-RMS tests check the unweighted key against
+  `aocore.rms_unweighted`. The per-frame path keeps its own device reduction,
+  because the aocore functions return host floats and would each add a
+  synchronization.
 
 ## [1.2.0] - 2026-10-07
 

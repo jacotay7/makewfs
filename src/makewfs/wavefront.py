@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
-from aocore import centered_coordinates, phase_to_opd
+from aocore import phase_to_opd
 from numpy.typing import ArrayLike, NDArray
 
 from .backend import ArrayBackend, cpu_backend
@@ -23,14 +23,14 @@ def _coordinates(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Return centered physical ``(x, y)`` coordinates for an array shape.
 
-    Pixel centres follow ``aocore.centered_coordinates`` (CONVENTIONS 1.2). The
-    unit-pitch offsets are exact in either precision; scaling to metres happens
-    on the backend in ``dtype``.
+    Pixel centres follow ``aocore.centered_coordinates`` (CONVENTIONS 1.2),
+    built on the backend's device. The unit-pitch offsets are exact in either
+    precision; scaling to metres happens on the backend in ``dtype``.
     """
     resolved = backend or cpu_backend()
     height, width = shape
-    x = resolved.asarray(centered_coordinates(width), dtype=dtype) * extent_m / width
-    y = resolved.asarray(centered_coordinates(height), dtype=dtype) * extent_m / height
+    x = resolved.centered_coordinates(width, dtype=dtype) * extent_m / width
+    y = resolved.centered_coordinates(height, dtype=dtype) * extent_m / height
     xx, yy = resolved.meshgrid(x, y)
     return xx, yy
 
@@ -261,7 +261,9 @@ def grid_rms(opd: Any, *, backend: ArrayBackend | None = None) -> Any:
 
     This is ``rms_unweighted`` in the sense of aocore CONVENTIONS 4.1: every
     grid pixel counts equally, including pixels outside the pupil, and the mean
-    is not removed.
+    is not removed. It equals ``aocore.rms_unweighted(opd)``, which returns a
+    host float and so would synchronize on its own; this returns a device
+    scalar for the one batched metadata crossing.
     """
     resolved = backend or cpu_backend()
     values = resolved.asarray(opd, dtype=np.float64)

@@ -9,7 +9,6 @@ from typing import Any, cast
 
 import numpy as np
 from aocore import block_sum as _aocore_block_sum
-from aocore import centered_coordinates
 from numpy.typing import NDArray
 
 from .backend import ArrayBackend, centered_fft_intensity, cpu_backend
@@ -147,9 +146,11 @@ def block_sum(
     """Sum square pixel blocks while preserving total flux.
 
     A thin wrapper over ``aocore.block_sum``, which owns flux-conserving
-    binning (CONVENTIONS 9). It keeps this module's error messages and a
-    factor-two fast path. ``backend`` is accepted for compatibility; the
-    reduction runs on the array's own namespace.
+    binning (CONVENTIONS 9); it keeps this module's error messages.
+    ``backend`` is accepted for compatibility; the reduction runs on the
+    array's own namespace. Since aocore 0.1.3 its strided CPU adds and
+    single-kernel CuPy path are at least as fast as the factor-two shortcut
+    this module used to keep, on the spot stacks the Shack-Hartmann bins.
     """
     if factor < 1:
         raise ValueError("factor must be positive")
@@ -158,17 +159,6 @@ def block_sum(
     height, width = array.shape[-2:]
     if height % factor or width % factor:
         raise ValueError(f"shape {array.shape[-2:]} is not divisible by factor {factor}")
-    if factor == 2:
-        # Two-times oversampling is the common SH path. Direct strided sums
-        # avoid NumPy's disproportionately expensive multi-axis reduction over
-        # thousands of tiny spot images and work unchanged with CuPy arrays.
-        return cast(
-            NDArray[Any],
-            array[..., 0::2, 0::2]
-            + array[..., 0::2, 1::2]
-            + array[..., 1::2, 0::2]
-            + array[..., 1::2, 1::2],
-        )
     return cast(NDArray[Any], _aocore_block_sum(array, factor))
 
 
@@ -306,8 +296,8 @@ class _SpotPropagationPlan:
                 coordinate = backend.arange(nfft, dtype=np.float64)
                 plan.half_sample = backend.exp(-1j * math.pi * coordinate / nfft)
         else:
-            detector_coordinate = backend.asarray(
-                centered_coordinates(high_resolution_pixels), dtype=np.float64
+            detector_coordinate = backend.centered_coordinates(
+                high_resolution_pixels, dtype=np.float64
             ) / (sampling * oversampling)
             pupil_coordinate = backend.arange(samples_per_lenslet, dtype=np.float64)
             kernel = backend.exp(
@@ -319,9 +309,7 @@ class _SpotPropagationPlan:
             )
             plan.dft_kernel = backend.astype(kernel, plan.field_dtype)
         if field_stop_radius_lambda_over_d is not None:
-            coordinates = backend.asarray(
-                centered_coordinates(high_resolution_pixels), dtype=np.float64
-            )
+            coordinates = backend.centered_coordinates(high_resolution_pixels, dtype=np.float64)
             y, x = backend.meshgrid(coordinates, coordinates, indexing="ij")
             radius_lambda_over_d = backend.hypot(x, y) / (oversampling * sampling)
             plan.field_stop_mask = radius_lambda_over_d <= field_stop_radius_lambda_over_d

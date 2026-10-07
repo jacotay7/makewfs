@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from aocore import rms as aocore_rms
+from aocore import rms_unweighted as aocore_rms_unweighted
 from aocore.conformance import check_rms
 
 from makewfs import WavefrontSensor, load_config
@@ -80,7 +81,7 @@ def test_tilt_matches_the_analytic_pupil_weighted_rms(name: str) -> None:
         aocore_rms(opd, _pupil(sensor)), rel=1e-12
     )
     assert metadata["wfs_input_opd_rms_unweighted_m"] == pytest.approx(
-        math.sqrt(float(np.mean(opd**2))), rel=1e-12
+        aocore_rms_unweighted(opd), rel=1e-12
     )
 
 
@@ -111,7 +112,7 @@ def test_integrated_exposure_reports_the_rms_of_the_mean_opd(name: str) -> None:
         aocore_rms(mean_opd, _pupil(sensor)), rel=1e-12
     )
     assert metadata["wfs_input_opd_rms_unweighted_m"] == pytest.approx(
-        math.sqrt(float(np.mean(mean_opd**2))), rel=1e-12
+        aocore_rms_unweighted(mean_opd), rel=1e-12
     )
 
 
@@ -163,7 +164,7 @@ def test_phase_input_rms_is_reported_in_opd_metres(name: str) -> None:
     phase = 2.0 * np.pi * opd / wavelength
 
     weighted = aocore_rms(opd, _pupil(opd_sensor))
-    unweighted = math.sqrt(float(np.mean(opd**2)))
+    unweighted = aocore_rms_unweighted(opd)
     for sensor, wavefront in ((opd_sensor, opd), (phase_sensor, phase)):
         metadata = sensor.expose(wavefront, seed=1).metadata
         assert metadata["wfs_input_opd_rms_m"] == pytest.approx(weighted, rel=1e-12)
@@ -182,6 +183,7 @@ def test_empty_pupil_on_the_input_grid_is_rejected() -> None:
 def test_grid_rms_keeps_piston_and_counts_every_pixel() -> None:
     opd = np.array([[1.0, 1.0], [1.0, 5.0]])
     assert float(grid_rms(opd)) == pytest.approx(math.sqrt(28.0 / 4.0))
+    assert float(grid_rms(opd)) == pytest.approx(aocore_rms_unweighted(opd), rel=1e-15)
 
 
 @pytest.mark.parametrize(
