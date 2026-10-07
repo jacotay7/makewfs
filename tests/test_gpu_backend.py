@@ -448,3 +448,47 @@ def test_compiled_sh_falls_back_when_kernel_exceeds_block_resources() -> None:
     if not engine._compiled_executors:
         assert "threads per block" in engine._compiled_executor_rejections[1]
     np.testing.assert_allclose(actual, expected, rtol=1e-10, atol=1e-10 * expected.max())
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("broadband", [False, True])
+def test_pyramid_cuda_graph_replay_equals_eager_and_owns_outputs(broadband: bool) -> None:
+    cupy = _cupy()
+    config = _gpu_config("pyramid_minimal.toml")
+    assert config.pyramid is not None
+    config = replace(
+        config,
+        pyramid=replace(config.pyramid, modulation_radius_lambda_over_d=2.0, modulation_samples=4),
+    )
+    if broadband:
+        config = replace(
+            config,
+            source=replace(
+                config.source,
+                wavelengths_m=(6.5e-7, 7.0e-7, 7.5e-7),
+                wavelength_weights=(0.3, 0.4, 0.3),
+            ),
+        )
+    engine = WavefrontSensor(config).engine
+    rng = cupy.random.RandomState(13)
+    first_opd = rng.normal(0.0, 5.0e-8, config.input.shape)
+    second_opd = rng.normal(0.0, 5.0e-8, config.input.shape)
+
+    first = engine.render(first_opd)
+    kept = first.photon_rate.copy()
+    second = engine.render(second_opd)
+    assert engine._graph is not None
+    assert engine._graph.failure is None
+    assert engine._graph._graph is not None
+    assert not cupy.shares_memory(first.photon_rate, second.photon_rate)
+    assert bool(cupy.array_equal(first.photon_rate, kept))
+
+    graph = engine._graph
+    engine._graph = None
+    eager = engine.render(second_opd)
+    engine._graph = graph
+    assert bool(cupy.array_equal(second.photon_rate, eager.photon_rate))
+    assert bool(cupy.array_equal(second.spectral_photon_rate, eager.spectral_photon_rate))
+    assert float(second.captured_rate_per_s) == float(eager.captured_rate_per_s)
+    expected_cube = (3, *engine.output_shape) if broadband else (1, *engine.output_shape)
+    assert second.spectral_photon_rate.shape == expected_cube

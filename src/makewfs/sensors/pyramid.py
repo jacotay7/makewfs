@@ -17,6 +17,7 @@ from ..radiometry import clear_aperture_fraction, source_rate_per_s
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
+from ._cuda_graph import _CudaGraphReplay
 
 
 class PyramidEngine(SensorEngine):
@@ -116,6 +117,11 @@ class PyramidEngine(SensorEngine):
         )
         self._base_output_shape = (pixels + separation, pixels + separation)
         self._build_unshifted_geometry()
+        # A GPU frame is launch-bound at these sizes: replay the fixed-shape
+        # propagation from a CUDA graph (see ``_cuda_graph``).
+        self._graph = (
+            None if self.backend.is_cpu else _CudaGraphReplay(self.backend.xp, self._propagate)
+        )
 
     def _make_pyramid_mask(self) -> NDArray[Any]:
         """Build four signed focal-plane ramps that separate the pupils."""
@@ -196,7 +202,8 @@ class PyramidEngine(SensorEngine):
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
-        outputs = self._propagate(internal)
+        # On a GPU the graph replays the same kernels as ``_propagate``.
+        outputs = self._propagate(internal) if self._graph is None else self._graph(internal)
         photon_rate, captured = outputs[0], outputs[1]
         spectral_photon_rate = outputs[2] if len(outputs) > 2 else photon_rate[None, ...]
         return OpticalResult(
@@ -209,7 +216,12 @@ class PyramidEngine(SensorEngine):
         )
 
     def _propagate(self, internal: NDArray[np.float64]) -> tuple[Any, ...]:
-        """Return the photon rate, captured rate and, if polychromatic, the cube."""
+        """Return the photon rate, captured rate and, if polychromatic, the cube.
+
+        Everything here has a fixed shape and stays on the device without a
+        host synchronization, which is what lets a GPU sensor capture it once
+        as a CUDA graph.
+        """
         photon_rate = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
         spectral_photon_rate = (
             None
