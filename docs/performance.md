@@ -154,6 +154,12 @@ record exact configuration paths, command, revision, dirty-checkout flag,
 environment, timings, and detector-only rates. The checked-in snapshot records a
 specific local environment and is not a cross-hardware performance guarantee.
 
+A second data point, on an Arm host (Ampere Neoverse-N1, 16 pinned cores) with
+an RTX 4060 and an RTX A400, is in
+[device-results-neoverse-n1.md](https://github.com/jacotay7/makewfs/blob/main/benchmarks/device-results-neoverse-n1.md).
+On the large double-precision configurations the RTX 4060 runs about 4x the
+RTX A400; on the small ones both cards are launch-bound and within about 10%.
+
 The repository benchmark runner separates cold construction, warm optical
 frames, end-to-end frames, and detector-only frames:
 

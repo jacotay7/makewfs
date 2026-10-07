@@ -4,6 +4,20 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Benchmark artifacts named the wrong GPU on multi-GPU hosts.**
+  `benchmarks/run.py` recorded the first line of `nvidia-smi`, which ignores
+  `CUDA_VISIBLE_DEVICES`. It now asks CuPy for the device the run used. On
+  Arm hosts, whose `/proc/cpuinfo` has no model name, it reads the CPU model
+  from `lscpu` (e.g. `Neoverse-N1`) instead of reporting `aarch64`.
+
+### Added
+
+- **Arm benchmark data point** (`benchmarks/device-results-neoverse-n1.*`): the
+  device table on an Ampere Neoverse-N1 host (16 pinned cores) with an RTX
+  4060 and an RTX A400.
+
 ## [2.0.0] - 2026-10-07
 
 ### Breaking

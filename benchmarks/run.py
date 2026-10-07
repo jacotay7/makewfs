@@ -135,17 +135,20 @@ def _git_state(root: Path) -> tuple[str | None, bool | None]:
 
 
 def _gpu_name() -> str | None:
-    """Return the first NVIDIA device name without requiring CUDA on CPU hosts."""
+    """Return the name of the CUDA device the benchmark runs on.
+
+    Asks CuPy for the current device, which honours ``CUDA_VISIBLE_DEVICES``.
+    ``nvidia-smi`` lists every card in its own order, so on a multi-GPU host
+    its first line can name a card the benchmark never used.
+    """
     try:
-        output = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError):
+        import cupy
+
+        device = cupy.cuda.runtime.getDevice()
+        name = cupy.cuda.runtime.getDeviceProperties(device)["name"]
+    except Exception:
         return None
-    return output.splitlines()[0].strip() if output.splitlines() else None
+    return name.decode() if isinstance(name, bytes) else str(name)
 
 
 def _cpu_model() -> str:
@@ -156,6 +159,15 @@ def _cpu_model() -> str:
                 return line.split(":", 1)[1].strip()
     except OSError:
         pass
+    # Arm /proc/cpuinfo has no "model name"; lscpu decodes the part number
+    # (e.g. "Neoverse-N1").
+    try:
+        output = subprocess.run(["lscpu"], check=True, capture_output=True, text=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        output = ""
+    for line in output.splitlines():
+        if line.startswith("Model name:"):
+            return line.split(":", 1)[1].strip()
     return platform.processor() or "unknown CPU"
 
 
