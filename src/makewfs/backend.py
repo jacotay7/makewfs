@@ -247,6 +247,111 @@ class ArrayBackend:
             transformed = self.fftshift(self.xp.fft.fft2(array, axes=axes, norm="ortho"), axes=axes)
         return self.abs(transformed) ** 2
 
+    def fft_axis(
+        self,
+        array: Any,
+        *,
+        axis: int,
+        norm: str,
+        inverse: bool = False,
+        workers: int = 1,
+    ) -> Any:
+        """One-dimensional FFT along ``axis`` of an array the caller owns.
+
+        The pruned two-dimensional transforms are built from these passes. On
+        the CPU the input may be overwritten, so pass only a temporary.
+        """
+        if self.is_cpu:
+            from scipy import fft
+
+            transform = fft.ifft if inverse else fft.fft
+            return transform(array, axis=axis, norm=norm, workers=workers, overwrite_x=True)
+        transform = self.xp.fft.ifft if inverse else self.xp.fft.fft
+        return transform(array, axis=axis, norm=norm)
+
+    def pruned_fft2(
+        self,
+        array: Any,
+        *,
+        size: int,
+        input_start: int | None = None,
+        output_start: int | None = None,
+        output_length: int | None = None,
+        inverse: bool = False,
+        axes: tuple[int, int] = (-2, -1),
+        workers: int = 1,
+    ) -> Any:
+        """Unitary square 2-D FFT that skips zero input and unwanted output lines.
+
+        ``array`` holds the ``(..., k, k)`` block that occupies grid rows and
+        columns ``input_start, ..., input_start + k - 1`` (modulo ``size``) of
+        an otherwise zero ``(size, size)`` grid, or the whole grid when
+        ``input_start`` is ``None`` (it may then be overwritten). Only the
+        ``output_length`` rows and columns from ``output_start`` (again modulo
+        ``size``) are returned, or all of them when ``output_start`` is
+        ``None``. Positions are on the unshifted grid. The result is
+        ``fft2(grid, norm="ortho")`` (``ifft2`` when ``inverse``) restricted to
+        those lines.
+
+        A 2-D FFT is a pass of 1-D transforms along ``axes[0]`` followed by a
+        pass along ``axes[1]``. A line that is entirely zero transforms to zero,
+        so the first pass runs only over the ``k`` lines that hold data; output
+        lines that are cropped away are never needed, so the second pass runs
+        only over the wanted ones. The whole ``1 / size`` unitary factor is
+        applied in the first pass, as SciPy's own 2-D transform does. Each
+        computed value is that of the same two passes over the whole grid; it is
+        bit-identical whenever the FFT library treats each line alike (SciPy
+        transforms lines in SIMD groups and a short remainder group can round
+        differently, so a different line count may move a value by an ulp).
+
+        Keep ``axes`` equal to the pass order of the transform being replaced,
+        because rounding depends on it: SciPy's ``fft2`` runs the listed axes in
+        order when ``overwrite_x=True`` but the last axis first when it
+        allocates its output.
+        """
+        if (output_start is None) != (output_length is None):
+            raise ValueError("output_start and output_length go together")
+        first_axis, second_axis = axes
+        first_norm, second_norm = ("backward", "forward") if inverse else ("forward", "backward")
+        spectrum = array
+        if input_start is not None:
+            spectrum = self._embed(spectrum, input_start, size=size, axis=first_axis)
+        spectrum = self.fft_axis(
+            spectrum, axis=first_axis, norm=first_norm, inverse=inverse, workers=workers
+        )
+        if output_start is not None:
+            assert output_length is not None
+            spectrum = self._gather(spectrum, output_start, output_length, axis=first_axis)
+        if input_start is not None:
+            spectrum = self._embed(spectrum, input_start, size=size, axis=second_axis)
+        spectrum = self.fft_axis(
+            spectrum, axis=second_axis, norm=second_norm, inverse=inverse, workers=workers
+        )
+        if output_start is not None:
+            assert output_length is not None
+            spectrum = self._gather(spectrum, output_start, output_length, axis=second_axis)
+        return spectrum
+
+    def _embed(self, array: Any, start: int, *, size: int, axis: int) -> Any:
+        """Zero-extend ``axis`` to ``size``, placing ``array`` from ``start`` with wrap."""
+        axis = axis % array.ndim
+        shape = list(array.shape)
+        shape[axis] = size
+        result = self.zeros(tuple(shape), dtype=array.dtype)
+        lead = (slice(None),) * axis
+        for grid, block in _wrapped_segments(start, array.shape[axis], size):
+            result[(*lead, grid)] = array[(*lead, block)]
+        return result
+
+    def _gather(self, array: Any, start: int, length: int, *, axis: int) -> Any:
+        """Select ``length`` entries of ``axis`` from ``start``, wrapping around."""
+        axis = axis % array.ndim
+        lead = (slice(None),) * axis
+        parts = [
+            array[(*lead, grid)] for grid, _ in _wrapped_segments(start, length, array.shape[axis])
+        ]
+        return parts[0] if len(parts) == 1 else self.xp.concatenate(parts, axis=axis)
+
     def centered_ifft2(self, array: Any, *, workers: int = 1) -> Any:
         """Perform a centered, unitary two-dimensional inverse FFT."""
         axes = (-2, -1)
@@ -331,6 +436,20 @@ class ArrayBackend:
         if self.is_cpu:
             return cast(NDArray[Any], value)
         return np.asarray(self.xp.asnumpy(value))
+
+
+def _wrapped_segments(start: int, length: int, size: int) -> list[tuple[slice, slice]]:
+    """Split ``length`` positions from ``start`` modulo ``size`` into slices.
+
+    Returns ``(grid, block)`` pairs: grid positions and the matching positions
+    in a block that lists the wrapped range in order. There are at most two.
+    """
+    start %= size
+    head = min(length, size - start)
+    segments = [(slice(start, start + head), slice(0, head))]
+    if head < length:
+        segments.append((slice(0, length - head), slice(head, length)))
+    return segments
 
 
 _CPU_BACKEND = ArrayBackend(np, name="cpu")
