@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+from aocore import centered_coordinates, phase_to_opd
 from numpy.typing import ArrayLike, NDArray
 
 from .backend import ArrayBackend, cpu_backend
@@ -20,11 +21,16 @@ def _coordinates(
     backend: ArrayBackend | None = None,
     dtype: object = np.float64,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Return centered physical ``(x, y)`` coordinates for an array shape."""
+    """Return centered physical ``(x, y)`` coordinates for an array shape.
+
+    Pixel centres follow ``aocore.centered_coordinates`` (CONVENTIONS 1.2). The
+    unit-pitch offsets are exact in either precision; scaling to metres happens
+    on the backend in ``dtype``.
+    """
     resolved = backend or cpu_backend()
     height, width = shape
-    x = (resolved.arange(width, dtype=dtype) - (width - 1) / 2.0) * extent_m / width
-    y = (resolved.arange(height, dtype=dtype) - (height - 1) / 2.0) * extent_m / height
+    x = resolved.asarray(centered_coordinates(width), dtype=dtype) * extent_m / width
+    y = resolved.asarray(centered_coordinates(height), dtype=dtype) * extent_m / height
     xx, yy = resolved.meshgrid(x, y)
     return xx, yy
 
@@ -91,7 +97,7 @@ class WavefrontInput:
         converted = self.backend.asarray(array, dtype=np.float64)
         if self.config.input.quantity == "phase":
             assert self.config.input.reference_wavelength_m is not None
-            converted = converted * self.config.input.reference_wavelength_m / (2.0 * np.pi)
+            converted = phase_to_opd(converted, self.config.input.reference_wavelength_m)
         if self.static_opd is not None:
             converted = converted + self.static_opd
         if not self.backend.scalar(self.backend.all(self.backend.isfinite(converted))):

@@ -6,6 +6,7 @@ import math
 from typing import Any, cast
 
 import numpy as np
+from aocore import opd_to_phase
 from numpy.typing import NDArray
 
 from ..backend import ArrayBackend, centered_fft2, centered_ifft2, complex_dtype, real_dtype
@@ -153,7 +154,7 @@ class PyramidEngine(SensorEngine):
         total_opd = internal + self._field_angle_opd[state_index]
         piston = total_opd[self._piston_index]
         relative_opd = total_opd - piston
-        phase = 2.0 * math.pi * relative_opd / state.wavelength_m
+        phase = opd_to_phase(relative_opd, state.wavelength_m)
         return cast(
             NDArray[Any],
             self.backend.asarray(self.backend.exp(1j * phase), dtype=self._complex_dtype),

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from aocore import ARCSEC_TO_RAD
 from numpy.typing import NDArray
 
 from .config import WFSConfig
@@ -33,8 +34,8 @@ def _normalised(values: tuple[float, ...], count: int) -> NDArray[np.float64]:
 def _angular_states(config: WFSConfig) -> list[tuple[float, float, float]]:
     """Return ``(x angle, y angle, weight)`` Gaussian angular quadrature."""
     source = config.source
-    base_x = math.radians(source.field_angle_arcsec[0] / 3600.0)
-    base_y = math.radians(source.field_angle_arcsec[1] / 3600.0)
+    base_x = source.field_angle_arcsec[0] * ARCSEC_TO_RAD
+    base_y = source.field_angle_arcsec[1] * ARCSEC_TO_RAD
     if source.angular_kernel_path is not None:
         data = np.atleast_2d(
             np.asarray(np.loadtxt(Path(source.angular_kernel_path)), dtype=np.float64)
@@ -48,8 +49,8 @@ def _angular_states(config: WFSConfig) -> list[tuple[float, float, float]]:
         weights = data[:, 2] / np.sum(data[:, 2])
         return [
             (
-                base_x + math.radians(float(x) / 3600.0),
-                base_y + math.radians(float(y) / 3600.0),
+                base_x + float(x) * ARCSEC_TO_RAD,
+                base_y + float(y) * ARCSEC_TO_RAD,
                 float(weight),
             )
             for (x, y), weight in zip(data[:, :2], weights)
@@ -60,7 +61,7 @@ def _angular_states(config: WFSConfig) -> list[tuple[float, float, float]]:
     # Three-point Gauss-Hermite is exact through fourth order for a normal
     # expectation. For higher configured orders use an evenly weighted grid;
     # this keeps the rule deterministic without requiring an optional package.
-    sigma = math.radians(source.angular_fwhm_arcsec / 3600.0) / 2.3548200450309493
+    sigma = source.angular_fwhm_arcsec * ARCSEC_TO_RAD / 2.3548200450309493
     if order == 3:
         nodes = np.array([-math.sqrt(3.0), 0.0, math.sqrt(3.0)])
         one_d = np.array([1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0])

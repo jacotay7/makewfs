@@ -22,7 +22,9 @@ quadrature, and sodium-layer LGS geometry — everything from the pupil to the A
 The package owns the wavefront-sensor optics and nothing else. It deliberately
 reuses [`pyturb`](https://github.com/jacotay7/pyturb) for atmospheric OPD and
 [`getframes`](https://github.com/jacotay7/getframes) for detector response and
-noise; neither model is reimplemented here. It runs on NumPy by default and
+noise; neither model is reimplemented here. Shared conventions and generic optics
+primitives (coordinates, angle constants, OPD/phase conversion, pixel binning)
+come from [`aocore`](https://github.com/jacotay7/aocore). It runs on NumPy by default and
 switches to CUDA (via CuPy) with a single configuration field.
 
 ## Install

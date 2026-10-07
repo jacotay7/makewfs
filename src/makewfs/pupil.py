@@ -1,4 +1,12 @@
-"""Analytic and custom entrance-pupil masks."""
+"""Analytic and custom entrance-pupil masks.
+
+These stay local rather than using ``aocore.Pupil``: the configured geometry
+has no aocore equivalent. Spiders are angular wedges of ``width_fraction`` of
+pi, segment gaps lie on a square grid, the whole pattern rotates with
+``pupil_rotation_deg``, grids may be rectangular, and masks are built on the
+selected array backend in the working precision. Pixel centres follow
+CONVENTIONS 1.2 through ``wavefront._coordinates``.
+"""
 
 from __future__ import annotations
 
