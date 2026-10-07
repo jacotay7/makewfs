@@ -4,6 +4,8 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-07
+
 ### Fixed
 
 - **CPU and GPU pyramids used different propagation grids for some
