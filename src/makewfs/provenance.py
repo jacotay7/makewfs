@@ -52,12 +52,15 @@ def metadata(
     seed: int | None,
     source_states: tuple[SourceState, ...] | None = None,
     file_digests: dict[str, str] | None = None,
+    pyramid_fft_size: int | None = None,
 ) -> dict[str, Any]:
     """Build serializable metadata for an ideal or detector frame.
 
     ``opd_rms_m`` is the input OPD's pupil-weighted, piston-removed RMS and
     ``opd_rms_unweighted_m`` its unweighted whole-grid RMS with piston
     included, both already reduced by the caller (aocore CONVENTIONS 4.1).
+    ``pyramid_fft_size`` is the side of the pyramid's square propagation grid,
+    recorded as ``wfs_pyramid_fft_size_px`` because it sets the physics.
     """
     states = iter_source_states(config) if source_states is None else source_states
     result: dict[str, Any] = {
@@ -97,6 +100,8 @@ def metadata(
             "lower_left",
             "lower_right",
         ]
+        if pyramid_fft_size is not None:
+            result["wfs_pyramid_fft_size_px"] = int(pyramid_fft_size)
     return result
 
 

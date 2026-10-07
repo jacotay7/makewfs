@@ -7,11 +7,13 @@ import numpy as np
 import pytest
 
 from makewfs.backend import (
+    ArrayBackend,
     centered_fft2,
     centered_fft_intensity,
     centered_ifft2,
     complex_dtype,
     cpu_backend,
+    next_fast_length,
     real_dtype,
 )
 from makewfs.config import SourceConfig, SpiderConfig, TelescopeConfig
@@ -372,3 +374,31 @@ def test_magnitude_rate_follows_pogson_scaling() -> None:
     faint = replace(bright, magnitude=12.0)
     ratio = source_rate_per_s(bright, telescope) / source_rate_per_s(faint, telescope)
     assert np.isclose(ratio, 10.0**0.8, rtol=1e-12)
+
+
+def _seven_smooth(value: int) -> bool:
+    for factor in (2, 3, 5, 7):
+        while value % factor == 0:
+            value //= factor
+    return value == 1
+
+
+def test_fft_length_rule_is_minimal_seven_smooth_and_backend_independent() -> None:
+    gpu_named = ArrayBackend(np, name="cupy")  # only the name differs from the CPU backend
+    for value in range(1, 3001):
+        length = next_fast_length(value)
+        assert length >= value
+        assert _seven_smooth(length)
+        assert not any(_seven_smooth(candidate) for candidate in range(value, length))
+        assert cpu_backend().next_fast_length(value) == length
+        assert gpu_named.next_fast_length(value) == length
+    # Lengths SciPy used to pick on the CPU while CuPy picked another.
+    assert [next_fast_length(value) for value in (33, 66, 99)] == [35, 70, 100]
+    with pytest.raises(ValueError, match="positive"):
+        next_fast_length(0)
+
+
+def test_fft_length_rule_matches_cupy_next_fast_len() -> None:
+    cupy_fft = pytest.importorskip("cupyx.scipy.fft")
+    for value in range(1, 3001):
+        assert next_fast_length(value) == int(cupy_fft.next_fast_len(value))

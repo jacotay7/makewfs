@@ -255,19 +255,53 @@ class ArrayBackend:
         norm: str,
         inverse: bool = False,
         workers: int = 1,
+        plans: dict[Any, Any] | None = None,
     ) -> Any:
         """One-dimensional FFT along ``axis`` of an array the caller owns.
 
         The pruned two-dimensional transforms are built from these passes. On
         the CPU the input may be overwritten, so pass only a temporary.
+
+        On a GPU, ``plans`` is a caller-owned cache of cuFFT plans. CuPy's own
+        plan cache is global and evicts plans when other transforms run, which
+        frees memory a captured CUDA graph still uses; a graph's owner passes
+        its own dict so the plans live exactly as long as the graph. The plan
+        is the same ``Plan1d`` CuPy would build, so values are unchanged.
         """
         if self.is_cpu:
             from scipy import fft
 
             transform = fft.ifft if inverse else fft.fft
             return transform(array, axis=axis, norm=norm, workers=workers, overwrite_x=True)
+        return self._device_fft_axis(  # pragma: no cover - optional CUDA execution
+            array, axis=axis, norm=norm, inverse=inverse, plans=plans
+        )
+
+    def _device_fft_axis(  # pragma: no cover - optional CUDA execution
+        self,
+        array: Any,
+        *,
+        axis: int,
+        norm: str,
+        inverse: bool,
+        plans: dict[Any, Any] | None,
+    ) -> Any:
         transform = self.xp.fft.ifft if inverse else self.xp.fft.fft
-        return transform(array, axis=axis, norm=norm)
+        if plans is None:
+            return transform(array, axis=axis, norm=norm)
+        # CuPy transforms ``axis`` as the last axis of a contiguous copy, with a
+        # ``Plan1d`` keyed by length, type and batch; build that same plan.
+        length = int(array.shape[axis])
+        batch = int(array.size) // length
+        key = (length, array.dtype.str, batch)
+        plan = plans.get(key)
+        if plan is None:
+            from cupy.cuda import cufft
+
+            kind = cufft.CUFFT_C2C if array.dtype == np.complex64 else cufft.CUFFT_Z2Z
+            plan = plans[key] = cufft.Plan1d(length, kind, batch)
+        with plan:
+            return transform(array, axis=axis, norm=norm)
 
     def pruned_fft2(
         self,
@@ -280,6 +314,7 @@ class ArrayBackend:
         inverse: bool = False,
         axes: tuple[int, int] = (-2, -1),
         workers: int = 1,
+        plans: dict[Any, Any] | None = None,
     ) -> Any:
         """Unitary square 2-D FFT that skips zero input and unwanted output lines.
 
@@ -307,7 +342,7 @@ class ArrayBackend:
         Keep ``axes`` equal to the pass order of the transform being replaced,
         because rounding depends on it: SciPy's ``fft2`` runs the listed axes in
         order when ``overwrite_x=True`` but the last axis first when it
-        allocates its output.
+        allocates its output. ``plans`` is passed to :meth:`fft_axis`.
         """
         if (output_start is None) != (output_length is None):
             raise ValueError("output_start and output_length go together")
@@ -317,7 +352,12 @@ class ArrayBackend:
         if input_start is not None:
             spectrum = self._embed(spectrum, input_start, size=size, axis=first_axis)
         spectrum = self.fft_axis(
-            spectrum, axis=first_axis, norm=first_norm, inverse=inverse, workers=workers
+            spectrum,
+            axis=first_axis,
+            norm=first_norm,
+            inverse=inverse,
+            workers=workers,
+            plans=plans,
         )
         if output_start is not None:
             assert output_length is not None
@@ -325,7 +365,12 @@ class ArrayBackend:
         if input_start is not None:
             spectrum = self._embed(spectrum, input_start, size=size, axis=second_axis)
         spectrum = self.fft_axis(
-            spectrum, axis=second_axis, norm=second_norm, inverse=inverse, workers=workers
+            spectrum,
+            axis=second_axis,
+            norm=second_norm,
+            inverse=inverse,
+            workers=workers,
+            plans=plans,
         )
         if output_start is not None:
             assert output_length is not None
@@ -412,13 +457,12 @@ class ArrayBackend:
         return gaussian_filter(array, sigma=sigma, mode="constant")
 
     def next_fast_length(self, value: int) -> int:
-        """Return an FFT-friendly length using this backend's implementation."""
-        if self.is_cpu:
-            from scipy.fft import next_fast_len
-        else:  # pragma: no cover - GPU optional
-            from cupyx.scipy.fft import next_fast_len
+        """Return the shared FFT length for ``value`` (see :func:`next_fast_length`).
 
-        return int(next_fast_len(value))
+        Deliberately independent of the backend: a grid size sets the physics
+        (padding, aliasing), so the CPU and the GPU must choose the same one.
+        """
+        return next_fast_length(value)
 
     def scalar(self, value: Any) -> float:
         """Extract one host scalar at an explicit metadata/geometry boundary."""
@@ -523,9 +567,31 @@ def centered_fft_intensity(
     )
 
 
+_FAST_FFT_FACTORS = (2, 3, 5, 7)
+
+
 def next_fast_length(value: int) -> int:
-    """Return a convenient CPU FFT length."""
-    return cpu_backend().next_fast_length(value)
+    """Return the smallest length ``>= value`` with no prime factor above 7.
+
+    One rule for every backend, so a configuration propagates on the same grid
+    on the CPU and the GPU. cuFFT has optimized kernels for radices 2, 3, 5
+    and 7, and SciPy's pocketfft handles them efficiently too. SciPy's own
+    ``next_fast_len`` also admits 11, which CuPy's does not; before 2.1.1 the
+    pyramid therefore padded differently on the two devices whenever SciPy
+    picked a factor of 11 (for example 33, 66 or 99 against 35, 70 or 100).
+    This rule equals CuPy's ``next_fast_len``.
+    """
+    if value < 1:
+        raise ValueError("FFT length must be positive")
+    length = int(value)
+    while True:
+        remainder = length
+        for factor in _FAST_FFT_FACTORS:
+            while remainder % factor == 0:
+                remainder //= factor
+        if remainder == 1:
+            return length
+        length += 1
 
 
 __all__ = [
