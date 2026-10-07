@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "aocore>=0.1.1",
     "build>=1.0",
     "mypy>=1.8",
     "pytest>=7.0",
