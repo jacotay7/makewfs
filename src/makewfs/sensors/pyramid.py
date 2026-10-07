@@ -220,7 +220,7 @@ class PyramidEngine(SensorEngine):
             photon_rate,
             self.source_rate,
             captured,
-            wavefront,
+            self.wavefront.input_opd(wavefront),
             spectral_photon_rate,
             self._wavelengths,
         )

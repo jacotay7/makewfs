@@ -4,6 +4,12 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Fixed: phase input was reported as metres.** With
+  `input.quantity = "phase"`, `OpticalResult.opd_m` and the
+  `wfs_input_opd_rms_m` frame metadata held the raw phase in radians, so a
+  13 nm wavefront was recorded as 0.083 m. Both now carry the input converted
+  to OPD metres at `input.reference_wavelength_m`. Images were never affected,
+  and OPD input is unchanged.
 - **Changed: generic optics helpers now come from
   [aocore](https://github.com/jacotay7/aocore).** `aocore>=0.1.2,<0.2` moves
   from the `dev` extra to a core dependency. Under CONVENTIONS.md §9, makewfs
