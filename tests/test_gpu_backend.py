@@ -341,3 +341,40 @@ def test_compiled_sh_records_feature_fallback_once() -> None:
     assert not engine._compiled_executors
     assert engine._compiled_executor_rejections == {1: "continuous optical blur"}
     assert bool(cupy.array_equal(first.photon_rate, second.photon_rate))
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("name", ["shack_hartmann_minimal.toml", "pyramid_minimal.toml"])
+@pytest.mark.parametrize("custom_mask", [False, True])
+def test_input_rms_metadata_matches_cpu(name: str, custom_mask: bool, tmp_path: Path) -> None:
+    # Both RMS keys are reduced on the device and cross with the captured rate
+    # in one batch; the values must match the CPU reduction.
+    cupy = _cupy()
+    config = _config(name)
+    if custom_mask:
+        shape = tuple(WavefrontSensor(config).engine.configured_pupil.shape)
+        mask = np.zeros(shape)
+        mask[shape[0] // 8 : shape[0] // 2, shape[1] // 4 : -shape[1] // 8] = 1.0
+        mask[shape[0] // 2 : shape[0] // 2 + 3, shape[1] // 4 : -shape[1] // 8] = 0.4
+        path = tmp_path / "mask.npy"
+        np.save(path, mask)
+        config = replace(config, telescope=replace(config.telescope, custom_mask_path=str(path)))
+    gpu_config = replace(config, numerics=replace(config.numerics, device="gpu"))
+    cpu_sensor = WavefrontSensor(config)
+    gpu_sensor = WavefrontSensor(gpu_config)
+    rng = np.random.default_rng(11)
+    height, width = config.input.shape
+    x = np.broadcast_to(np.arange(width) - (width - 1) / 2, (height, width))
+    opd = 2.0e-9 * x + rng.normal(0.0, 2.0e-8, (height, width)) + 1.5e-6
+
+    cpu = cpu_sensor.expose(opd, seed=3).metadata
+    gpu = gpu_sensor.expose(cupy.asarray(opd), seed=3).metadata
+    for key in ("wfs_input_opd_rms_m", "wfs_input_opd_rms_unweighted_m"):
+        assert isinstance(gpu[key], float)
+        assert gpu[key] == pytest.approx(cpu[key], rel=1e-12)
+
+    samples = np.stack([opd, 0.5 * opd - 1.0e-6])
+    cpu_integrated = cpu_sensor.expose_integrated(samples, seed=3).metadata
+    gpu_integrated = gpu_sensor.expose_integrated(cupy.asarray(samples), seed=3).metadata
+    for key in ("wfs_input_opd_rms_m", "wfs_input_opd_rms_unweighted_m"):
+        assert gpu_integrated[key] == pytest.approx(cpu_integrated[key], rel=1e-12)

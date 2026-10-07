@@ -4,6 +4,65 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-07
+
+### Breaking
+
+- **`wfs_input_opd_rms_m` is now the pupil-weighted, piston-removed RMS.**
+  It follows aocore CONVENTIONS.md 4.1: the RMS of the input OPD in metres,
+  weighted by the intensity of the pupil the optics use and with the
+  intensity-weighted mean (piston) removed. Before 2.0 it was the quadratic
+  mean over the whole input grid, with every pixel counted equally, pixels
+  outside the pupil included and piston kept. For the same wavefront the new
+  value is usually smaller; a pure piston now reports 0. The weights are the
+  configured pupil's intensity (the amplitude the engines use, squared) on the
+  input grid: an analytic pupil is evaluated on `input.shape` with the
+  configured `numerics.pupil_supersampling`, the same map
+  `WavefrontSensor.pupil_illumination()` returns; a custom mask, which exists
+  only on the engine's pupil grid, is area-averaged onto the input grid.
+  Phase input is converted to OPD first, and `expose_integrated` reports the
+  RMS of the mean OPD, as before. The value is still reduced on the device and
+  crosses to the host in the same single batched transfer as the captured
+  photon rate. A pupil with no transmission on the input grid is now rejected
+  when the sensor is built.
+- **`makewfs.provenance.metadata`**, an internal helper, takes the two
+  reduced RMS values as required `opd_rms_m` and `opd_rms_unweighted_m`
+  arguments and no longer accepts `opd_m`.
+
+See "Migrating to 2.0" in the stability guide.
+
+### Added
+
+- **`wfs_input_opd_rms_unweighted_m`** frame metadata keeps the 1.x quantity,
+  the unweighted RMS over the whole input grid with piston included, so no
+  information is lost. Read it wherever the old number is still wanted.
+- Both sensor engines expose `configured_pupil`, the pupil amplitude on their
+  own pupil grid, and `makewfs.sampling.area_rebin` area-averages a map onto
+  another grid of the same extent, for any shape ratio.
+
+### Changed
+
+- The `closed_loop_injection.py` and `showcase.py` examples take the residual
+  RMS they plot from each frame's `wfs_input_opd_rms_m` instead of a
+  whole-grid `np.std`, so the numbers they print are pupil-weighted. The
+  checked-in `makewfs_showcase.webp` was not regenerated.
+- **Requires `aocore>=0.1.3,<0.2`.** `makewfs.sampling.block_sum` drops its
+  own factor-two shortcut and delegates every factor to `aocore.block_sum`,
+  whose strided CPU adds and single CuPy kernel measured at least as fast on
+  the spot stacks the Shack-Hartmann actually bins (for example
+  `(400, 16, 16)` float32: CPU 112 vs 173 us, Quadro P620 65 vs 94 us;
+  `(3600, 12, 12)` float64: CPU 0.90 vs 1.27 ms, GPU 98 vs 173 us). The
+  additions happen in a different order, so Shack-Hartmann float32 images
+  differ from 1.2.0 by float32 rounding (at most about 1e-7 relative) and
+  float64 ones by about 2e-16; pyramid images are bit-for-bit unchanged.
+  Pixel-centre coordinates for the input, pupil and DFT detector grids are
+  now built on the selected device by `aocore.centered_coordinates`
+  (`ArrayBackend.centered_coordinates`), with identical values.
+- The input-RMS tests check the unweighted key against
+  `aocore.rms_unweighted`. The per-frame path keeps its own device reduction,
+  because the aocore functions return host floats and would each add a
+  synchronization.
+
 ## [1.2.0] - 2026-10-07
 
 - **Fixed: phase input was reported as metres.** With

@@ -25,3 +25,20 @@ The physical per-frame contract is a wavefront array plus configuration (and an
 optional detector seed). `out` controls storage lifetime only and cannot change
 the simulated result. Atmosphere, reconstruction, controllers, and detector
 physics remain outside the package boundary.
+
+## Migrating to 2.0
+
+makewfs 2.0 changes the meaning of one frame-metadata key; the API and the
+configuration schema are unchanged.
+
+- `wfs_input_opd_rms_m` is now the pupil-weighted, piston-removed RMS of
+  aocore CONVENTIONS 4.1 (see
+  [Concepts](concepts.md#input-wavefront-rms-in-frame-metadata)). For the same
+  wavefront it is usually smaller than before: it no longer includes piston or
+  any OPD outside the pupil.
+- The old quantity, the unweighted RMS over the whole input grid with piston
+  included, is still recorded as `wfs_input_opd_rms_unweighted_m`. Code that
+  needs the 1.x number reads that key instead.
+- `makewfs.provenance.metadata`, an internal helper, now takes both RMS values
+  as required `opd_rms_m` and `opd_rms_unweighted_m` arguments and no longer
+  accepts `opd_m`.

@@ -5,7 +5,9 @@ external AO loop that measures the frame, estimates a correction, and hands the
 next *residual* wavefront back to ``WavefrontSensor.expose``. The residual is a
 low-order aberration (defocus + astigmatism) so the Shack-Hartmann spots shift
 differently across the pupil and the relaxation toward the flat reference is
-visible, and a convergence panel tracks the residual RMS.
+visible, and a convergence panel tracks the residual RMS that each frame
+records in its ``wfs_input_opd_rms_m`` metadata: pupil-weighted with piston
+removed, as aocore CONVENTIONS 4.1 defines ``rms``.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import makewfs
 
 
 def _low_order_residual(shape: tuple[int, int], amplitude_m: float) -> np.ndarray:
-    """Return a defocus + astigmatism OPD normalized to ``amplitude_m`` RMS."""
+    """Return a defocus + astigmatism OPD with ``amplitude_m`` RMS over the grid."""
     yy, xx = np.mgrid[: shape[0], : shape[1]]
     x = (xx - (shape[1] - 1) / 2) / (shape[1] / 2)
     y = (yy - (shape[0] - 1) / 2) / (shape[0] / 2)
@@ -56,8 +58,9 @@ def main() -> None:
     residual_rms_nm: list[float] = []
     for step in range(args.steps):
         residual = _low_order_residual(shape, amplitude_m=200e-9) * (0.6**step)
-        residual_rms_nm.append(float(np.std(residual) * 1e9))
-        frames.append(np.asarray(sensor.expose(residual, seed=0)).astype(np.float64))
+        frame = sensor.expose(residual, seed=0)
+        residual_rms_nm.append(frame.metadata["wfs_input_opd_rms_m"] * 1e9)
+        frames.append(np.asarray(frame).astype(np.float64))
 
     columns = min(4, args.steps)
     shown = sorted({0, 1, args.steps // 2, args.steps - 1})[:columns]
@@ -91,7 +94,7 @@ def main() -> None:
     convergence.plot(range(args.steps), residual_rms_nm, "o-")
     convergence.set_title("external loop convergence")
     convergence.set_xlabel("loop step")
-    convergence.set_ylabel("residual OPD RMS (nm)")
+    convergence.set_ylabel("residual OPD RMS over the pupil (nm)")
     convergence.grid(True, alpha=0.3)
 
     frame_rms = [float(np.sqrt(np.mean(diff**2))) for diff in diffs]

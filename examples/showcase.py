@@ -263,7 +263,6 @@ def benchmark_panel(panel: Panel, sync: Callable[[], None]) -> float:
 def collect_frames(panel: Panel) -> np.ndarray:
     """``(N_FRAMES, *output_shape)`` detector ADU on the host, plus the OPD rms."""
     import getframes
-    import pyturb
 
     sensor = panel.build_sensor()
     atmosphere = panel.build_atmosphere()
@@ -271,8 +270,10 @@ def collect_frames(panel: Panel) -> np.ndarray:
     rms = []
     for index in range(N_FRAMES):
         residual = panel.residual(atmosphere, index)
-        rms.append(float(np.std(pyturb.to_numpy(residual))) * 1e9)
         frame = sensor.expose(residual, seed=index)
+        # Pupil-weighted, piston-removed (aocore CONVENTIONS 4.1), reduced on
+        # the sensor's device.
+        rms.append(frame.metadata["wfs_input_opd_rms_m"] * 1e9)
         out[index] = getframes.to_numpy(frame.data).astype(np.float32)
     panel.badge_extra = f"residual {np.mean(rms):.0f} nm rms"
     return np.clip(out - panel.bias_adu, 0.0, None)

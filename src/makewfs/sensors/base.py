@@ -33,6 +33,12 @@ class SensorEngine:
     source_states: tuple[SourceState, ...]
     file_digests: dict[str, str]
     backend: ArrayBackend
+    configured_pupil: Any
+    """Pupil amplitude on the engine's configured pupil grid.
+
+    The grid spans ``input.grid_extent_m`` on each axis. A custom mask is
+    defined on this grid, so it is the only place that mask exists.
+    """
 
     @staticmethod
     def resolve_backend(backend: ArrayBackend | None) -> ArrayBackend:

@@ -7,9 +7,6 @@ import importlib.metadata
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-from numpy.typing import NDArray
-
 from .config import WFSConfig
 from .source import SourceState, iter_source_states
 
@@ -44,28 +41,24 @@ def referenced_file_digests(config: WFSConfig) -> dict[str, str]:
     }
 
 
-def _opd_rms(opd_m: NDArray[Any] | None, opd_rms_m: float | None) -> float:
-    """Resolve a host OPD RMS, accepting a backend-reduced value."""
-    if opd_rms_m is not None:
-        return float(opd_rms_m)
-    if opd_m is None:
-        raise ValueError("metadata requires opd_m or opd_rms_m")
-    return float(np.sqrt(np.mean(np.asarray(opd_m) ** 2)))
-
-
 def metadata(
     config: WFSConfig,
     *,
     sensor_kind: str,
     launched_rate: float,
     captured_rate: float,
-    opd_m: NDArray[Any] | None = None,
-    opd_rms_m: float | None = None,
+    opd_rms_m: float,
+    opd_rms_unweighted_m: float,
     seed: int | None,
     source_states: tuple[SourceState, ...] | None = None,
     file_digests: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Build serializable metadata for an ideal or detector frame."""
+    """Build serializable metadata for an ideal or detector frame.
+
+    ``opd_rms_m`` is the input OPD's pupil-weighted, piston-removed RMS and
+    ``opd_rms_unweighted_m`` its unweighted whole-grid RMS with piston
+    included, both already reduced by the caller (aocore CONVENTIONS 4.1).
+    """
     states = iter_source_states(config) if source_states is None else source_states
     result: dict[str, Any] = {
         "frame_type": "wfs",
@@ -74,7 +67,8 @@ def metadata(
         "wfs_wavelength_m": config.sensor.wavelength_m,
         "wfs_launched_photons_s": float(launched_rate),
         "wfs_captured_photons_s": float(captured_rate),
-        "wfs_input_opd_rms_m": _opd_rms(opd_m, opd_rms_m),
+        "wfs_input_opd_rms_m": float(opd_rms_m),
+        "wfs_input_opd_rms_unweighted_m": float(opd_rms_unweighted_m),
         "wfs_seed": seed if seed is not None else "internal",
         "wfs_source_kind": config.source.kind,
         "wfs_source_state_count": len(states),

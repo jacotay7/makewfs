@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import numpy as np
+from aocore import centered_coordinates as _aocore_centered_coordinates
 from numpy.typing import NDArray
 
 
@@ -47,6 +48,18 @@ class ArrayBackend:
     def asarray(self, value: Any, *, dtype: Any | None = None) -> Any:
         """Convert a value using this backend's array namespace."""
         return self.xp.asarray(value, dtype=dtype)
+
+    def centered_coordinates(self, n: int, *, dtype: Any) -> Any:
+        """Unit-pitch pixel-centre coordinates (CONVENTIONS 1.2) on this device.
+
+        ``aocore.centered_coordinates`` builds them in float64 and casts to
+        ``dtype`` directly on the GPU, so no host array is copied over. The
+        CPU path still passes through :meth:`asarray`, which keeps an injected
+        namespace in the loop.
+        """
+        if self.is_cpu:
+            return self.asarray(_aocore_centered_coordinates(n, dtype=dtype), dtype=dtype)
+        return _aocore_centered_coordinates(n, dtype=dtype, backend="gpu")
 
     def zeros(self, shape: Any, *, dtype: Any) -> Any:
         """Allocate a zero-filled array on this backend."""
