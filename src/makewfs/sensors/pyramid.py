@@ -50,7 +50,8 @@ class PyramidEngine(SensorEngine):
         self.output_shape = (pixels + separation + 2 * margin, pixels + separation + 2 * margin)
         # Oversample the propagation grid so the diffraction halo lands outside
         # the detector crop instead of wrapping onto the pupil rims; cropped
-        # flux is reported as captured rate, never renormalized.
+        # flux is reported as captured rate, never renormalized. The length
+        # rule is shared by every backend, so CPU and GPU use the same grid.
         self.nfft = self.backend.next_fast_length(
             config.numerics.fft_oversampling * max(self.output_shape)
         )
@@ -122,6 +123,9 @@ class PyramidEngine(SensorEngine):
         self._graph = (
             None if self.backend.is_cpu else _CudaGraphReplay(self.backend.xp, self._propagate)
         )
+        # The graph replays cuFFT work, so its plans must outlive it rather than
+        # live in CuPy's global, evicting plan cache (see ``fft_axis``).
+        self._fft_plans: dict[Any, Any] = {}
 
     def _make_pyramid_mask(self) -> NDArray[Any]:
         """Build four signed focal-plane ramps that separate the pupils."""
@@ -243,6 +247,7 @@ class PyramidEngine(SensorEngine):
                 size=self.nfft,
                 input_start=self._pupil_start,
                 workers=self.config.numerics.fft_workers,
+                plans=self._fft_plans,
             )
             focal *= self._unshifted_mask
             exit_pupil = self.backend.pruned_fft2(
@@ -252,6 +257,7 @@ class PyramidEngine(SensorEngine):
                 output_length=self._base_output_shape[0],
                 inverse=True,
                 workers=self.config.numerics.fft_workers,
+                plans=self._fft_plans,
             )
             cropped = self.backend.abs(exit_pupil) ** 2
             mosaic = self.backend.mean(cropped, axis=0)

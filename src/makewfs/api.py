@@ -58,6 +58,7 @@ class WavefrontSensor:
             seed=None,
             source_states=self.engine.source_states,
             file_digests=self.engine.file_digests,
+            pyramid_fft_size=getattr(self.engine, "nfft", None),
         )
         self._rms_weights = pupil_weights(self._input_pupil_intensity(), backend=self.backend)
 

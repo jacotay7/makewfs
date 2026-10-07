@@ -271,3 +271,21 @@ def test_unshifted_pruned_propagation_matches_centered_reference(
     np.testing.assert_allclose(
         result.photon_rate, expected, rtol=tolerance, atol=tolerance * expected.max()
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "size"),
+    [
+        (CONFIG, 288),
+        (CONFIG.parents[2] / "benchmarks" / "configs" / "pyramid_40_float32.toml", 108),
+        (CONFIG.parents[2] / "benchmarks" / "configs" / "pyramid_60_mod8_float32.toml", 160),
+        (CONFIG.parents[2] / "benchmarks" / "configs" / "pyramid_80_mod32_float64.toml", 216),
+    ],
+)
+def test_pyramid_fft_size_is_recorded_and_unchanged_for_shipped_configs(
+    path: Path, size: int
+) -> None:
+    sensor = WavefrontSensor.from_toml(path)
+    assert sensor.engine.nfft == size
+    frame = sensor.expose(np.zeros(sensor.config.input.shape), seed=1)
+    assert frame.metadata["wfs_pyramid_fft_size_px"] == size

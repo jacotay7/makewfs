@@ -492,3 +492,55 @@ def test_pyramid_cuda_graph_replay_equals_eager_and_owns_outputs(broadband: bool
     assert float(second.captured_rate_per_s) == float(eager.captured_rate_per_s)
     expected_cube = (3, *engine.output_shape) if broadband else (1, *engine.output_shape)
     assert second.spectral_photon_rate.shape == expected_cube
+
+
+@pytest.mark.gpu
+def test_pyramid_geometry_with_former_factor_eleven_grid_matches_cpu() -> None:
+    # 24 + 9 pixels at 2x oversampling requests 66 samples: SciPy used to pick
+    # 66 (2 x 3 x 11) on the CPU and CuPy 70 on the GPU, which changed the
+    # rate by up to 46% for this modulated geometry. Both now use 70.
+    cupy = _cupy()
+    config = _config("pyramid_minimal.toml")
+    assert config.pyramid is not None
+    config = replace(
+        config,
+        numerics=replace(config.numerics, dtype="float64"),
+        pyramid=replace(
+            config.pyramid,
+            pixels_across_pupil=24,
+            pupil_separation_pixels=9,
+            modulation_radius_lambda_over_d=3.0,
+            modulation_samples=12,
+        ),
+    )
+    cpu = WavefrontSensor(config)
+    gpu = WavefrontSensor(replace(config, numerics=replace(config.numerics, device="gpu")))
+    assert cpu.engine.nfft == gpu.engine.nfft == 70
+    opd = np.random.default_rng(7).normal(0.0, 5.0e-8, config.input.shape)
+
+    expected = cpu.photon_rate(opd)
+    actual = cupy.asnumpy(gpu.photon_rate(cupy.asarray(opd)))
+    np.testing.assert_allclose(actual, expected, rtol=1e-10, atol=1e-10 * expected.max())
+    cpu_size = cpu.expose(opd, seed=1).metadata["wfs_pyramid_fft_size_px"]
+    gpu_size = gpu.expose(cupy.asarray(opd), seed=1).metadata["wfs_pyramid_fft_size_px"]
+    assert cpu_size == gpu_size == 70
+
+
+@pytest.mark.gpu
+def test_pyramid_cuda_graph_survives_cupy_plan_cache_churn() -> None:
+    # CuPy's plan cache is global and evicts plans when other transforms run;
+    # the captured graph must not depend on it (2.1.0 replayed freed memory).
+    cupy = _cupy()
+    sensor = WavefrontSensor(_gpu_config("pyramid_minimal.toml"))
+    opd = cupy.asarray(np.random.default_rng(3).normal(0.0, 5.0e-8, sensor.config.input.shape))
+    first = sensor.photon_rate(opd).copy()
+    assert sensor.engine._graph._graph is not None
+    for length in range(20, 60):
+        cupy.fft.fft(cupy.ones((3, length), dtype=cupy.complex64), axis=-1)
+    cupy.fft.config.get_plan_cache().clear()
+    import gc
+
+    gc.collect()
+    again = sensor.photon_rate(opd)
+    cupy.cuda.Device().synchronize()
+    assert bool(cupy.array_equal(first, again))
