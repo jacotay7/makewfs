@@ -83,6 +83,23 @@ class WavefrontInput:
         )
         self._resample_coordinates: dict[tuple[int, int], Any] = {}
 
+    def input_opd(self, value: ArrayLike) -> NDArray[np.float64]:
+        """The input wavefront in OPD metres, before static OPD and regridding.
+
+        OPD input is returned as given. Phase input is converted at the
+        configured reference wavelength.
+        """
+        if self.config.input.quantity != "phase":
+            return cast(NDArray[np.float64], value)
+        assert self.config.input.reference_wavelength_m is not None
+        return cast(
+            NDArray[np.float64],
+            phase_to_opd(
+                self.backend.asarray(value, dtype=np.float64),
+                self.config.input.reference_wavelength_m,
+            ),
+        )
+
     def opd(
         self, value: ArrayLike, *, target_shape: tuple[int, int] | None = None
     ) -> NDArray[np.float64]:

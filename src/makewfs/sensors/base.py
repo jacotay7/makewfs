@@ -20,6 +20,7 @@ class OpticalResult:
     launched_rate_per_s: float
     captured_rate_per_s: Any
     opd_m: NDArray[np.float64]
+    """Input wavefront in OPD metres (phase input converted), without static OPD."""
     spectral_photon_rate: NDArray[np.float64] | None = None
     spectral_wavelengths_m: tuple[float, ...] | None = None
 

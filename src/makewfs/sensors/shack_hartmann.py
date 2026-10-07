@@ -460,7 +460,7 @@ class ShackHartmannEngine(SensorEngine):
         internal = (
             internal_samples[0] if sample_count == 1 else self.backend.stack(internal_samples)
         )
-        opd = (
+        opd = self.wavefront.input_opd(
             wavefronts[0]
             if sample_count == 1
             else self.backend.mean(
