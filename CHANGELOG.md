@@ -4,7 +4,35 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+### Performance
+
+- **Pruned FFTs on CPU and GPU.** Shack-Hartmann spots and the pyramid
+  transform only the FFT lines that hold data and keep only the cropped
+  output lines; the pyramid applies its mask on the unshifted grid instead of
+  shifting four full grids per state. CPU results are unchanged (bit-identical
+  in 451 of 468 arrays of a before/after matrix, otherwise within 2.5e-7
+  relative in float32).
+- **CUDA-graph replay of the pyramid.** On a GPU the pyramid's fixed-shape
+  propagation is captured once and replayed with one launch.
+- **Compiled CUDA executor for integer-FFT Shack-Hartmann grids**, which
+  previously ran the array path. Results agree to float rounding.
+- End-to-end frames/s on an Ampere Neoverse-N1 (12 cores) and an RTX 4060,
+  2.0.0 -> now: SH 20x20 float32 CPU 38.5 -> 126.1 (3.3x), GPU 496 -> 813
+  (1.6x); SH 60x60 float64 CPU 10.4 -> 29.8 (2.9x), GPU 199 -> 640 (3.2x);
+  nine-sample SH CPU 52.0 -> 96.3 (1.9x), GPU 189 -> 764 (4.1x); pyramid 40
+  CPU 923 -> 1,101 (1.2x), GPU 397 -> 759 (1.9x); pyramid 60 mod-8 CPU 173 ->
+  272 (1.6x), GPU 408 -> 762 (1.9x); pyramid 80 mod-32 float64 CPU 11.4 ->
+  20.9 (1.8x), GPU 204 -> 277 (1.4x). See `docs/performance.md`.
+
 ### Fixed
+
+- **Compiled CUDA Shack-Hartmann executor misread float32 rotated or offset
+  lenslet grids.** Such grids resample the OPD in float32, but the kernel read
+  it as float64, so the GPU spot pattern was wrong (82-96% error). The OPD is
+  now widened (exactly) before the launch.
+- **Compiled CUDA Shack-Hartmann executor failed to launch for large
+  lenslet sampling** (e.g. 32x32 samples, 1024 threads) when register use left
+  fewer threads per block. Such geometries now fall back to the array path.
 
 - **Benchmark artifacts named the wrong GPU on multi-GPU hosts.**
   `benchmarks/run.py` recorded the first line of `nvidia-smi`, which ignores
