@@ -340,16 +340,17 @@ class ArrayBackend:
         result = self.zeros(tuple(shape), dtype=array.dtype)
         lead = (slice(None),) * axis
         for grid, block in _wrapped_segments(start, array.shape[axis], size):
-            result[(*lead, grid)] = array[(*lead, block)]
+            # Index tuples are built first: Python 3.10 rejects ``a[*lead, x]``.
+            target, source = (*lead, grid), (*lead, block)
+            result[target] = array[source]
         return result
 
     def _gather(self, array: Any, start: int, length: int, *, axis: int) -> Any:
         """Select ``length`` entries of ``axis`` from ``start``, wrapping around."""
         axis = axis % array.ndim
         lead = (slice(None),) * axis
-        parts = [
-            array[(*lead, grid)] for grid, _ in _wrapped_segments(start, length, array.shape[axis])
-        ]
+        indices = [(*lead, grid) for grid, _ in _wrapped_segments(start, length, array.shape[axis])]
+        parts = [array[index] for index in indices]
         return parts[0] if len(parts) == 1 else self.xp.concatenate(parts, axis=axis)
 
     def centered_ifft2(self, array: Any, *, workers: int = 1) -> Any:
