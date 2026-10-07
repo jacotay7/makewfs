@@ -16,10 +16,11 @@ from .config import WFSConfig, load_config
 from .detector import DetectorAdapter
 from .provenance import metadata as build_metadata
 from .pupil import make_pupil
+from .sampling import area_rebin
 from .sensors.base import OpticalResult, SensorEngine
 from .sensors.pyramid import PyramidEngine
 from .sensors.shack_hartmann import ShackHartmannEngine
-from .wavefront import iter_phase_samples
+from .wavefront import grid_rms, iter_phase_samples, pupil_rms, pupil_weights
 
 
 class WavefrontSensor:
@@ -53,10 +54,12 @@ class WavefrontSensor:
             launched_rate=0.0,
             captured_rate=0.0,
             opd_rms_m=0.0,
+            opd_rms_unweighted_m=0.0,
             seed=None,
             source_states=self.engine.source_states,
             file_digests=self.engine.file_digests,
         )
+        self._rms_weights = pupil_weights(self._input_pupil_intensity(), backend=self.backend)
 
     @classmethod
     def from_toml(cls, path: str | Path) -> WavefrontSensor:
@@ -66,9 +69,42 @@ class WavefrontSensor:
     def _render(self, wavefront: ArrayLike) -> OpticalResult:
         return self.engine.render(cast(NDArray[np.float64], wavefront))
 
-    def _opd_rms(self, opd: Any) -> Any:
-        """Reduce OPD RMS on-device before the batched metadata crossing."""
-        return self.backend.sqrt(self.backend.mean(opd**2))
+    def _input_pupil_intensity(self) -> Any:
+        """Return the pupil intensity the optics use, on the input grid.
+
+        An analytic pupil is evaluated on ``input.shape`` from the same
+        telescope model and ``numerics.pupil_supersampling`` the engine uses on
+        its own grid, as :meth:`pupil_illumination` does; both grids span
+        ``input.grid_extent_m``. A custom mask exists only on the engine's
+        configured pupil grid, so its intensity is area-averaged from there
+        onto the input grid, which is exact when the two shapes match. The
+        engines use the pupil as a field amplitude, so the intensity is its
+        square.
+        """
+        if self.config.telescope.custom_mask_path is None:
+            amplitude = make_pupil(
+                self.config.telescope,
+                self.config.input.shape,
+                self.config.input.grid_extent_m,
+                supersampling=self.config.numerics.pupil_supersampling,
+                backend=self.backend,
+                dtype=np.float64,
+            )
+            return amplitude * amplitude
+        amplitude = self.backend.asarray(self.engine.configured_pupil, dtype=np.float64)
+        return area_rebin(amplitude * amplitude, self.config.input.shape, backend=self.backend)
+
+    def _opd_rms(self, opd: Any) -> tuple[Any, Any]:
+        """Reduce both input-OPD RMS values on the device.
+
+        Returns the pupil-weighted, piston-removed RMS and the unweighted
+        whole-grid RMS as device scalars, for the one batched metadata
+        crossing in ``backend.scalars``.
+        """
+        return (
+            pupil_rms(opd, self._rms_weights, backend=self.backend),
+            grid_rms(opd, backend=self.backend),
+        )
 
     def _frame_metadata(
         self,
@@ -76,6 +112,7 @@ class WavefrontSensor:
         launched_rate: float,
         captured_rate: float,
         opd_rms_m: float,
+        opd_rms_unweighted_m: float,
         seed: int | None,
     ) -> dict[str, Any]:
         """Copy cached static provenance and fill the per-frame values."""
@@ -85,6 +122,7 @@ class WavefrontSensor:
                 "wfs_launched_photons_s": float(launched_rate),
                 "wfs_captured_photons_s": float(captured_rate),
                 "wfs_input_opd_rms_m": float(opd_rms_m),
+                "wfs_input_opd_rms_unweighted_m": float(opd_rms_unweighted_m),
                 "wfs_seed": seed if seed is not None else "internal",
             }
         )
@@ -182,18 +220,26 @@ class WavefrontSensor:
         seed: int | None = None,
         out: Any | None = None,
     ) -> Any:
-        """Render one wavefront into optional caller-owned detector storage."""
+        """Render one wavefront into optional caller-owned detector storage.
+
+        Besides provenance and timings, the frame metadata records the input
+        wavefront's ``wfs_input_opd_rms_m``, its RMS in OPD metres weighted by
+        the pupil intensity with piston removed (aocore CONVENTIONS 4.1), and
+        ``wfs_input_opd_rms_unweighted_m``, its RMS over the whole input grid
+        with piston kept.
+        """
         total_start = perf_counter()
         optical_start = total_start
         result = self._render(wavefront)
-        captured_rate, opd_rms = self.backend.scalars(
-            result.captured_rate_per_s, self._opd_rms(result.opd_m)
+        captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
+            result.captured_rate_per_s, *self._opd_rms(result.opd_m)
         )
         optical_elapsed = perf_counter() - optical_start
         frame_metadata = self._frame_metadata(
             launched_rate=result.launched_rate_per_s,
             captured_rate=captured_rate,
             opd_rms_m=opd_rms,
+            opd_rms_unweighted_m=opd_rms_unweighted,
             seed=seed,
         )
         detector_start = perf_counter()
@@ -244,13 +290,14 @@ class WavefrontSensor:
             if not samples:
                 raise ValueError("phase_samples must contain at least one sample")
             result = batched(samples)
-            captured_rate, opd_rms = self.backend.scalars(
-                result.captured_rate_per_s, self._opd_rms(result.opd_m)
+            captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
+                result.captured_rate_per_s, *self._opd_rms(result.opd_m)
             )
             frame_metadata = self._frame_metadata(
                 launched_rate=result.launched_rate_per_s,
                 captured_rate=captured_rate,
                 opd_rms_m=opd_rms,
+                opd_rms_unweighted_m=opd_rms_unweighted,
                 seed=seed,
             )
             frame_metadata["wfs_temporal_samples"] = len(samples)
@@ -305,13 +352,14 @@ class WavefrontSensor:
             None if spectral_rate_sum is None else spectral_rate_sum / sample_count
         )
         average_opd = opd_sum / sample_count
-        captured_rate, opd_rms = self.backend.scalars(
-            captured / sample_count, self._opd_rms(average_opd)
+        captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
+            captured / sample_count, *self._opd_rms(average_opd)
         )
         frame_metadata = self._frame_metadata(
             launched_rate=launched,
             captured_rate=captured_rate,
             opd_rms_m=opd_rms,
+            opd_rms_unweighted_m=opd_rms_unweighted,
             seed=seed,
         )
         frame_metadata["wfs_temporal_samples"] = sample_count

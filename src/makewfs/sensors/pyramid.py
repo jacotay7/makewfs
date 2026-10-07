@@ -62,6 +62,7 @@ class PyramidEngine(SensorEngine):
             backend=self.backend,
             dtype=self._real_dtype,
         )
+        self.configured_pupil = self.pupil
         self.wavefront = WavefrontInput(
             config,
             load_static_opd(config),

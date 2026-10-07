@@ -4,6 +4,49 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-07
+
+### Breaking
+
+- **`wfs_input_opd_rms_m` is now the pupil-weighted, piston-removed RMS.**
+  It follows aocore CONVENTIONS.md 4.1: the RMS of the input OPD in metres,
+  weighted by the intensity of the pupil the optics use and with the
+  intensity-weighted mean (piston) removed. Before 2.0 it was the quadratic
+  mean over the whole input grid, with every pixel counted equally, pixels
+  outside the pupil included and piston kept. For the same wavefront the new
+  value is usually smaller; a pure piston now reports 0. The weights are the
+  configured pupil's intensity (the amplitude the engines use, squared) on the
+  input grid: an analytic pupil is evaluated on `input.shape` with the
+  configured `numerics.pupil_supersampling`, the same map
+  `WavefrontSensor.pupil_illumination()` returns; a custom mask, which exists
+  only on the engine's pupil grid, is area-averaged onto the input grid.
+  Phase input is converted to OPD first, and `expose_integrated` reports the
+  RMS of the mean OPD, as before. The value is still reduced on the device and
+  crosses to the host in the same single batched transfer as the captured
+  photon rate. A pupil with no transmission on the input grid is now rejected
+  when the sensor is built.
+- **`makewfs.provenance.metadata`**, an internal helper, takes the two
+  reduced RMS values as required `opd_rms_m` and `opd_rms_unweighted_m`
+  arguments and no longer accepts `opd_m`.
+
+See "Migrating to 2.0" in the stability guide.
+
+### Added
+
+- **`wfs_input_opd_rms_unweighted_m`** frame metadata keeps the 1.x quantity,
+  the unweighted RMS over the whole input grid with piston included, so no
+  information is lost. Read it wherever the old number is still wanted.
+- Both sensor engines expose `configured_pupil`, the pupil amplitude on their
+  own pupil grid, and `makewfs.sampling.area_rebin` area-averages a map onto
+  another grid of the same extent, for any shape ratio.
+
+### Changed
+
+- The `closed_loop_injection.py` and `showcase.py` examples take the residual
+  RMS they plot from each frame's `wfs_input_opd_rms_m` instead of a
+  whole-grid `np.std`, so the numbers they print are pupil-weighted. The
+  checked-in `makewfs_showcase.webp` was not regenerated.
+
 ## [1.2.0] - 2026-10-07
 
 - **Fixed: phase input was reported as metres.** With

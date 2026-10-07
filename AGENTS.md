@@ -87,6 +87,14 @@ write a failing integration test/design note, use the conditional gates in
 - Intensities, not fields, are summed over incoherent wavelengths, modulation
   points, finite-source samples, and sodium slices.
 - Cropping reports lost flux; it does not renormalize it away.
+- Wavefront metrics follow aocore CONVENTIONS 4.1. Frame metadata
+  `wfs_input_opd_rms_m` is the pupil-intensity-weighted, piston-removed RMS of
+  the input OPD on the input grid (weights from `WavefrontSensor._rms_weights`:
+  the analytic pupil evaluated on `input.shape`, or a custom mask area-averaged
+  from the engine's `configured_pupil`); `wfs_input_opd_rms_unweighted_m` is the
+  whole-grid quadratic mean with piston kept. Both are reduced on the device and
+  cross in the one `backend.scalars` batch. Any other RMS-like key must say its
+  variant in its name (`_unweighted`, `_tiptilt_removed`).
 - The intended top-level API is `load_config`, `WavefrontSensor`, and `simulate`.
   Keep other implementation objects out of `makewfs.__init__` unless an API review
   explicitly accepts them.
@@ -155,6 +163,9 @@ Follow the target layout in `ROADMAP.md`:
   FFT workers and `ndimage` helpers, which `aocore.Backend` does not, and its
   centred FFTs keep the `fftshift` convention. `sampling.block_sum` wraps
   `aocore.block_sum` but keeps its own factor-two fast path.
+  `sampling.area_rebin` is exact-overlap area averaging between grids of the
+  same extent and any shape ratio, which `aocore.block_sum` (integer factors
+  only) does not cover.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
   `_shack_hartmann_cuda.py` is a private first-use-JIT execution plan for exact
   compatible CUDA geometries; `shack_hartmann.py` remains the readable physics

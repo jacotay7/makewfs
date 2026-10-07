@@ -194,6 +194,80 @@ def _resampling_coordinates(
     return backend.stack((yy, xx), axis=0)
 
 
+def pupil_weights(intensity: NDArray[Any], *, backend: ArrayBackend | None = None) -> Any:
+    """Normalize a pupil intensity map into RMS weights that sum to one.
+
+    Parameters
+    ----------
+    intensity
+        Non-negative pupil intensity (amplitude squared) on the OPD grid.
+    backend
+        Array backend holding ``intensity``.
+
+    Returns
+    -------
+    numpy.ndarray or cupy.ndarray
+        Float64 weights on the same backend.
+
+    Raises
+    ------
+    ValueError
+        If the pupil transmits nothing on this grid.
+    """
+    resolved = backend or cpu_backend()
+    weights = resolved.asarray(intensity, dtype=np.float64)
+    total = resolved.sum(weights)
+    if not resolved.scalar(total) > 0.0:
+        raise ValueError("pupil has no illuminated pixels on the input grid")
+    return weights / total
+
+
+def pupil_rms(opd: Any, weights: Any, *, backend: ArrayBackend | None = None) -> Any:
+    """Pupil-weighted, piston-removed OPD RMS, left on the device.
+
+    Implements ``rms`` of aocore CONVENTIONS 4.1,
+    ``sqrt(sum a^2 (opd - <opd>_a)^2 / sum a^2)``, where ``weights`` is the
+    intensity ``a^2`` already normalized by :func:`pupil_weights`. The piston is
+    subtracted before squaring rather than taken from ``<opd^2> - <opd>^2``, so
+    a large piston does not cancel away the residual's precision and a
+    piston-only input gives zero to rounding.
+
+    ``aocore.rms`` defines the same quantity but reduces on the host with
+    NumPy; this stays on the selected backend so frame metadata needs no extra
+    device-to-host copy. The tests check it with ``aocore.conformance.check_rms``.
+
+    Parameters
+    ----------
+    opd
+        OPD in metres on the same grid as ``weights``.
+    weights
+        Normalized pupil intensity weights.
+    backend
+        Array backend holding both arrays.
+
+    Returns
+    -------
+    numpy.ndarray or cupy.ndarray
+        A zero-dimensional float64 array; no host synchronization happens here.
+    """
+    resolved = backend or cpu_backend()
+    values = resolved.asarray(opd, dtype=np.float64)
+    residual = values - resolved.sum(weights * values)
+    return resolved.sqrt(resolved.sum(weights * residual * residual))
+
+
+def grid_rms(opd: Any, *, backend: ArrayBackend | None = None) -> Any:
+    """Unweighted OPD RMS over the whole grid, piston included, on the device.
+
+    This is ``rms_unweighted`` in the sense of aocore CONVENTIONS 4.1: every
+    grid pixel counts equally, including pixels outside the pupil, and the mean
+    is not removed.
+    """
+    resolved = backend or cpu_backend()
+    values = resolved.asarray(opd, dtype=np.float64)
+    return resolved.sqrt(resolved.mean(values * values))
+
+
 def iter_phase_samples(
     value: ArrayLike | Iterable[ArrayLike],
     shape: tuple[int, int],
@@ -221,7 +295,10 @@ def iter_phase_samples(
 __all__ = [
     "WavefrontInput",
     "_coordinates",
+    "grid_rms",
     "iter_phase_samples",
     "load_static_opd",
+    "pupil_rms",
+    "pupil_weights",
     "resample_opd",
 ]

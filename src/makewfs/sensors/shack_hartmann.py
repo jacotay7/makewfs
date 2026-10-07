@@ -80,7 +80,7 @@ class ShackHartmannEngine(SensorEngine):
             backend=self.backend,
             dtype=self._real_dtype,
         )
-        self._configured_pupil = pupil
+        self.configured_pupil = pupil
         if self.field_upsampling > 1:
             # Hold each configured pupil cell's area-weighted transmission
             # constant over its refined sub-cells, so the illuminated area and
@@ -182,7 +182,7 @@ class ShackHartmannEngine(SensorEngine):
             # Spiders, segment gaps and custom masks block light the analytic
             # annulus of the magnitude normalization would otherwise count.
             self.clear_aperture_fraction = clear_aperture_fraction(
-                self._configured_pupil,
+                self.configured_pupil,
                 config.telescope,
                 self.pupil_shape,
                 config.input.grid_extent_m,
