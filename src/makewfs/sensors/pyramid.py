@@ -12,7 +12,7 @@ from ..backend import ArrayBackend, centered_fft2, centered_ifft2, complex_dtype
 from ..config import WFSConfig
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
-from ..radiometry import source_rate_per_s
+from ..radiometry import clear_aperture_fraction, source_rate_per_s
 from ..sampling import crop_center, pad_center
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
@@ -73,6 +73,19 @@ class PyramidEngine(SensorEngine):
             dtype=self._real_dtype,
         )
         self.source_rate = source_rate_per_s(config.source, config.telescope)
+        self.clear_aperture_fraction = 1.0
+        if config.source.normalization == "magnitude":
+            # Spiders, segment gaps and custom masks block light the analytic
+            # annulus of the magnitude normalization would otherwise count.
+            self.clear_aperture_fraction = clear_aperture_fraction(
+                self.pupil,
+                config.telescope,
+                self.internal_shape,
+                config.input.grid_extent_m,
+                supersampling=config.numerics.pupil_supersampling,
+                backend=self.backend,
+            )
+            self.source_rate *= self.clear_aperture_fraction
         self.source_states = iter_source_states(config)
         self.file_digests = referenced_file_digests(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)

@@ -4,6 +4,17 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Fixed: magnitude-normalized photon rates ignored spiders, segment gaps and
+  custom masks.** The rate came from the analytic annulus area
+  `pi / 4 D^2 (1 - eps^2)` and was then distributed over the sampled pupil's own
+  flux, so obstructions inside the annulus never removed photons. Both sensors
+  now scale a magnitude-normalized rate by the sampled pupil's clear fraction
+  of the annulus, exposed as `engine.clear_aperture_fraction`: about 0.96 for
+  four 2 % wedge spiders, and exactly 1 for a plain annulus, so such
+  configurations are unchanged. Direct `detector_photon_rate` sources are never
+  rescaled; the Keck HAKA example already computes its rate from the masked
+  area and is unaffected.
+
 - **Fixed: Shack-Hartmann flux creation and ghost spots for wide subaperture
   windows** ([#4](https://github.com/jacotay7/makewfs/issues/4)). A lenslet
   field sampled at `s` points per lenslet has a far field that repeats every

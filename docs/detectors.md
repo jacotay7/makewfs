@@ -18,8 +18,13 @@ registered to the camera preset rather than being reconstructed in the optical
 model.
 
 Magnitude normalization uses public `getframes.Bandpass` and `getframes.Telescope`
-radiometry. Direct detector-surface photon rates are the preferred way to isolate
-WFS optical behavior in a trade study.
+radiometry, which collects light over the analytic annulus
+`pi / 4 D^2 (1 - eps^2)`. The sensor then scales that rate by the sampled pupil's
+clear fraction of the annulus (`engine.clear_aperture_fraction`), so spiders,
+segment gaps and a custom mask remove the photons they block. A plain annulus
+has a clear fraction of exactly 1. Direct detector-surface photon rates are
+never rescaled, and they remain the preferred way to isolate WFS optical
+behavior in a trade study.
 
 For broadband scenes whose spatial spectrum varies across the detector, set
 `detector.qe_curve_path` to a two-column `wavelength_nm qe` curve. `makewfs`
