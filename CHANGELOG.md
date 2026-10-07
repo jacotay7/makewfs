@@ -4,6 +4,8 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-07
+
 - **Fixed: phase input was reported as metres.** With
   `input.quantity = "phase"`, `OpticalResult.opd_m` and the
   `wfs_input_opd_rms_m` frame metadata held the raw phase in radians, so a
