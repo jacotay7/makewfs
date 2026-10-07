@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from typing import Any
+
+from .backend import ArrayBackend
 from .config import SourceConfig, TelescopeConfig
 
 
@@ -31,4 +35,46 @@ def source_rate_per_s(source: SourceConfig, telescope: TelescopeConfig) -> float
     return float(optical.photon_rate_from_magnitude(source.magnitude))
 
 
-__all__ = ["source_rate_per_s"]
+def clear_aperture_fraction(
+    pupil: Any,
+    telescope: TelescopeConfig,
+    shape: tuple[int, int],
+    extent_m: float,
+    *,
+    supersampling: int,
+    backend: ArrayBackend,
+) -> float:
+    """Return the sampled pupil's transmitted fraction of its unobstructed annulus.
+
+    Magnitude normalization collects light over the analytic annulus
+    ``pi / 4 D^2 (1 - eps^2)``, which knows nothing of spiders, segment gaps or
+    a custom mask. This is the ratio of ``sum |pupil|^2`` to the same sum for
+    the annulus alone, sampled identically, so a plain annulus gives exactly 1
+    and every additional obstruction removes its share of the photons.
+    """
+    if (
+        telescope.custom_mask_path is None
+        and not telescope.spiders
+        and (telescope.segments_across_pupil is None or telescope.segment_gap_fraction == 0.0)
+    ):
+        return 1.0
+    from .pupil import make_pupil
+
+    annulus = replace(
+        telescope,
+        spiders=(),
+        custom_mask_path=None,
+        segments_across_pupil=None,
+        segment_gap_fraction=0.0,
+    )
+    reference = make_pupil(
+        annulus, shape, extent_m, supersampling=supersampling, backend=backend, dtype=pupil.dtype
+    )
+    clear = backend.scalar(backend.sum(backend.abs(pupil) ** 2))
+    full = backend.scalar(backend.sum(backend.abs(reference) ** 2))
+    if full <= 0.0:
+        raise ValueError("the telescope annulus has no illuminated pixels")
+    return float(clear / full)
+
+
+__all__ = ["clear_aperture_fraction", "source_rate_per_s"]

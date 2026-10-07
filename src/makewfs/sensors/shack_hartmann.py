@@ -14,7 +14,7 @@ from ..config import WFSConfig
 from ..detector import charge_diffusion_fwhm_px
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
-from ..radiometry import source_rate_per_s
+from ..radiometry import clear_aperture_fraction, source_rate_per_s
 from ..sampling import (
     _SpotPropagationPlan,
     lenslet_field_upsampling,
@@ -79,6 +79,7 @@ class ShackHartmannEngine(SensorEngine):
             backend=self.backend,
             dtype=self._real_dtype,
         )
+        self._configured_pupil = pupil
         if self.field_upsampling > 1:
             # Hold each configured pupil cell's area-weighted transmission
             # constant over its refined sub-cells, so the illuminated area and
@@ -175,6 +176,19 @@ class ShackHartmannEngine(SensorEngine):
         else:
             self._lgs_mean_range_m = None
         self.source_rate = source_rate_per_s(config.source, config.telescope)
+        self.clear_aperture_fraction = 1.0
+        if config.source.normalization == "magnitude":
+            # Spiders, segment gaps and custom masks block light the analytic
+            # annulus of the magnitude normalization would otherwise count.
+            self.clear_aperture_fraction = clear_aperture_fraction(
+                self._configured_pupil,
+                config.telescope,
+                self.pupil_shape,
+                config.input.grid_extent_m,
+                supersampling=config.numerics.pupil_supersampling,
+                backend=self.backend,
+            )
+            self.source_rate *= self.clear_aperture_fraction
         self.file_digests = referenced_file_digests(config)
         self._complex_dtype = complex_dtype(config.numerics.dtype)
         self._optical_blur_kernel = (
