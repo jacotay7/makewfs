@@ -17,6 +17,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+class _CompiledExecutorUnavailable(ValueError):
+    """The compiled kernel cannot launch for this geometry on this device."""
+
+
 class _CompiledOpticalArrays(NamedTuple):
     """Device arrays produced by one compiled optical execution."""
 
@@ -104,6 +108,15 @@ class _CompiledShackHartmannExecutor:  # pragma: no cover - optional CUDA execut
             "makewfs_compiled_shack_hartmann",
             options=("-std=c++11",),
         )
+        # The static thread and shared-memory limits above cannot see register
+        # pressure: a compiled variant may fit fewer threads per block than it
+        # needs (e.g. 32x32 lenslet samples at 1024 threads), and launching it
+        # would fail. Reading the limit compiles the kernel now.
+        if self._kernel.max_threads_per_block < self.signature.block_threads:
+            raise _CompiledExecutorUnavailable(
+                f"compiled kernel fits {self._kernel.max_threads_per_block} threads per block, "
+                f"needs {self.signature.block_threads}"
+            )
         self._grid = (self.signature.lenslets**2,)
         self._block = (self.signature.block_threads,)
         self._piston_index = int(engine._piston_index[0]) * self.signature.internal_width + int(
@@ -152,6 +165,10 @@ class _CompiledShackHartmannExecutor:  # pragma: no cover - optional CUDA execut
 
     def render(self, internal: Any) -> _CompiledOpticalArrays:
         """Execute every incoherent state into newly owned rate arrays."""
+        # The kernel reads float64 OPD, but a rotated or offset lenslet grid
+        # resamples the OPD in the configured precision. Widening float32 is
+        # exact, so the kernel sees the values the array path uses.
+        internal = self.xp.ascontiguousarray(internal, dtype=np.float64)
         shape = (self.signature.output_width, self.signature.output_width)
         spectral = self.xp.zeros((self.signature.wavelengths, *shape), dtype=np.float64)
         photon_rate = self.xp.zeros(shape, dtype=np.float64)
@@ -195,8 +212,8 @@ def _compiled_executor_rejection(  # pragma: no cover - optional CUDA execution
         return "continuous optical blur"
     if engine._optical_blur_kernel is not None:
         return "measured native-pixel optical blur"
-    if any(plan.geometry != "dft" or plan.dft_kernel is None for plan in engine._spot_plans):
-        return "non-DFT spot geometry"
+    if any(plan.dft_kernel is None for plan in engine._spot_plans):
+        return "no sampled-DFT kernel"
     charge_kernel = engine._charge_diffusion_kernel
     if charge_kernel is not None:
         shape = tuple(int(value) for value in charge_kernel.shape)

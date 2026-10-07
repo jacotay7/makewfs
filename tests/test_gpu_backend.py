@@ -150,6 +150,9 @@ def test_broadband_sh_gpu_state_batch_matches_sequential_execution() -> None:
     config = WFSConfig.from_dict(data)
     sensor = WavefrontSensor(config)
     engine = sensor.engine
+    # State grouping belongs to the array path, which the compiled executor
+    # would otherwise replace for this geometry.
+    engine._compiled_executor_enabled = False
     assert any(len(group) > 1 for group in engine._state_groups)
     rng = cupy.random.RandomState(17)
     opd = rng.normal(0.0, 8.0e-8, config.input.shape)
@@ -378,3 +381,70 @@ def test_input_rms_metadata_matches_cpu(name: str, custom_mask: bool, tmp_path: 
     gpu_integrated = gpu_sensor.expose_integrated(cupy.asarray(samples), seed=3).metadata
     for key in ("wfs_input_opd_rms_m", "wfs_input_opd_rms_unweighted_m"):
         assert gpu_integrated[key] == pytest.approx(cpu_integrated[key], rel=1e-12)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("sampling", [2.0, 0.91])
+@pytest.mark.parametrize(("rotation_deg", "offset"), [(3.0, (0.0, 0.0)), (0.0, (0.2, -0.1))])
+def test_compiled_sh_handles_float32_rotated_and_offset_lenslet_grids(
+    sampling: float, rotation_deg: float, offset: tuple[float, float]
+) -> None:
+    # A transformed lenslet grid resamples the OPD in the configured float32;
+    # the compiled kernel reads float64 and must widen it rather than misread it.
+    cupy = _cupy()
+    config = _config("shack_hartmann_minimal.toml")
+    assert config.shack_hartmann is not None
+    config = replace(
+        config,
+        numerics=replace(config.numerics, device="gpu", dtype="float32"),
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            spot_sampling_pixels_per_lambda_over_d=sampling,
+            lenslet_grid_rotation_deg=rotation_deg,
+            lenslet_grid_offset_fraction=offset,
+        ),
+    )
+    engine = WavefrontSensor(config).engine
+    opd = cupy.random.RandomState(5).normal(0.0, 3.0e-8, config.input.shape)
+
+    compiled = engine.render(opd)
+    assert 1 in engine._compiled_executors
+    engine._compiled_executor_enabled = False
+    reference = engine.render(opd)
+    np.testing.assert_allclose(
+        cupy.asnumpy(compiled.photon_rate),
+        cupy.asnumpy(reference.photon_rate),
+        rtol=2e-6,
+        atol=2e-6 * float(reference.photon_rate.max()),
+    )
+
+
+@pytest.mark.gpu
+def test_compiled_sh_falls_back_when_kernel_exceeds_block_resources() -> None:
+    # 32x32 lenslet samples need a 1024-thread block; register pressure can
+    # make the compiled variant unlaunchable, which must fall back, not fail.
+    cupy = _cupy()
+    config = _config("shack_hartmann_minimal.toml")
+    assert config.shack_hartmann is not None
+    config = replace(
+        config,
+        input=replace(config.input, shape=(256, 256)),
+        numerics=replace(config.numerics, device="gpu", dtype="float64"),
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            lenslets_across_pupil=8,
+            pixels_per_subaperture=16,
+            spot_sampling_pixels_per_lambda_over_d=2.0,
+        ),
+    )
+    sensor = WavefrontSensor(config)
+    cpu = WavefrontSensor(replace(config, numerics=replace(config.numerics, device="cpu")))
+    assert sensor.engine.samples_per_lenslet == 32
+    opd = np.random.default_rng(9).normal(0.0, 3.0e-8, config.input.shape)
+
+    actual = cupy.asnumpy(sensor.photon_rate(cupy.asarray(opd)))
+    expected = cpu.photon_rate(opd)
+    engine = sensor.engine
+    if not engine._compiled_executors:
+        assert "threads per block" in engine._compiled_executor_rejections[1]
+    np.testing.assert_allclose(actual, expected, rtol=1e-10, atol=1e-10 * expected.max())

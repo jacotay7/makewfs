@@ -28,6 +28,7 @@ from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
 from ._shack_hartmann_cuda import (
     _compiled_executor_rejection,
+    _CompiledExecutorUnavailable,
     _CompiledShackHartmannExecutor,
 )
 
@@ -590,7 +591,11 @@ class ShackHartmannEngine(SensorEngine):
         if rejection is not None:
             self._compiled_executor_rejections[sample_count] = rejection
             return None
-        executor = _CompiledShackHartmannExecutor(self, sample_count)
+        try:
+            executor = _CompiledShackHartmannExecutor(self, sample_count)
+        except _CompiledExecutorUnavailable as exc:
+            self._compiled_executor_rejections[sample_count] = str(exc)
+            return None
         self._compiled_executors[sample_count] = executor
         batched_internal = internal[None, ...] if sample_count == 1 else internal
         return executor.render(batched_internal)

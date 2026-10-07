@@ -300,7 +300,13 @@ class _SpotPropagationPlan:
                 coordinate = backend.arange(nfft, dtype=np.float64)
                 plan.half_sample = backend.exp(-1j * math.pi * coordinate / nfft)
             plan._build_fft_window(nfft)
-        else:
+        if geometry == "dft" or not backend.is_cpu:
+            # An integer FFT grid samples the same Fraunhofer sum at the same
+            # detector quadrature points (``nfft = s * sampling * oversampling``,
+            # and the half-sample ramp moves even grids onto the half-integer
+            # centred coordinates used here), so the intensities agree to
+            # rounding. Device plans keep the kernel for every geometry because
+            # the compiled CUDA executor evaluates all of them as this DFT.
             detector_coordinate = backend.centered_coordinates(
                 high_resolution_pixels, dtype=np.float64
             ) / (sampling * oversampling)
