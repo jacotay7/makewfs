@@ -11,7 +11,7 @@ import numpy as np
 from aocore import block_sum as _aocore_block_sum
 from numpy.typing import NDArray
 
-from .backend import ArrayBackend, centered_fft_intensity, cpu_backend
+from .backend import ArrayBackend, cpu_backend
 
 
 def spot_sampling_geometry(
@@ -239,6 +239,10 @@ class _SpotPropagationPlan:
     high_resolution_pixels: int
     field_stop_radius_lambda_over_d: float | None
     half_sample: Any | None = None
+    fft_window_start: int = 0
+    fft_output_start: int = 0
+    fft_weights: Any | None = None
+    fft_axes: tuple[int, int] = (-2, -1)
     dft_kernel: Any | None = None
     field_stop_mask: Any | None = None
     optical_blur_kernel: Any | None = None
@@ -295,7 +299,14 @@ class _SpotPropagationPlan:
             if high_resolution_pixels % 2 == 0:
                 coordinate = backend.arange(nfft, dtype=np.float64)
                 plan.half_sample = backend.exp(-1j * math.pi * coordinate / nfft)
-        else:
+            plan._build_fft_window(nfft)
+        if geometry == "dft" or not backend.is_cpu:
+            # An integer FFT grid samples the same Fraunhofer sum at the same
+            # detector quadrature points (``nfft = s * sampling * oversampling``,
+            # and the half-sample ramp moves even grids onto the half-integer
+            # centred coordinates used here), so the intensities agree to
+            # rounding. Device plans keep the kernel for every geometry because
+            # the compiled CUDA executor evaluates all of them as this DFT.
             detector_coordinate = backend.centered_coordinates(
                 high_resolution_pixels, dtype=np.float64
             ) / (sampling * oversampling)
@@ -314,6 +325,49 @@ class _SpotPropagationPlan:
             radius_lambda_over_d = backend.hypot(x, y) / (oversampling * sampling)
             plan.field_stop_mask = radius_lambda_over_d <= field_stop_radius_lambda_over_d
         return plan
+
+    def _build_fft_window(self, nfft: int) -> None:
+        """Cache where the lenslet field and the detector crop sit on the FFT grid.
+
+        ``spot_intensity`` once zero-padded every lenslet to ``nfft``, applied
+        the half-sample ramp and the even-grid checkerboard to the whole grid,
+        transformed it all and cropped the intensity. Only the ``s x s`` field
+        window holds data and only ``high_resolution_pixels`` rows and columns
+        survive the crop, so the plan keeps those positions and the window's
+        combined weights for :meth:`ArrayBackend.pruned_fft2`.
+
+        The weights are the cached ramp outer product, in the ramp's complex128
+        precision as the old in-place product used, with the checkerboard sign
+        folded in. Negation is exact and rounding is sign-symmetric, so the
+        weighted field is bit-for-bit the one the full-grid path transformed.
+        """
+        backend = self.backend
+        samples = self.samples_per_lenslet
+        start = (nfft - samples) // 2
+        crop_start = nfft // 2 - self.high_resolution_pixels // 2
+        weights = None
+        if self.half_sample is not None:
+            ramp = self.half_sample[start : start + samples]
+            weights = ramp[:, None] * ramp[None, :]
+        if nfft % 2 == 0:
+            # ``centered_fft_intensity`` negates odd ``y + x`` samples so the
+            # transform lands already centred; the crop is then contiguous.
+            window = backend.arange(start, start + samples)
+            parity = backend.mod(window[:, None] + window[None, :], 2)
+            sign = backend.where(parity == 0, 1.0, -1.0)
+            weights = (
+                backend.asarray(sign, dtype=self.field_dtype) if weights is None else weights * sign
+            )
+            self.fft_output_start = crop_start
+            # That reference transformed in place, which runs axis -2 first.
+            self.fft_axes = (-2, -1)
+        else:
+            # Odd grids are ``fftshift``-ed after a transform into a new array
+            # (axis -1 first): read the crop from the unshifted frequencies.
+            self.fft_output_start = (crop_start - nfft // 2) % nfft
+            self.fft_axes = (-1, -2)
+        self.fft_window_start = start
+        self.fft_weights = weights
 
     def validate(
         self,
@@ -413,28 +467,33 @@ def spot_intensity(
     high_resolution_pixels = plan.high_resolution_pixels
     if geometry == "fft":
         nfft = int(geometry_value)
-        padded = pad_center(field, (nfft, nfft), backend=resolved)
-        if plan.half_sample is not None:
-            # An even detector has its optical axis on the boundary shared by its
-            # central four pixels. Evaluate the Fourier transform at half-integer
-            # frequency samples so equal-area integration is exactly symmetric
-            # around that boundary. The pupil-plane phase ramp performs the
-            # half-sample Fourier shift without interpolating intensity or changing
-            # flux. Its sign only selects the equivalent half-pixel sampling branch.
-            half_sample = plan.half_sample
-            padded *= half_sample[None, :, None] * half_sample[None, None, :]
-        intensity = centered_fft_intensity(
-            padded,
-            workers=workers,
-            backend=resolved,
-            overwrite_input=True,
+        # An even detector has its optical axis on the boundary shared by its
+        # central four pixels. Evaluate the Fourier transform at half-integer
+        # frequency samples so equal-area integration is exactly symmetric
+        # around that boundary. The pupil-plane phase ramp in ``fft_weights``
+        # performs the half-sample Fourier shift without interpolating intensity
+        # or changing flux. Its sign only selects the equivalent half-pixel
+        # sampling branch.
+        weighted = (
+            field
+            if plan.fft_weights is None
+            else resolved.asarray(field * plan.fft_weights, dtype=field.dtype)
         )
-        # ``fftshift`` puts zero frequency at ``nfft // 2``. This start index is
-        # symmetric for odd grids; even grids become symmetric after the half-sample
-        # evaluation above.
-        crop_start = nfft // 2 - high_resolution_pixels // 2
-        crop_stop = crop_start + high_resolution_pixels
-        cropped = intensity[..., crop_start:crop_stop, crop_start:crop_stop]
+        # Zero padding to ``nfft`` sets the physical sampling; the transform
+        # skips the all-zero padding rows and the frequencies cropped away.
+        # ``fftshift`` puts zero frequency at ``nfft // 2``. The crop start is
+        # symmetric for odd grids; even grids become symmetric after the
+        # half-sample evaluation above.
+        spectrum = resolved.pruned_fft2(
+            weighted,
+            size=nfft,
+            input_start=plan.fft_window_start,
+            output_start=plan.fft_output_start,
+            output_length=high_resolution_pixels,
+            axes=plan.fft_axes,
+            workers=workers,
+        )
+        cropped = resolved.abs(spectrum) ** 2
     else:
         # Evaluate the Fraunhofer transform exactly at the detector quadrature
         # points. This preserves arbitrary normalized sampling, including

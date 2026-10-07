@@ -45,6 +45,120 @@ def test_centered_fft_intensity_omits_only_irrelevant_fourier_phase() -> None:
     assert np.allclose(actual, expected, rtol=2e-6, atol=2e-6)
 
 
+def _two_pass_fft2(grid: np.ndarray, axes: tuple[int, int], *, inverse: bool) -> np.ndarray:
+    """Full-grid 2-D unitary FFT as the same two 1-D passes ``pruned_fft2`` uses."""
+    from scipy import fft
+
+    transform = fft.ifft if inverse else fft.fft
+    first_norm, second_norm = ("backward", "forward") if inverse else ("forward", "backward")
+    first = transform(grid, axis=axes[0], norm=first_norm)
+    return np.asarray(transform(first, axis=axes[1], norm=second_norm))
+
+
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+@pytest.mark.parametrize("axes", [(-2, -1), (-1, -2)])
+@pytest.mark.parametrize("inverse", [False, True])
+@pytest.mark.parametrize(
+    ("size", "block", "start", "out_start", "out_length"),
+    [
+        (16, 4, 6, 4, 8),
+        (15, 5, 12, 11, 9),  # both ranges wrap around the grid edge
+        (12, 12, 0, 0, 12),
+    ],
+)
+def test_pruned_fft2_matches_full_grid_transform(
+    dtype: type,
+    axes: tuple[int, int],
+    inverse: bool,
+    size: int,
+    block: int,
+    start: int,
+    out_start: int,
+    out_length: int,
+) -> None:
+    rng = np.random.default_rng(size + block)
+    values = rng.normal(size=(4, block, block)) + 1j * rng.normal(size=(4, block, block))
+    values = values.astype(dtype)
+    rows = (start + np.arange(block)) % size
+    grid = np.zeros((4, size, size), dtype=dtype)
+    grid[:, rows[:, None], rows[None, :]] = values
+    wanted = (out_start + np.arange(out_length)) % size
+    full = _two_pass_fft2(grid, axes, inverse=inverse)[:, wanted[:, None], wanted[None, :]]
+
+    pruned = cpu_backend().pruned_fft2(
+        values.copy(),
+        size=size,
+        input_start=start,
+        output_start=out_start,
+        output_length=out_length,
+        inverse=inverse,
+        axes=axes,
+    )
+
+    assert pruned.dtype == dtype
+    # Skipped lines are exact zeros and every kept line sees the same 1-D
+    # transform; only SciPy's SIMD grouping of a different line count may move
+    # a value by an ulp.
+    tolerance = 1e-6 if dtype == np.complex64 else 1e-14
+    np.testing.assert_allclose(pruned, full, rtol=tolerance, atol=tolerance)
+    reference = np.fft.ifft2(grid, norm="ortho") if inverse else np.fft.fft2(grid, norm="ortho")
+    np.testing.assert_allclose(
+        pruned,
+        reference[:, wanted[:, None], wanted[None, :]],
+        rtol=10 * tolerance,
+        atol=10 * tolerance,
+    )
+
+
+def test_pruned_fft2_full_input_and_output() -> None:
+    rng = np.random.default_rng(5)
+    grid = rng.normal(size=(2, 10, 10)) + 1j * rng.normal(size=(2, 10, 10))
+    np.testing.assert_allclose(
+        cpu_backend().pruned_fft2(grid.copy(), size=10),
+        np.fft.fft2(grid, norm="ortho"),
+        rtol=1e-13,
+        atol=1e-13,
+    )
+    with pytest.raises(ValueError, match="go together"):
+        cpu_backend().pruned_fft2(grid, size=10, output_start=0)
+
+
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+@pytest.mark.parametrize(
+    ("pixels", "samples", "sampling", "oversampling"),
+    [(8, 16, 2.0, 2), (6, 8, 2.0, 2), (7, 10, 2.0, 2), (5, 9, 3.0, 1), (4, 9, 3.0, 3)],
+)
+def test_pruned_spot_intensity_matches_full_grid_reference(
+    dtype: type, pixels: int, samples: int, sampling: float, oversampling: int
+) -> None:
+    """The pruned FFT spot path equals padding, transforming and cropping."""
+    rng = np.random.default_rng(pixels * samples)
+    field = rng.normal(size=(3, samples, samples)) + 1j * rng.normal(size=(3, samples, samples))
+    field = field.astype(dtype)
+    spots = spot_intensity(
+        field.copy(),
+        pixels=pixels,
+        samples_per_lenslet=samples,
+        sampling=sampling,
+        oversampling=oversampling,
+        workers=1,
+    )
+
+    high = pixels * oversampling
+    nfft = round(samples * sampling * oversampling)
+    padded = pad_center(field.astype(np.complex128), (nfft, nfft))
+    if high % 2 == 0:
+        ramp = np.exp(-1j * np.pi * np.arange(nfft) / nfft)
+        padded = padded * ramp[None, :, None] * ramp[None, None, :]
+    intensity = np.abs(centered_fft2(padded)) ** 2
+    start = nfft // 2 - high // 2
+    expected = block_sum(intensity[:, start : start + high, start : start + high], oversampling)
+
+    assert spots.dtype == real_dtype("float32" if dtype == np.complex64 else "float64")
+    tolerance = 2e-6 if dtype == np.complex64 else 1e-12
+    np.testing.assert_allclose(spots, expected, rtol=tolerance, atol=tolerance * expected.max())
+
+
 def test_fft_worker_count_is_deterministic() -> None:
     rng = np.random.default_rng(31)
     array = (rng.normal(size=(16, 16)) + 1j * rng.normal(size=(16, 16))).astype(np.complex64)

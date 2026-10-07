@@ -172,8 +172,10 @@ Follow the target layout in `ROADMAP.md`:
   only) does not cover.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
   `_shack_hartmann_cuda.py` is a private first-use-JIT execution plan for exact
-  compatible CUDA geometries; `shack_hartmann.py` remains the readable physics
-  reference and must stay as the automatic feature-complete fallback.
+  compatible CUDA geometries (sampled-DFT and integer-FFT spot grids alike);
+  `shack_hartmann.py` remains the readable physics reference and must stay as
+  the automatic feature-complete fallback. `_cuda_graph.py` replays the
+  pyramid's fixed-shape GPU propagation from a captured CUDA graph.
 - `radiometry.py` produces source photon budgets using public `getframes` tools.
 - `detector.py` is a narrow adapter to `getframes.Camera.expose` and the
   optional public `expose_spectral` cube API, plus the
@@ -235,6 +237,33 @@ python benchmarks/run.py --representative --frames 1 --output /tmp/makewfs-bench
 python benchmarks/check_regression.py /tmp/makewfs-benchmark.json
 MPLBACKEND=Agg python examples/gallery.py
 ```
+
+## Performance gotchas
+
+- `ArrayBackend.pruned_fft2` skips all-zero input lines and cropped output
+  lines of a 2-D FFT. Keep its `axes` equal to the pass order of the transform
+  it replaces: SciPy's `fft2` runs the listed axes in order when
+  `overwrite_x=True` but the last axis first when it allocates its output, and
+  the two orders round differently. SciPy also transforms lines in SIMD groups
+  whose short remainder group rounds differently, so a pruned transform can
+  differ from the full one by an ulp where the line counts differ. Check
+  candidate changes with a saved before/after render matrix, not only tests.
+- The pyramid applies its mask on the unshifted FFT grid (the stored mask is
+  `ifftshift`-ed) and turns the outer shifts into wrapped start indices. Do not
+  reintroduce `fftshift`/`ifftshift` copies there; they are pure permutations.
+- `PyramidEngine._propagate` is captured as a CUDA graph on a GPU. It must keep
+  fixed shapes and never synchronize with the host (no `scalar`, `.item()`,
+  `to_host`, or data-dependent shapes). A failed capture silently falls back to
+  eager execution and records why in `engine._graph.failure`; check it after
+  changing that method.
+- The compiled SH kernel reads the OPD as float64; `_CompiledShackHartmannExecutor.render`
+  widens a float32 lenslet-grid resample (exact). Its static thread and
+  shared-memory checks cannot see register pressure, so construction also
+  checks the compiled kernel's `max_threads_per_block` and falls back.
+- `ArrayBackend.next_fast_length` uses SciPy on the CPU and CuPy on the GPU,
+  which disagree when SciPy picks a factor of 11 (for example 33, 66, 99). The
+  pyramid's FFT size, and therefore its result, can then differ between
+  devices; parity tests use geometries where they agree.
 
 ## Documentation and examples
 

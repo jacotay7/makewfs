@@ -9,15 +9,15 @@ import numpy as np
 from aocore import opd_to_phase
 from numpy.typing import NDArray
 
-from ..backend import ArrayBackend, centered_fft2, centered_ifft2, complex_dtype, real_dtype
+from ..backend import ArrayBackend, complex_dtype, real_dtype
 from ..config import WFSConfig
 from ..provenance import referenced_file_digests
 from ..pupil import make_pupil
 from ..radiometry import clear_aperture_fraction, source_rate_per_s
-from ..sampling import crop_center, pad_center
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
+from ._cuda_graph import _CudaGraphReplay
 
 
 class PyramidEngine(SensorEngine):
@@ -116,6 +116,12 @@ class PyramidEngine(SensorEngine):
             wavelength_index[state.wavelength_m] for state in self.source_states
         )
         self._base_output_shape = (pixels + separation, pixels + separation)
+        self._build_unshifted_geometry()
+        # A GPU frame is launch-bound at these sizes: replay the fixed-shape
+        # propagation from a CUDA graph (see ``_cuda_graph``).
+        self._graph = (
+            None if self.backend.is_cpu else _CudaGraphReplay(self.backend.xp, self._propagate)
+        )
 
     def _make_pyramid_mask(self) -> NDArray[Any]:
         """Build four signed focal-plane ramps that separate the pupils."""
@@ -129,6 +135,26 @@ class PyramidEngine(SensorEngine):
             NDArray[Any],
             self.backend.asarray(self.backend.exp(1j * phase), dtype=self._complex_dtype),
         )
+
+    def _build_unshifted_geometry(self) -> None:
+        """Cache the propagation geometry on the unshifted FFT grid.
+
+        The reference chain is ``pad_center``, ``ifftshift``, ``fft2``,
+        ``fftshift``, mask, ``ifftshift``, ``ifft2``, ``fftshift``, intensity
+        and ``crop_center``. The shifts are pure permutations, so the two in the
+        middle cancel once the mask is stored ``ifftshift``-ed, and the outer two
+        become index lists: where each padded pupil row lands after the input
+        shift, and which unshifted output rows the centred crop keeps. Values
+        are unchanged; four full-grid copies per state are not made.
+        """
+        n = self.nfft
+        pixels = self.internal_shape[0]
+        crop = self._base_output_shape[0]
+        # ``ifftshift`` sends padded index i to (i - n // 2) mod n, and the
+        # output ``fftshift`` reads unshifted index (i - n // 2) mod n.
+        self._pupil_start = ((n - pixels) // 2 - n // 2) % n
+        self._crop_start = ((n - crop) // 2 - n // 2) % n
+        self._unshifted_mask = self.backend.ifftshift(self._mask)
 
     def _make_modulation_tilts(self) -> NDArray[Any] | None:
         """Cache modulation phasors, which are immutable instrument geometry."""
@@ -176,6 +202,26 @@ class PyramidEngine(SensorEngine):
 
     def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
+        # On a GPU the graph replays the same kernels as ``_propagate``.
+        outputs = self._propagate(internal) if self._graph is None else self._graph(internal)
+        photon_rate, captured = outputs[0], outputs[1]
+        spectral_photon_rate = outputs[2] if len(outputs) > 2 else photon_rate[None, ...]
+        return OpticalResult(
+            photon_rate,
+            self.source_rate,
+            captured,
+            self.wavefront.input_opd(wavefront),
+            spectral_photon_rate,
+            self._wavelengths,
+        )
+
+    def _propagate(self, internal: NDArray[np.float64]) -> tuple[Any, ...]:
+        """Return the photon rate, captured rate and, if polychromatic, the cube.
+
+        Everything here has a fixed shape and stays on the device without a
+        host synchronization, which is what lets a GPU sensor capture it once
+        as a CUDA graph.
+        """
         photon_rate = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
         spectral_photon_rate = (
             None
@@ -188,19 +234,26 @@ class PyramidEngine(SensorEngine):
         margin = self.settings.detector_margin_pixels
         for state_index, state in enumerate(self.source_states):
             fields = self._fields(internal, state, state_index)
-            padded = pad_center(fields, (self.nfft, self.nfft), backend=self.backend)
-            focal = centered_fft2(
-                padded,
+            # Centred unitary FFT, pyramid mask, centred inverse FFT and crop,
+            # evaluated on the unshifted grid (see ``_build_unshifted_geometry``).
+            # The transforms skip the zero padding rows and the cropped-away
+            # output lines.
+            focal = self.backend.pruned_fft2(
+                fields,
+                size=self.nfft,
+                input_start=self._pupil_start,
                 workers=self.config.numerics.fft_workers,
-                backend=self.backend,
             )
-            exit_pupil = centered_ifft2(
-                focal * self._mask[None, ...],
+            focal *= self._unshifted_mask
+            exit_pupil = self.backend.pruned_fft2(
+                focal,
+                size=self.nfft,
+                output_start=self._crop_start,
+                output_length=self._base_output_shape[0],
+                inverse=True,
                 workers=self.config.numerics.fft_workers,
-                backend=self.backend,
             )
-            intensity = self.backend.abs(exit_pupil) ** 2
-            cropped = crop_center(intensity, self._base_output_shape)
+            cropped = self.backend.abs(exit_pupil) ** 2
             mosaic = self.backend.mean(cropped, axis=0)
             if margin:
                 padded = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
@@ -216,15 +269,8 @@ class PyramidEngine(SensorEngine):
                 spectral_photon_rate[self._state_wavelength_indices[state_index]] += contribution
             captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
         if spectral_photon_rate is None:
-            spectral_photon_rate = photon_rate[None, ...]
-        return OpticalResult(
-            photon_rate,
-            self.source_rate,
-            captured,
-            self.wavefront.input_opd(wavefront),
-            spectral_photon_rate,
-            self._wavelengths,
-        )
+            return photon_rate, captured
+        return photon_rate, captured, spectral_photon_rate
 
 
 __all__ = ["PyramidEngine"]

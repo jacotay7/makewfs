@@ -225,3 +225,49 @@ def test_simulate_accepts_a_config_path_and_matches_a_seeded_exposure() -> None:
         np.asarray(simulate(phase, CONFIG, seed=3)),
         np.asarray(sensor.expose(phase, seed=3)),
     )
+
+
+@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize(
+    ("pixels", "separation", "samples", "margin"), [(16, 6, 1, 0), (17, 5, 4, 2)]
+)
+def test_unshifted_pruned_propagation_matches_centered_reference(
+    dtype: str, pixels: int, separation: int, samples: int, margin: int
+) -> None:
+    """Cancelling the inner shifts and pruning the FFTs keeps the optical result."""
+    from makewfs.backend import centered_fft2, centered_ifft2
+    from makewfs.sampling import crop_center, pad_center
+
+    config = WavefrontSensor.from_toml(CONFIG).config
+    assert config.pyramid is not None
+    config = replace(
+        config,
+        numerics=replace(config.numerics, dtype=dtype),
+        pyramid=replace(
+            config.pyramid,
+            pixels_across_pupil=pixels,
+            pupil_separation_pixels=separation,
+            modulation_radius_lambda_over_d=2.0 if samples > 1 else 0.0,
+            modulation_samples=samples,
+            detector_margin_pixels=margin,
+        ),
+    )
+    engine = WavefrontSensor(config).engine
+    rng = np.random.default_rng(3)
+    opd = rng.normal(0.0, 5.0e-8, config.input.shape)
+    internal = engine.wavefront.opd(opd, target_shape=engine.internal_shape)
+    fields = engine._fields(internal, engine.source_states[0], 0)
+    padded = pad_center(fields, (engine.nfft, engine.nfft))
+    exit_pupil = centered_ifft2(centered_fft2(padded) * engine._mask[None, ...])
+    mosaic = np.mean(crop_center(np.abs(exit_pupil) ** 2, engine._base_output_shape), axis=0)
+    expected = np.zeros(engine.output_shape)
+    base = engine._base_output_shape[0]
+    expected[margin : margin + base, margin : margin + base] = mosaic
+    expected *= engine.source_rate / engine._total_field_flux
+
+    result = engine.render(opd)
+
+    tolerance = 2e-6 if dtype == "float32" else 1e-12
+    np.testing.assert_allclose(
+        result.photon_rate, expected, rtol=tolerance, atol=tolerance * expected.max()
+    )

@@ -313,9 +313,9 @@ def _cupy() -> Any:
 @pytest.mark.gpu
 @pytest.mark.parametrize(
     ("sampling", "pixels", "compiled"),
-    # 0.25 px refines to an exact integer FFT grid; the others run the
-    # compiled CUDA DFT executor on the refined grid.
-    [(0.25, 4, False), (0.32, 4, True), (0.91, 16, True)],
+    # 0.25 px refines to an exact integer FFT grid and 0.32/0.91 px to sampled
+    # DFTs; on a device the compiled CUDA executor evaluates all of them.
+    [(0.25, 4, True), (0.32, 4, True), (0.91, 16, True)],
 )
 @pytest.mark.parametrize("dtype", ["float32", "float64"])
 def test_gpu_refined_grid_matches_cpu_and_conserves_flux(

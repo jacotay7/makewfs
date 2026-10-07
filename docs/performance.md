@@ -15,10 +15,55 @@ oversampling case with direct strided sums. Temporally integrated exposures
 batch their fields and avoid a caller-side optical render for every sample.
 These are mathematically equivalent allocation/reduction optimizations.
 
+## Pruned transforms and launch-overhead removal (2.1)
+
+Both sensors zero-pad a small field onto a large FFT grid and then keep only a
+centred crop. `ArrayBackend.pruned_fft2` runs the two 1-D passes of the
+unitary 2-D FFT only over the lines that hold data and over the lines that
+survive the crop: a 16-sample lenslet on a 64-point grid cropped to 16 pixels
+needs 32 one-dimensional transforms instead of 128. Intensities are taken on
+the kept pixels only. The pass order and normalization reproduce the replaced
+SciPy transforms, so CPU renders are unchanged: across a 156-configuration
+before/after matrix (both precisions, oversampling 1-3, odd and even grids,
+field stops, blur, margins, rotated grids, modulated and broadband pyramids)
+451 of 468 output arrays are bit-identical and the rest differ by at most
+2.5e-7 relative, in float32 pyramid cases where SciPy's SIMD remainder lines
+round differently.
+
+The pyramid also applies its mask on the unshifted grid (the stored mask is
+`ifftshift`-ed), which turns four full-grid `fftshift`/`ifftshift` copies per
+source state into two start indices. On a GPU its fixed-shape propagation is
+captured once as a CUDA graph and replayed with one launch; replay runs the
+same kernels, so results equal eager execution. Shack--Hartmann configurations
+on integer FFT grids now use the compiled executor described below.
+
+Measured on cfl-test-bench (Ampere Neoverse-N1, 12 pinned cores, NumPy 2.5.3,
+SciPy 1.18.1, CuPy 14.2.0, getframes 2.4.0; GeForce RTX 4060) with the device
+benchmark command below, 100 frames, three interleaved baseline/candidate
+repeats, median end-to-end frames/s (optics plus detector):
+
+| Configuration | CPU 2.0.0 | CPU 2.1 | Speedup | RTX 4060 2.0.0 | RTX 4060 2.1 | Speedup |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `pyramid_40_float32.toml` | 922.6 | 1,101.2 | 1.19x | 397.3 | 759.0 | 1.91x |
+| `pyramid_60_mod8_float32.toml` | 173.1 | 272.0 | 1.57x | 408.4 | 762.1 | 1.87x |
+| `pyramid_80_mod32_float64.toml` | 11.4 | 20.9 | 1.83x | 204.0 | 277.4 | 1.36x |
+| `shack_hartmann_20x20_float32.toml` | 38.5 | 126.1 | 3.28x | 496.0 | 812.5 | 1.64x |
+| `shack_hartmann_60x60_float64.toml` | 10.4 | 29.8 | 2.88x | 198.9 | 639.9 | 3.22x |
+| `shack_hartmann_quadrature_9sample.toml` | 52.0 | 96.3 | 1.85x | 188.7 | 764.0 | 4.05x |
+
+Optics alone improved 1.4-3.8x on the CPU and 1.4-14x on the GPU. The
+benchmark configurations set `fft_workers = 1`, so the CPU rows are
+single-threaded transforms. On the GPU the small configurations now spend
+about half of each frame in the `getframes` detector chain.
+
 ## First-use-JIT Shack--Hartmann execution
 
-Compatible sampled-DFT Shack--Hartmann configurations on CUDA automatically use
-a shape-specialized compiled executor. The persistent sensor generates a CUDA C
+Compatible Shack--Hartmann configurations on CUDA automatically use a
+shape-specialized compiled executor. Since 2.1 this includes integer-FFT spot
+grids (for example 2 pixels per lambda/D at 2x oversampling), not only sampled
+DFTs: the FFT samples the same Fraunhofer sum at the same detector quadrature
+points, so the executor evaluates every geometry as that DFT and the
+intensities agree to rounding. The persistent sensor generates a CUDA C
 kernel for its precision, temporal sample count, lenslet geometry, detector
 sampling, field stop, margin, wavelength count, and detector-owned charge
 diffusion footprint. CuPy compiles it on the first launch and caches the binary
@@ -36,9 +81,10 @@ sample. Wavelength/source states still launch and accumulate in their declared
 order, so incoherent intensity and spectral-QE inputs are preserved.
 
 The readable array implementation remains the reference and automatic fallback
-for CPU execution, FFT-resolved spot geometries, continuous optical Gaussian
-blur, measured native-pixel optical kernels, and geometries exceeding portable
-CUDA block/shared-memory limits. Compiled renders allocate independent public
+for CPU execution, continuous optical Gaussian blur, measured native-pixel
+optical kernels, and geometries exceeding portable CUDA block/shared-memory
+limits or, after compilation, the device's per-block register budget (for
+example 32x32 lenslet samples on an RTX 4060). Compiled renders allocate independent public
 rate outputs on every call; cached plan storage is immutable and never aliases a
 returned result.
 

@@ -88,9 +88,9 @@ LGS is monochromatic at the 589 nm D2 line, broadened by only ~0.003 nm, so its
 spectral axis exists there purely to exercise the polychromatic path. The
 showcase clip above instead runs a physically correct narrowband beacon sampled
 across the sodium layer's depth, which is where spot elongation actually comes
-from. Compatible sampled-DFT Shack–Hartmann geometries are compiled
-on first use, so warm each fixed sensor before measuring or entering a real-time
-loop. Reproduce the table with
+from. On a GPU, compatible Shack–Hartmann geometries are compiled and
+pyramid frames are captured as a CUDA graph on first use, so warm each fixed
+sensor before measuring or entering a real-time loop. Reproduce the table with
 
 ```bash
 python benchmarks/run.py --device both --frames 100 \
