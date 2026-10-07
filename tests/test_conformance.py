@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
+from aocore import ARCSEC_TO_RAD, conformance
 
 from makewfs import WavefrontSensor, load_config
 
-conformance = pytest.importorskip("aocore.conformance")
 SH_CONFIG = "examples/configs/shack_hartmann_minimal.toml"
 PYRAMID_CONFIG = "examples/configs/pyramid_minimal.toml"
 
@@ -19,8 +18,6 @@ def _sensor(path: str):
 
 
 def test_shack_hartmann_spots_centre_between_pixels_and_follow_tilt() -> None:
-    from aocore import ARCSEC_TO_RAD
-
     config, sensor, image = _sensor(SH_CONFIG)
     shape = config.input.shape
     conformance.check_image_centring(image, pupil_shape=shape)

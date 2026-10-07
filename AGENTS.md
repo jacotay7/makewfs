@@ -62,6 +62,13 @@ pupil OPD/phase + static config
   because it is part of WFS image formation, but it never predicts LGS return
   flux or evolves the sodium layer.
 
+- Stack conventions and generic optics primitives belong to
+  [`aocore`](https://github.com/jacotay7/aocore), a core dependency. Its
+  `CONVENTIONS.md` is the contract, and §9 says to import the primitives rather
+  than re-implement them. Today makewfs takes `centered_coordinates`,
+  `ARCSEC_TO_RAD`/`RAD_TO_ARCSEC`, `opd_to_phase`/`phase_to_opd` and
+  `block_sum` from it. Change a convention in aocore, never here.
+
 Do not copy sibling physics for convenience. If their public API is insufficient,
 write a failing integration test/design note, use the conditional gates in
 `ROADMAP.md`, and make the smallest change in the owning repository.
@@ -141,6 +148,13 @@ Follow the target layout in `ROADMAP.md`:
 
 - `config.py` parses and validates; it does not propagate optics.
 - `wavefront.py`, `pupil.py`, and `sampling.py` hold shared numerical rules.
+  Some aocore look-alikes stay local on purpose; each says why in its module
+  docstring. `pupil.make_pupil` builds wedge spiders, square segment gaps,
+  rotation and rectangular grids on the selected backend, none of which
+  `aocore.Pupil` models. `backend.ArrayBackend` takes a dtype per array, explicit
+  FFT workers and `ndimage` helpers, which `aocore.Backend` does not, and its
+  centred FFTs keep the `fftshift` convention. `sampling.block_sum` wraps
+  `aocore.block_sum` but keeps its own factor-two fast path.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
   `_shack_hartmann_cuda.py` is a private first-use-JIT execution plan for exact
   compatible CUDA geometries; `shack_hartmann.py` remains the readable physics

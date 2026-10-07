@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+from aocore import block_sum as _aocore_block_sum
+from aocore import centered_coordinates
 from numpy.typing import NDArray
 
 from .backend import ArrayBackend, centered_fft_intensity, cpu_backend
@@ -142,7 +144,13 @@ def crop_center(array: NDArray[Any], shape: tuple[int, int]) -> NDArray[Any]:
 def block_sum(
     array: NDArray[Any], factor: int, *, backend: ArrayBackend | None = None
 ) -> NDArray[Any]:
-    """Sum square pixel blocks while preserving total flux."""
+    """Sum square pixel blocks while preserving total flux.
+
+    A thin wrapper over ``aocore.block_sum``, which owns flux-conserving
+    binning (CONVENTIONS 9). It keeps this module's error messages and a
+    factor-two fast path. ``backend`` is accepted for compatibility; the
+    reduction runs on the array's own namespace.
+    """
     if factor < 1:
         raise ValueError("factor must be positive")
     if factor == 1:
@@ -161,10 +169,7 @@ def block_sum(
             + array[..., 1::2, 0::2]
             + array[..., 1::2, 1::2],
         )
-    resolved = backend or cpu_backend()
-    reshaped = array.reshape((*array.shape[:-2], height // factor, factor, width // factor, factor))
-    reduced_x = resolved.sum(reshaped, axis=-1)
-    return cast(NDArray[Any], resolved.sum(reduced_x, axis=-2))
+    return cast(NDArray[Any], _aocore_block_sum(array, factor))
 
 
 @dataclass
@@ -245,9 +250,8 @@ class _SpotPropagationPlan:
                 coordinate = backend.arange(nfft, dtype=np.float64)
                 plan.half_sample = backend.exp(-1j * math.pi * coordinate / nfft)
         else:
-            detector_coordinate = (
-                backend.arange(high_resolution_pixels, dtype=np.float64)
-                - (high_resolution_pixels - 1) / 2.0
+            detector_coordinate = backend.asarray(
+                centered_coordinates(high_resolution_pixels), dtype=np.float64
             ) / (sampling * oversampling)
             pupil_coordinate = backend.arange(samples_per_lenslet, dtype=np.float64)
             kernel = backend.exp(
@@ -259,12 +263,11 @@ class _SpotPropagationPlan:
             )
             plan.dft_kernel = backend.astype(kernel, plan.field_dtype)
         if field_stop_radius_lambda_over_d is not None:
-            coordinates = backend.arange(high_resolution_pixels, dtype=np.float64)
+            coordinates = backend.asarray(
+                centered_coordinates(high_resolution_pixels), dtype=np.float64
+            )
             y, x = backend.meshgrid(coordinates, coordinates, indexing="ij")
-            radius_lambda_over_d = backend.hypot(
-                x - (high_resolution_pixels - 1) / 2.0,
-                y - (high_resolution_pixels - 1) / 2.0,
-            ) / (oversampling * sampling)
+            radius_lambda_over_d = backend.hypot(x, y) / (oversampling * sampling)
             plan.field_stop_mask = radius_lambda_over_d <= field_stop_radius_lambda_over_d
         return plan
 

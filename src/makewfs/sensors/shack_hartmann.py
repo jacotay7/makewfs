@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 import numpy as np
+from aocore import opd_to_phase
 from numpy.typing import NDArray
 
 from ..backend import ArrayBackend, complex_dtype, real_dtype
@@ -379,7 +380,7 @@ class ShackHartmannEngine(SensorEngine):
         # it makes the exact physical piston invariance survive finite precision
         # in exp(i*phase) and has no effect on the intensity.
         relative_opd = total_opd - piston
-        phase = 2.0 * math.pi * relative_opd / state.wavelength_m
+        phase = opd_to_phase(relative_opd, state.wavelength_m)
         return cast(
             NDArray[Any],
             self.backend.asarray(
@@ -416,7 +417,7 @@ class ShackHartmannEngine(SensorEngine):
             [self.source_states[index].wavelength_m for index in state_group] * samples,
             dtype=self._real_dtype,
         )[:, None, None]
-        phase = 2.0 * math.pi * (total_opd - piston) / wavelengths
+        phase = opd_to_phase(total_opd - piston, wavelengths)
         return cast(
             NDArray[Any],
             self.backend.asarray(

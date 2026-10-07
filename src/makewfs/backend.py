@@ -5,6 +5,14 @@ mathematics calls this small backend object rather than allocating through
 NumPy directly.  That boundary is deliberately private today; it gives a
 future CuPy implementation one place to provide array creation, reductions,
 FFT, and interpolation semantics without changing the optical equations.
+
+It is deliberately separate from ``aocore.Backend``. The sensors choose a dtype
+per array rather than one precision per backend, pass explicit FFT worker
+counts and ``overwrite_x``, and need SciPy/CuPy ``ndimage`` helpers. The
+centred FFTs here use the ``fftshift`` convention (zero frequency on pixel
+``n // 2``). The engines own the conversion to CONVENTIONS 1.3 centring: for
+example ``sampling.spot_intensity`` applies a half-sample phase ramp for even
+detectors, and ``tests/test_conformance.py`` checks both sensors.
 """
 
 from __future__ import annotations

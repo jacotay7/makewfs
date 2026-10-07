@@ -4,6 +4,24 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- **Changed: generic optics helpers now come from
+  [aocore](https://github.com/jacotay7/aocore).** `aocore>=0.1.2,<0.2` moves
+  from the `dev` extra to a core dependency. Under CONVENTIONS.md §9, makewfs
+  now imports these primitives instead of keeping its own copies:
+  `centered_coordinates` for the pupil, field-stop and DFT detector grids;
+  `ARCSEC_TO_RAD`/`RAD_TO_ARCSEC` for source angles and the Shack-Hartmann
+  plate scale; `opd_to_phase`/`phase_to_opd` for phase input and the sensor
+  phasors; and `block_sum` for pixel integration. No public name changes.
+  `makewfs.sampling.block_sum` keeps its signature, error messages and
+  factor-two fast path, and delegates other factors to aocore. The behaviour
+  already followed the conventions. Float32 renders of the example
+  configurations are bit-for-bit unchanged, and float64 renders differ only by
+  floating-point rounding (at most about 6e-16 relative), from the changed
+  operation order in the angle and phase conversions and, for oversampling
+  factors above two, in pixel binning. The pupil masks, the
+  `ArrayBackend` and its `fftshift`-convention centred FFTs stay local
+  because aocore has no equivalent for them; the module docstrings say why.
+
 - **Tests: conformance with the AO stack conventions.** `tests/test_conformance.py`
   runs [aocore](https://github.com/jacotay7/aocore)'s checks against both
   sensors. Shack-Hartmann spots centre between pixels for a flat wavefront and

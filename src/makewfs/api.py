@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import Any, cast
 
 import numpy as np
+from aocore import RAD_TO_ARCSEC
 from numpy.typing import ArrayLike, NDArray
 
 from .backend import ArrayBackend, cpu_backend, cupy_backend
@@ -19,8 +20,6 @@ from .sensors.base import OpticalResult, SensorEngine
 from .sensors.pyramid import PyramidEngine
 from .sensors.shack_hartmann import ShackHartmannEngine
 from .wavefront import iter_phase_samples
-
-_ARCSEC_PER_RADIAN = 206264.80624709636
 
 
 class WavefrontSensor:
@@ -125,7 +124,7 @@ class WavefrontSensor:
         sampling = engine._spot_sampling(self.config.sensor.wavelength_m)
         subaperture_m = self.config.input.grid_extent_m / engine.n_lenslets
         lambda_over_d_rad = self.config.sensor.wavelength_m / subaperture_m
-        return float(lambda_over_d_rad / sampling * _ARCSEC_PER_RADIAN)
+        return float(lambda_over_d_rad / sampling * RAD_TO_ARCSEC)
 
     def subaperture_field_of_view_arcsec(self) -> float:
         """Return the on-sky field of view one subaperture's window spans.
