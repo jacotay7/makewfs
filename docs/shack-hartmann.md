@@ -37,6 +37,43 @@ rotated or decentered lenslet array relative to the entrance pupil. They use
 physical-coordinate interpolation and are intended for instrument registration
 studies; the zero-valued defaults retain the faster aligned-grid path.
 
+## Lenslet-grid offset states
+
+`shack_hartmann.lenslet_grid_offset_states_fraction` pre-declares positions of
+the lenslet grid on the pupil, as `[x, y]` offsets in lenslet pitches added to
+`lenslet_grid_offset_fraction`. Dithered, modulated, or otherwise time-varying
+Shack-Hartmann schemes declare the positions they visit; the sensor builds each
+state's geometry once and selects it per call:
+
+```python
+wfs = makewfs.WavefrontSensor.from_toml("examples/configs/shack_hartmann_offset_states.toml")
+wfs.lenslet_grid_offsets_fraction()  # ((0.0, 0.0), (0.5, 0.0), (0.0, 0.5), (0.5, 0.5))
+frame = wfs.expose(opd_m, seed=0, offset_state=1)
+valid = wfs.valid_subapertures(offset_state=1)
+frames = wfs.expose_many(stream, offset_states=itertools.cycle(range(4)))
+```
+
+Each state caches its translated pupil illumination, lenslet mask,
+valid-subaperture map, source and sodium-range tilts, flux normalization, LGS
+kernel, and (on a GPU) compiled executor, so switching state costs a lookup.
+Frames record `wfs_lenslet_offset_state` and the effective
+`wfs_lenslet_grid_offset_fraction`. The index only selects geometry already in
+the configuration, so the configuration and its digest still reproduce every
+frame ([ADR 0005](adr/0005-lenslet-offset-states.md)). Memory grows with the
+number of states times the number of propagated source states.
+
+Moving the lenslet grid by `+f` pitches is equivalent to translating the pupil
+illumination and the OPD by `-f` under a fixed grid. Both are sampled at the
+transformed coordinates by linear interpolation. For the area-weighted pupil
+this is its exact area-weighted translation on the sampled grid, so a lenslet's
+illumination changes continuously with sub-sample offsets. Since 2.2 the pupil
+is zero beyond the grid with interpolation across its last half sample, and
+the OPD keeps its edge value there; previously each edge column of samples
+dropped to zero at once, so illumination near a grid-filling pupil's edge moved
+in steps of a whole sample column. Use `numerics.pupil_supersampling > 1` for
+area-weighted pupil edges; with 8 sub-samples the translated lenslet
+illumination matches the analytic area to better than 0.5% in the tests.
+
 The phase-ramp sign and spot displacement are fixed by analytic tests. This
 repository produces the image; centroiding, slope extraction, and reconstruction
 belong downstream.
@@ -92,11 +129,41 @@ the test cases (`tests/test_shack_hartmann_sampling.py`).
 Raise `numerics.pupil_samples_per_lenslet` when wing flux matters, for example
 for wide-field or quad-cell geometries; the cost grows with `s^2`.
 
+## Centroider choice for closed-loop use
+
+makewfs forms images; it has no centroider, slope, or reconstruction API.
+Those belong to downstream AO software (for example
+[shmpipeline-ao](https://github.com/jacotay7/shmpipeline-ao)). When choosing a
+centroider for a closed loop that consumes these images, these properties are
+standard and worth checking against the measurement model the controller
+assumes:
+
+- A **linear centre of gravity over the full subaperture window with a fixed
+  denominator** (the expected reference flux rather than the measured flux) is
+  linear in the pixel values, so its mean under zero-mean detector noise equals
+  its noise-free response. By the centroid theorem, the centroid of a fully
+  captured spot equals the subaperture-averaged wavefront gradient (weighted by
+  the pupil intensity in a partially illuminated subaperture), scaled by the
+  plate scale.
+- A **thresholded** centre of gravity is non-linear in the pixels. Its gain
+  depends on flux and noise, so a gain calibrated on noise-free images is biased
+  for noisy frames.
+- A **weighted** (for example Gaussian-weighted) centre of gravity is not the
+  subaperture-averaged gradient: its response depends on spot shape, and it
+  differs from the average gradient when the wavefront varies within the
+  subaperture, for instance when one subaperture spans several actuators.
+- Dividing by the measured flux makes any centre of gravity non-linear, and
+  window truncation (the field stop each subaperture window imposes, see
+  `subaperture_field_of_view_arcsec()`) breaks the centroid theorem for spots
+  that extend past the window, such as elongated LGS spots.
+
 ## Current limitations
 
 The CPU path supports deterministic wavelength quadrature, finite NGS angular
 extent and user kernels, rotated analytic pupils with square segment gaps,
 static path OPD, measured blur kernels, and a configurable sodium-range
-elongation model for Shack–Hartmann. Lenslet-grid rotation/offset is supported
-through the explicit resampling path. LGS return flux is always supplied by the
+elongation model for Shack–Hartmann, with an equivalent fast
+[kernel mode](guide-stars.md#fast-lgs-kernel-mode). Lenslet-grid rotation/offset,
+including pre-declared offset states, is supported through the explicit
+resampling path. LGS return flux is always supplied by the
 user; `makewfs` does not model laser propagation or sodium physics.

@@ -544,3 +544,74 @@ def test_pyramid_cuda_graph_survives_cupy_plan_cache_churn() -> None:
     again = sensor.photon_rate(opd)
     cupy.cuda.Device().synchronize()
     assert bool(cupy.array_equal(first, again))
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("dtype", ["float32", "float64"])
+def test_lenslet_offset_states_match_cpu_and_compile_per_state(dtype: str) -> None:
+    cupy = _cupy()
+    config = _config("shack_hartmann_minimal.toml")
+    assert config.shack_hartmann is not None
+    config = replace(
+        config,
+        numerics=replace(config.numerics, dtype=dtype),
+        shack_hartmann=replace(
+            config.shack_hartmann,
+            lenslet_grid_offset_states_fraction=((0.0, 0.0), (0.5, 0.0), (0.25, -0.4)),
+        ),
+    )
+    cpu = WavefrontSensor(config)
+    gpu = WavefrontSensor(replace(config, numerics=replace(config.numerics, device="gpu")))
+    opd = np.random.default_rng(21).normal(0.0, 3.0e-8, config.input.shape)
+    tolerance = 2e-5 if dtype == "float32" else 1e-10
+    for state in range(3):
+        expected = cpu.photon_rate(opd, offset_state=state)
+        actual = gpu.photon_rate(cupy.asarray(opd), offset_state=state)
+        np.testing.assert_allclose(
+            cupy.asnumpy(actual), expected, rtol=0.0, atol=tolerance * float(expected.max())
+        )
+        np.testing.assert_array_equal(
+            cupy.asnumpy(gpu.valid_subapertures(offset_state=state)),
+            cpu.valid_subapertures(offset_state=state),
+        )
+    engine = gpu.engine
+    # Each state compiles its own executor (state 0's is the legacy attribute).
+    assert all(1 in engine.geometry(state).compiled_executors for state in range(3))
+    assert engine._compiled_executors is engine.geometry(0).compiled_executors
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("dtype", ["float32", "float64"])
+def test_lgs_kernel_mode_matches_cpu(dtype: str) -> None:
+    cupy = _cupy()
+    config = _config("shack_hartmann_minimal.toml")
+    config = replace(
+        config,
+        numerics=replace(config.numerics, dtype=dtype),
+        source=replace(
+            config.source,
+            kind="lgs",
+            lgs_model="kernel",
+            lgs_ranges_m=(88e3, 89e3, 90e3, 91e3, 92e3),
+            lgs_range_weights=(1.0, 2.0, 3.0, 2.0, 1.0),
+            lgs_launch_position_m=(3.0, -1.0),
+            angular_fwhm_arcsec=0.2,
+            wavelengths_m=(650e-9, 750e-9),
+        ),
+    )
+    cpu = WavefrontSensor(config)
+    gpu = WavefrontSensor(replace(config, numerics=replace(config.numerics, device="gpu")))
+    assert gpu.engine.lgs_kernel_margin_samples == cpu.engine.lgs_kernel_margin_samples
+    opd = np.random.default_rng(23).normal(0.0, 3.0e-8, config.input.shape)
+    expected = cpu.photon_rate(opd)
+    actual = gpu.photon_rate(cupy.asarray(opd))
+    assert isinstance(actual, cupy.ndarray)
+    tolerance = 2e-5 if dtype == "float32" else 1e-10
+    np.testing.assert_allclose(
+        cupy.asnumpy(actual), expected, rtol=0.0, atol=tolerance * float(expected.max())
+    )
+    # The kernel convolution has no compiled CUDA variant; it must fall back.
+    assert not gpu.engine._compiled_executors
+    assert gpu.engine._compiled_executor_rejections[1] == "LGS kernel convolution"
+    frame = gpu.expose(cupy.asarray(opd), seed=4)
+    assert isinstance(frame.truth.photon_rate, cupy.ndarray)

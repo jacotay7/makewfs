@@ -133,6 +133,8 @@ jobs:
           python examples/compare_sensors.py --output "$RUNNER_TEMP/makewfs-examples/compare.png"
           python examples/lgs_elongation.py --output "$RUNNER_TEMP/makewfs-examples/lgs.png"
           python examples/lgs_thin_beacon.py --output "$RUNNER_TEMP/makewfs-examples/lgs-thin.png"
+          python examples/lgs_kernel_mode.py --output "$RUNNER_TEMP/makewfs-examples/lgs-kernel.png"
+          python examples/lenslet_offset_states.py --output "$RUNNER_TEMP/makewfs-examples/offset-states.png"
           python examples/magnitude_series.py --magnitudes 10 14 --output "$RUNNER_TEMP/makewfs-examples/magnitudes.png"
           python examples/detector_choices.py --output "$RUNNER_TEMP/makewfs-examples/detectors.png"
           python examples/closed_loop_injection.py --steps 6 --output "$RUNNER_TEMP/makewfs-examples/closed-loop.png"

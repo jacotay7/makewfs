@@ -15,6 +15,10 @@ The most complete current workflows are:
 - `lgs_thin_beacon.py`: explicit thin-beacon LGS return-rate and cone-effect
   boundary;
 - `lgs_elongation.py`: centre/side launch and finite sodium-range elongation.
+- `lgs_kernel_mode.py`: the fast LGS kernel mode against the range/angle
+  quadrature, with timings;
+- `lenslet_offset_states.py`: one wavefront through four pre-declared
+  lenslet-grid offset states and their valid-subaperture maps;
 - `closed_loop_injection.py`: external residual update at the closed-loop API
   boundary;
 - `detector_choices.py`: identical ideal maps through several getframes presets.

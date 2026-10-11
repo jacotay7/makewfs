@@ -238,6 +238,8 @@ class _SpotPropagationPlan:
     geometry_value: int | float
     high_resolution_pixels: int
     field_stop_radius_lambda_over_d: float | None
+    window_margin: int = 0
+    """Extra focal-plane samples propagated on each side of the detector window."""
     half_sample: Any | None = None
     fft_window_start: int = 0
     fft_output_start: int = 0
@@ -261,8 +263,18 @@ class _SpotPropagationPlan:
         optical_blur_kernel: NDArray[np.float64] | None,
         charge_diffusion_kernel: NDArray[np.float64] | None,
         backend: ArrayBackend,
+        window_margin: int = 0,
     ) -> _SpotPropagationPlan:
-        """Build backend-resident geometry once for one optical state."""
+        """Build backend-resident geometry once for one optical state.
+
+        ``window_margin`` propagates that many extra oversampled focal-plane
+        samples on each side of the detector window, for a source convolution
+        that moves light into the window (see :mod:`makewfs.sensors.lgs`). It
+        must keep the extended window within one alias-free period of the
+        sampled lenslet field.
+        """
+        if window_margin < 0:
+            raise ValueError("window_margin must be non-negative")
         geometry, geometry_value = spot_sampling_geometry(
             pixels=pixels,
             samples_per_lenslet=samples_per_lenslet,
@@ -285,6 +297,7 @@ class _SpotPropagationPlan:
                 if field_stop_radius_lambda_over_d is None
                 else float(field_stop_radius_lambda_over_d)
             ),
+            window_margin=int(window_margin),
             optical_blur_kernel=(
                 None if optical_blur_kernel is None else backend.asarray(optical_blur_kernel)
             ),
@@ -308,7 +321,7 @@ class _SpotPropagationPlan:
             # rounding. Device plans keep the kernel for every geometry because
             # the compiled CUDA executor evaluates all of them as this DFT.
             detector_coordinate = backend.centered_coordinates(
-                high_resolution_pixels, dtype=np.float64
+                high_resolution_pixels + 2 * plan.window_margin, dtype=np.float64
             ) / (sampling * oversampling)
             pupil_coordinate = backend.arange(samples_per_lenslet, dtype=np.float64)
             kernel = backend.exp(
@@ -344,7 +357,10 @@ class _SpotPropagationPlan:
         backend = self.backend
         samples = self.samples_per_lenslet
         start = (nfft - samples) // 2
-        crop_start = nfft // 2 - self.high_resolution_pixels // 2
+        extended = self.high_resolution_pixels + 2 * self.window_margin
+        if extended > nfft:
+            raise ValueError("window_margin extends the spot window beyond one FFT period")
+        crop_start = nfft // 2 - extended // 2
         weights = None
         if self.half_sample is not None:
             ramp = self.half_sample[start : start + samples]
@@ -381,6 +397,7 @@ class _SpotPropagationPlan:
         field_stop_radius_lambda_over_d: float | None,
         optical_blur_kernel: NDArray[np.float64] | None,
         charge_diffusion_kernel: NDArray[np.float64] | None,
+        window_margin: int = 0,
     ) -> None:
         """Reject accidental use of a plan for a different physical geometry."""
         if (
@@ -399,6 +416,7 @@ class _SpotPropagationPlan:
             )
             or ((self.optical_blur_kernel is None) != (optical_blur_kernel is None))
             or ((self.charge_diffusion_kernel is None) != (charge_diffusion_kernel is None))
+            or self.window_margin != window_margin
             or (
                 (self.geometry == "dft" or self.field_stop_mask is not None)
                 and self.sampling != float(sampling)
@@ -419,6 +437,7 @@ def spot_intensity(
     optical_blur_fwhm_pixels: float = 0.0,
     optical_blur_kernel: NDArray[np.float64] | None = None,
     charge_diffusion_kernel: NDArray[np.float64] | None = None,
+    source_kernel: Any | None = None,
     _plan: _SpotPropagationPlan | None = None,
     backend: ArrayBackend | None = None,
 ) -> NDArray[Any]:
@@ -438,8 +457,15 @@ def spot_intensity(
     belongs to ``getframes``; this function only applies the supplied operator at
     the one sampling where a sub-pixel width is representable, ahead of the
     pixel-area integration that collects the diffused charge.
+
+    ``source_kernel`` is an optional per-subaperture source convolution
+    (:class:`makewfs.sensors.lgs._LGSKernelPlan`). The field is then propagated
+    over the detector window plus the kernel's margin, convolved, and cropped
+    back to the window before the field stop, blur, and pixel integration;
+    light convolved out of the window is lost.
     """
     resolved = backend or cpu_backend()
+    window_margin = 0 if source_kernel is None else int(source_kernel.margin)
     plan = _plan or _SpotPropagationPlan.build(
         pixels=pixels,
         samples_per_lenslet=samples_per_lenslet,
@@ -450,6 +476,7 @@ def spot_intensity(
         optical_blur_kernel=optical_blur_kernel,
         charge_diffusion_kernel=charge_diffusion_kernel,
         backend=resolved,
+        window_margin=window_margin,
     )
     plan.validate(
         field,
@@ -461,10 +488,12 @@ def spot_intensity(
         field_stop_radius_lambda_over_d=field_stop_radius_lambda_over_d,
         optical_blur_kernel=optical_blur_kernel,
         charge_diffusion_kernel=charge_diffusion_kernel,
+        window_margin=window_margin,
     )
     geometry = plan.geometry
     geometry_value = plan.geometry_value
     high_resolution_pixels = plan.high_resolution_pixels
+    propagated_pixels = high_resolution_pixels + 2 * plan.window_margin
     if geometry == "fft":
         nfft = int(geometry_value)
         # An even detector has its optical axis on the boundary shared by its
@@ -489,7 +518,7 @@ def spot_intensity(
             size=nfft,
             input_start=plan.fft_window_start,
             output_start=plan.fft_output_start,
-            output_length=high_resolution_pixels,
+            output_length=propagated_pixels,
             axes=plan.fft_axes,
             workers=workers,
         )
@@ -503,6 +532,10 @@ def spot_intensity(
         transformed = resolved.matmul(resolved.matmul(plan.dft_kernel, field), plan.dft_kernel.T)
         ideal_nfft = samples_per_lenslet * sampling * oversampling
         cropped = resolved.abs(transformed / ideal_nfft) ** 2
+    if source_kernel is not None:
+        cropped = source_kernel.apply(cropped)
+    elif plan.window_margin:
+        cropped = crop_center(cropped, (high_resolution_pixels, high_resolution_pixels))
     if plan.field_stop_mask is not None:
         cropped = cropped * plan.field_stop_mask
     if optical_blur_kernel is not None and optical_blur_fwhm_pixels > 0.0:

@@ -25,6 +25,13 @@ script accepts `--help` for output and resolution controls.
 - `lgs_elongation.py` compares thin, centre-launched, and side-launched sodium
   range profiles; spots elongate radially from the launch, growing with launch
   distance, using a wide subaperture field of view so the streaks are not clipped.
+- `lgs_kernel_mode.py` renders the same side-launched sodium LGS with the
+  range/angle quadrature and the fast kernel mode (`configs/lgs_kernel.toml`),
+  printing each model's warm frame time and captured flux.
+- `lenslet_offset_states.py` renders one wavefront through four pre-declared
+  half-pitch lenslet-grid offset states
+  (`configs/shack_hartmann_offset_states.toml`) and shows each state's
+  valid-subaperture map.
 - `closed_loop_injection.py` drives a low-order residual toward zero via a toy
   external loop and tracks the residual RMS and the frame's departure from the
   flat reference; the controller is explicitly outside makewfs.

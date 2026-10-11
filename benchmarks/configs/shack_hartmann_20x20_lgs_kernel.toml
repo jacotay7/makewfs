@@ -1,0 +1,51 @@
+# 20x20 sodium-LGS Shack-Hartmann, kernel model: the 1 arcsec source extent and
+# 5-range sodium profile are one fixed per-subaperture convolution (1 propagation).
+# shack_hartmann_20x20_lgs_quadrature.toml is the same instrument in quadrature mode.
+schema_version = 1
+
+[input]
+quantity = "opd"
+unit = "m"
+shape = [320, 320]
+grid_extent_m = 8.0
+
+[telescope]
+pupil_diameter_m = 8.0
+central_obscuration_ratio = 0.14
+
+[source]
+kind = "lgs"
+normalization = "detector_photon_rate"
+detector_photon_rate_per_s = 2.0e8
+angular_fwhm_arcsec = 1.0
+angular_quadrature_order = 3
+# Gaussian sodium layer, 10 km FWHM about 90 km, at -2..2 sigma.
+lgs_ranges_m = [81507.0, 85753.0, 90000.0, 94247.0, 98493.0]
+lgs_range_weights = [0.1353, 0.6065, 1.0, 0.6065, 0.1353]
+lgs_launch_position_m = [4.5, 0.0]
+lgs_model = "kernel"
+
+[sensor]
+kind = "shack_hartmann"
+wavelength_m = 5.89e-7
+
+[shack_hartmann]
+lenslets_across_pupil = 20
+pixels_per_subaperture = 16
+# 0.15 arcsec pixels on 0.4 m subapertures: a 2.4 arcsec field.
+spot_sampling_pixels_per_lambda_over_d = 2.0
+minimum_illuminated_fraction = 0.5
+
+[detector]
+preset = "generic_cmos"
+exposure_s = 0.001
+binning = 1
+precision = "float32"
+
+[numerics]
+dtype = "float32"
+fft_oversampling = 2
+fft_workers = 1
+# A 32-sample lenslet field repeats every 32 lambda/d (64 pixels), which keeps
+# the elongated spots (up to ~20 pixels) inside one period for both LGS models.
+pupil_samples_per_lenslet = 32

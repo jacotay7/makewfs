@@ -4,6 +4,70 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-10
+
+Closed-loop conveniences from
+[#19](https://github.com/jacotay7/makewfs/issues/19) that belong to image
+formation. The issue's centroiders, geometric slope engine, and
+interaction-matrix helper produce slopes or calibrations, which the product
+boundary assigns to downstream AO software; they are tracked in
+[shmpipeline-ao#5](https://github.com/jacotay7/shmpipeline-ao/issues/5).
+
+### Added
+
+- **Lenslet-grid offset states.** `shack_hartmann.lenslet_grid_offset_states_fraction`
+  pre-declares `[x, y]` lenslet-grid offsets (in pitches, added to
+  `lenslet_grid_offset_fraction`) for dithered, modulated, or time-varying
+  Shack-Hartmann schemes. Every state's geometry, valid-subaperture map, source
+  tilts, flux normalization, LGS kernel, and compiled CUDA executor is built
+  once. `photon_rate`, `reference`, `expose`, `expose_integrated`, and
+  `valid_subapertures` take `offset_state=` (default `0`), `expose_many` takes
+  `offset_states=`, and `WavefrontSensor.lenslet_grid_offsets_fraction()` lists
+  the effective offsets. Shack-Hartmann frames record
+  `wfs_lenslet_offset_state`, `wfs_lenslet_grid_offset_fraction`, and
+  `wfs_lenslet_offset_state_count`. The selector is an index into configured
+  geometry, so configuration plus digest still reproduce every frame
+  ([ADR 0005](docs/adr/0005-lenslet-offset-states.md)). A pyramid accepts only
+  `offset_state = 0`.
+- **Fast sodium-LGS kernel mode.** `source.lgs_model = "kernel"` (default
+  `"quadrature"`) propagates only the wavelength states and applies the source
+  extent and sodium range profile as one fixed, cached convolution per
+  subaperture on the oversampled focal grid, before the field stop, blur, and
+  pixel integration. It uses the same LGS inputs as the quadrature. Light
+  elongated out of a window is lost and reported, never renormalized; light
+  moved into it comes from a propagated margin of up to the kernel half-width
+  (limited to one alias-free lenslet-field period), recorded with the radius as
+  `wfs_lgs_kernel_margin_px` and `wfs_lgs_kernel_radius_px`. LGS frames record
+  `wfs_lgs_model`. On a 20 x 20, 45-state benchmark a frame is about 9x faster.
+  Against a densely sampled Gaussian quadrature the image agrees to 0.14% and
+  centroids to 0.002 pixel (`validation/lgs_kernel.py`). Requires a
+  Shack-Hartmann sensor and `source.kind = "lgs"`.
+- `validation/lgs_kernel.py` (kernel versus quadrature, with a dense
+  reference), benchmark configs `shack_hartmann_20x20_lgs_{quadrature,kernel}.toml`,
+  and examples `lgs_kernel_mode.py` and `lenslet_offset_states.py`.
+- Docs: a "Centroider choice for closed-loop use" note in the Shack-Hartmann
+  guide, pointing to downstream implementations.
+
+### Fixed
+
+- **Offset or rotated lenslet grids translated the pupil illumination in
+  steps.** The pupil was resampled with zero fill beyond the outermost sample
+  centres and no interpolation there, so as a sub-pixel offset grew, each edge
+  column of samples dropped to zero at once and lenslet illumination near a
+  grid-filling pupil's edge changed unevenly (in an 8 x 8 test, by 0.5% or 3.5%
+  of a lenslet per 0.01 pitch instead of the analytic 1%). The pupil now interpolates to zero
+  across the last half sample and the OPD keeps its edge value, so translation
+  is continuous and matches the analytic area. **Behaviour change** only where
+  a rotated or offset lenslet grid samples within half a pupil sample of the
+  input grid's edge with light there (a pupil that fills the grid): photon
+  rates change by up to a few percent in edge subapertures. Aligned grids and
+  pupils inside the grid are bit-for-bit unchanged.
+
+### Compatibility
+
+- Both new keys are omitted from the normalized configuration at their
+  defaults, so the digest of every existing configuration is unchanged.
+
 ## [2.1.1] - 2026-10-07
 
 ### Fixed

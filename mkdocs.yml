@@ -52,3 +52,4 @@ nav:
       - Flux normalization: adr/0002-flux-normalization.md
       - Public API: adr/0003-public-api.md
       - Backend boundary: adr/0004-backend-boundary.md
+      - Lenslet-grid offset states: adr/0005-lenslet-offset-states.md

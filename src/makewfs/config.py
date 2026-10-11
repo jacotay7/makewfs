@@ -220,6 +220,7 @@ class SourceConfig:
     lgs_launch_position_m: tuple[float, float] = (0.0, 0.0)
     sed_path: str | None = None
     transmission_path: str | None = None
+    lgs_model: str = "quadrature"
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> SourceConfig:
@@ -244,6 +245,7 @@ class SourceConfig:
                 "lgs_launch_position_m",
                 "sed_path",
                 "transmission_path",
+                "lgs_model",
             },
             "source",
         )
@@ -334,6 +336,11 @@ class SourceConfig:
             raise ConfigError("source.lgs_launch_position_m: expected [x, y]")
         if kind != "lgs" and (lgs_ranges or lgs_weights or any(value != 0 for value in launch)):
             raise ConfigError("source: LGS geometry fields require source.kind = 'lgs'")
+        lgs_model = str(data.get("lgs_model", "quadrature")).lower()
+        if lgs_model not in {"quadrature", "kernel"}:
+            raise ConfigError("source.lgs_model: expected 'quadrature' or 'kernel'")
+        if lgs_model == "kernel" and kind != "lgs":
+            raise ConfigError("source.lgs_model: 'kernel' requires source.kind = 'lgs'")
         base_path = Path.cwd() if base is None else base
         angular_kernel_path = (
             None if angular_kernel is None else str((base_path / str(angular_kernel)).resolve())
@@ -363,6 +370,7 @@ class SourceConfig:
             (launch[0], launch[1]),
             sed_path,
             transmission_path,
+            lgs_model,
         )
 
 
@@ -401,6 +409,22 @@ class ShackHartmannConfig:
     detector_margin_pixels: int = 0
     lenslet_grid_rotation_deg: float = 0.0
     lenslet_grid_offset_fraction: tuple[float, float] = (0.0, 0.0)
+    lenslet_grid_offset_states_fraction: tuple[tuple[float, float], ...] = ()
+
+    @property
+    def lenslet_grid_offsets_fraction(self) -> tuple[tuple[float, float], ...]:
+        """Return the effective ``[x, y]`` grid offset of every offset state.
+
+        Each declared state is added to the static ``lenslet_grid_offset_fraction``.
+        Without declared states there is one state, the static offset itself.
+        """
+        base_x, base_y = self.lenslet_grid_offset_fraction
+        if not self.lenslet_grid_offset_states_fraction:
+            return ((base_x, base_y),)
+        return tuple(
+            (base_x + state_x, base_y + state_y)
+            for state_x, state_y in self.lenslet_grid_offset_states_fraction
+        )
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, base: Path | None = None) -> ShackHartmannConfig:
@@ -422,6 +446,7 @@ class ShackHartmannConfig:
                 "detector_margin_pixels",
                 "lenslet_grid_rotation_deg",
                 "lenslet_grid_offset_fraction",
+                "lenslet_grid_offset_states_fraction",
             },
             "shack_hartmann",
         )
@@ -461,6 +486,7 @@ class ShackHartmannConfig:
         )
         if len(grid_offset) != 2:
             raise ConfigError("shack_hartmann.lenslet_grid_offset_fraction: expected [x, y]")
+        offset_states = _offset_states(data.get("lenslet_grid_offset_states_fraction", []))
         return cls(
             _positive_int(
                 data.get("lenslets_across_pupil"), "shack_hartmann.lenslets_across_pupil", minimum=1
@@ -522,7 +548,22 @@ class ShackHartmannConfig:
                 "shack_hartmann.lenslet_grid_rotation_deg",
             ),
             (grid_offset[0], grid_offset[1]),
+            offset_states,
         )
+
+
+def _offset_states(value: Any) -> tuple[tuple[float, float], ...]:
+    """Validate a list of ``[x, y]`` lenslet-grid offset states."""
+    path = "shack_hartmann.lenslet_grid_offset_states_fraction"
+    if not isinstance(value, (list, tuple)):
+        raise ConfigError(f"{path}: expected a list of [x, y] pairs")
+    states: list[tuple[float, float]] = []
+    for index, item in enumerate(value):
+        pair = _tuple_floats(item, f"{path}[{index}]")
+        if len(pair) != 2:
+            raise ConfigError(f"{path}[{index}]: expected [x, y]")
+        states.append((pair[0], pair[1]))
+    return tuple(states)
 
 
 @dataclass(frozen=True)
@@ -818,6 +859,10 @@ class WFSConfig:
         telescope_config = TelescopeConfig.from_dict(table("telescope"), base=base_path)
         source_config = SourceConfig.from_dict(table("source"), base=base_path)
         sensor = SensorConfig.from_dict(table("sensor"))
+        if source_config.lgs_model == "kernel" and sensor.kind != "shack_hartmann":
+            raise ConfigError(
+                "source.lgs_model: 'kernel' is implemented for sensor.kind = 'shack_hartmann' only"
+            )
         if sensor.kind == "shack_hartmann" and data.get("pyramid") is not None:
             raise ConfigError("pyramid: remove this table for a Shack-Hartmann sensor")
         if sensor.kind == "pyramid" and data.get("shack_hartmann") is not None:
@@ -880,6 +925,12 @@ class WFSConfig:
 
         data = cast(dict[str, Any], serialise(asdict(self)))
         data.pop("source_path", None)
+        # Optional fields added after 2.1 are omitted at their defaults, so the
+        # configuration digest of every existing file is unchanged.
+        for table, key, default in _OMITTED_AT_DEFAULT:
+            values = data.get(table)
+            if isinstance(values, dict) and values.get(key) == default:
+                values.pop(key)
         detector = data.get("detector")
         if isinstance(detector, dict):
             detector["camera"] = detector.pop("inline", {})
@@ -893,6 +944,12 @@ class WFSConfig:
         ).encode()
         return hashlib.sha256(payload).hexdigest()[:16]
 
+
+_OMITTED_AT_DEFAULT: tuple[tuple[str, str, Any], ...] = (
+    ("source", "lgs_model", "quadrature"),
+    ("shack_hartmann", "lenslet_grid_offset_states_fraction", []),
+)
+"""``(table, key, serialized default)`` of fields left out of ``to_dict`` at default."""
 
 Config = WFSConfig
 

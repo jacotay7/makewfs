@@ -78,7 +78,7 @@ class _ExecutorSignature:  # pragma: no cover - optional CUDA execution
 class _CompiledShackHartmannExecutor:  # pragma: no cover - optional CUDA execution
     """One first-use-JIT CUDA kernel and its immutable launch data."""
 
-    def __init__(self, engine: Any, sample_count: int) -> None:
+    def __init__(self, engine: Any, sample_count: int, geometry: Any) -> None:
         charge_kernel = engine._charge_diffusion_kernel
         field_stop = engine.settings.field_stop_radius_lambda_over_d is not None
         focal_kernel_size = 0 if charge_kernel is None else int(charge_kernel.shape[0])
@@ -119,11 +119,12 @@ class _CompiledShackHartmannExecutor:  # pragma: no cover - optional CUDA execut
             )
         self._grid = (self.signature.lenslets**2,)
         self._block = (self.signature.block_threads,)
-        self._piston_index = int(engine._piston_index[0]) * self.signature.internal_width + int(
-            engine._piston_index[1]
+        # ``geometry`` is the engine's cached lenslet geometry of one offset state.
+        self._piston_index = int(geometry.piston_index[0]) * self.signature.internal_width + int(
+            geometry.piston_index[1]
         )
-        self._lenslet_mask = engine.lenslet_mask
-        self._angles = engine._field_angle_opd
+        self._lenslet_mask = geometry.lenslet_mask
+        self._angles = geometry.field_angle_opd
         self._dft_kernels = tuple(plan.dft_kernel for plan in engine._spot_plans)
         self._field_stops = tuple(
             self._lenslet_mask if plan.field_stop_mask is None else plan.field_stop_mask
@@ -143,7 +144,7 @@ class _CompiledShackHartmannExecutor:  # pragma: no cover - optional CUDA execut
                 dtype=real_dtype,
             )
         )
-        total_field_flux = self.backend.scalar(engine._total_field_flux)
+        total_field_flux = self.backend.scalar(geometry.total_field_flux)
         self._state_arguments = tuple(
             (
                 float(state.wavelength_m),
@@ -212,6 +213,8 @@ def _compiled_executor_rejection(  # pragma: no cover - optional CUDA execution
         return "continuous optical blur"
     if engine._optical_blur_kernel is not None:
         return "measured native-pixel optical blur"
+    if engine.config.source.lgs_model == "kernel":
+        return "LGS kernel convolution"
     if any(plan.dft_kernel is None for plan in engine._spot_plans):
         return "no sampled-DFT kernel"
     charge_kernel = engine._charge_diffusion_kernel

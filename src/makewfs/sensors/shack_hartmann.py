@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 import numpy as np
@@ -24,13 +25,40 @@ from ..sampling import (
     spot_sampling_geometry,
 )
 from ..sensors.base import OpticalResult, SensorEngine
-from ..source import SourceState, iter_source_states
+from ..source import SourceState, iter_source_states, lgs_kernel_morphology
 from ..wavefront import WavefrontInput, _coordinates, load_static_opd
 from ._shack_hartmann_cuda import (
     _compiled_executor_rejection,
     _CompiledExecutorUnavailable,
     _CompiledShackHartmannExecutor,
 )
+from .lgs import _KernelOffsets, _LGSKernelPlan, kernel_offsets, kernel_radius_samples
+
+
+@dataclass
+class _LensletGeometry:
+    """Cached lenslet-grid geometry of one configured offset state.
+
+    Everything here depends on where the lenslet grid sits on the pupil, so a
+    sensor with several ``lenslet_grid_offset_states_fraction`` holds one per
+    state and selects it per call. Arrays are on the engine's backend.
+    """
+
+    offset_fraction: tuple[float, float]
+    sample_indices: tuple[Any, Any] | None
+    """Physical-grid sample coordinates of each lenslet-grid sample, or ``None``
+    for the aligned grid, which needs no resampling."""
+    lenslet_mask: Any
+    lenslet_illumination: Any
+    lenslet_valid: Any
+    centers_x: Any
+    """Flattened ``(lenslet_y, lenslet_x)`` subaperture centres, pupil metres."""
+    centers_y: Any
+    total_field_flux: Any
+    piston_index: tuple[int, int]
+    field_angle_opd: tuple[Any, ...]
+    lgs_kernel: _LGSKernelPlan | None = None
+    compiled_executors: dict[int, _CompiledShackHartmannExecutor] = field(default_factory=dict)
 
 
 class ShackHartmannEngine(SensorEngine):
@@ -102,68 +130,8 @@ class ShackHartmannEngine(SensorEngine):
             config.input.grid_extent_m,
             backend=self.backend,
         )
-        rotation = math.radians(self.settings.lenslet_grid_rotation_deg)
-        offset_x, offset_y = self.settings.lenslet_grid_offset_fraction
-        self._grid_transform_enabled = abs(rotation) > 1e-15 or bool(offset_x or offset_y)
-        self._sample_indices: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
-        if self._grid_transform_enabled:
-            pitch = config.input.grid_extent_m / self.n_lenslets
-            cosine = math.cos(rotation)
-            sine = math.sin(rotation)
-            self._field_x = cosine * self.xx - sine * self.yy + offset_x * pitch
-            self._field_y = sine * self.xx + cosine * self.yy + offset_y * pitch
-            sample_x = (self._field_x / config.input.grid_extent_m + 0.5) * self.internal_shape[1]
-            sample_y = (self._field_y / config.input.grid_extent_m + 0.5) * self.internal_shape[0]
-            self._sample_indices = (sample_y - 0.5, sample_x - 0.5)
-            self._pupil_on_lenslet_grid = self._sample_to_lenslet_grid(self.pupil)
-        else:
-            self._field_x = self.xx
-            self._field_y = self.yy
-            self._pupil_on_lenslet_grid = self.pupil
-        self.lenslet_mask = self._make_lenslet_mask()
-        self.lenslet_illumination = self.backend.mean(
-            self.lenslet_mask.reshape(
-                self.n_lenslets,
-                self.samples_per_lenslet,
-                self.n_lenslets,
-                self.samples_per_lenslet,
-            ),
-            axis=(1, 3),
-        )
-        self.lenslet_valid = self.lenslet_illumination >= self.settings.minimum_illuminated_fraction
-        local_centers_x = self.backend.mean(
-            self.xx.reshape(
-                self.n_lenslets,
-                self.samples_per_lenslet,
-                self.n_lenslets,
-                self.samples_per_lenslet,
-            ),
-            axis=(1, 3),
-        )
-        local_centers_y = self.backend.mean(
-            self.yy.reshape(
-                self.n_lenslets,
-                self.samples_per_lenslet,
-                self.n_lenslets,
-                self.samples_per_lenslet,
-            ),
-            axis=(1, 3),
-        )
-        pitch = config.input.grid_extent_m / self.n_lenslets
-        cosine = math.cos(rotation)
-        sine = math.sin(rotation)
-        centers = cosine * local_centers_x - sine * local_centers_y + offset_x * pitch
-        centers_y = sine * local_centers_x + cosine * local_centers_y + offset_y * pitch
-        self._subap_x = self.backend.repeat(
-            self.backend.repeat(centers, self.samples_per_lenslet, axis=0),
-            self.samples_per_lenslet,
-            axis=1,
-        )
-        self._subap_y = self.backend.repeat(
-            self.backend.repeat(centers_y, self.samples_per_lenslet, axis=0),
-            self.samples_per_lenslet,
-            axis=1,
-        )
+        self._rotation_rad = math.radians(self.settings.lenslet_grid_rotation_deg)
+        self._local_centers = self._local_lenslet_centers()
         self._lgs_mean_range_m: float | None
         if config.source.lgs_ranges_m:
             weights = self.backend.asarray(config.source.lgs_range_weights, dtype=np.float64)
@@ -206,28 +174,208 @@ class ShackHartmannEngine(SensorEngine):
         )
         self._expected_output_shape = self.output_shape
         self._base_shape = base_shape
-        self._total_field_flux = self.backend.asarray(
-            self.backend.sum(self.backend.abs(self.lenslet_mask) ** 2),
-            dtype=self._rate_dtype,
-        )
-        if self.backend.scalar(self._total_field_flux) <= 0.0:
-            raise ValueError("pupil has no illuminated pixels")
-        piston_score = self.lenslet_mask / (1.0 + self.xx**2 + self.yy**2)
-        flat_piston_index = int(self.backend.scalar(self.backend.argmax(piston_score)))
-        self._piston_index = divmod(flat_piston_index, self.internal_shape[1])
-        self._field_angle_opd = tuple(
-            self._field_angle_for_state(state) for state in self.source_states
-        )
         self._wavelengths = tuple(dict.fromkeys(state.wavelength_m for state in self.source_states))
         wavelength_index = {value: index for index, value in enumerate(self._wavelengths)}
         self._state_wavelength_indices = tuple(
             wavelength_index[state.wavelength_m] for state in self.source_states
         )
+        self._geometries = tuple(
+            self._build_geometry(offset) for offset in self.settings.lenslet_grid_offsets_fraction
+        )
+        self.lgs_kernel_margin_samples = 0
+        self.lgs_kernel_radius_samples = 0
+        if config.source.lgs_model == "kernel":
+            self.lgs_kernel_margin_samples = self._attach_lgs_kernels()
         self._state_groups = self._build_state_groups()
         self._spot_plans = self._build_spot_plans()
         self._compiled_executor_enabled = True
-        self._compiled_executors: dict[int, _CompiledShackHartmannExecutor] = {}
         self._compiled_executor_rejections: dict[int, str] = {}
+
+    @property
+    def offset_states(self) -> tuple[tuple[float, float], ...]:
+        """Effective ``[x, y]`` lenslet-grid offset of each state, in lenslet pitches."""
+        return tuple(geometry.offset_fraction for geometry in self._geometries)
+
+    def geometry(self, offset_state: int = 0) -> _LensletGeometry:
+        """Return the cached lenslet geometry of one configured offset state."""
+        if isinstance(offset_state, bool) or not isinstance(offset_state, (int, np.integer)):
+            raise TypeError("offset_state must be an integer index")
+        count = len(self._geometries)
+        if not 0 <= int(offset_state) < count:
+            raise ValueError(
+                f"offset_state {offset_state} is out of range: the configuration declares "
+                f"{count} lenslet-grid offset state(s) "
+                "(shack_hartmann.lenslet_grid_offset_states_fraction)"
+            )
+        return self._geometries[int(offset_state)]
+
+    # The aligned (first) state keeps the attribute names the engine has always
+    # exposed, so code that inspects one-state sensors is unchanged.
+    @property
+    def lenslet_mask(self) -> Any:
+        """Lenslet-grid pupil amplitude of offset state 0."""
+        return self._geometries[0].lenslet_mask
+
+    @property
+    def lenslet_illumination(self) -> Any:
+        """Mean lenslet illumination of offset state 0."""
+        return self._geometries[0].lenslet_illumination
+
+    @property
+    def lenslet_valid(self) -> Any:
+        """Valid-subaperture map of offset state 0."""
+        return self._geometries[0].lenslet_valid
+
+    @property
+    def _total_field_flux(self) -> Any:
+        return self._geometries[0].total_field_flux
+
+    @property
+    def _piston_index(self) -> tuple[int, int]:
+        return self._geometries[0].piston_index
+
+    @property
+    def _field_angle_opd(self) -> tuple[Any, ...]:
+        return self._geometries[0].field_angle_opd
+
+    @property
+    def _compiled_executors(self) -> dict[int, _CompiledShackHartmannExecutor]:
+        return self._geometries[0].compiled_executors
+
+    def _local_lenslet_centers(self) -> tuple[Any, Any]:
+        """Return lenslet-frame centre coordinates, one per lenslet, in metres."""
+        shape = (
+            self.n_lenslets,
+            self.samples_per_lenslet,
+            self.n_lenslets,
+            self.samples_per_lenslet,
+        )
+        return (
+            self.backend.mean(self.xx.reshape(shape), axis=(1, 3)),
+            self.backend.mean(self.yy.reshape(shape), axis=(1, 3)),
+        )
+
+    def _build_geometry(self, offset: tuple[float, float]) -> _LensletGeometry:
+        """Build the lenslet geometry for one ``[x, y]`` grid offset.
+
+        The lenslet grid is rotated by ``lenslet_grid_rotation_deg`` and
+        shifted by ``offset`` lenslet pitches on the pupil. Equivalently, the
+        pupil illumination and the OPD translate under a fixed lenslet grid:
+        both are sampled at the transformed coordinates by linear
+        interpolation of the area-weighted pupil, which moves the illumination
+        continuously with sub-pixel offsets instead of snapping edge pixels.
+        """
+        config = self.config
+        extent = config.input.grid_extent_m
+        pitch = extent / self.n_lenslets
+        offset_x, offset_y = offset
+        cosine = math.cos(self._rotation_rad)
+        sine = math.sin(self._rotation_rad)
+        sample_indices: tuple[Any, Any] | None = None
+        if abs(self._rotation_rad) > 1e-15 or bool(offset_x or offset_y):
+            field_x = cosine * self.xx - sine * self.yy + offset_x * pitch
+            field_y = sine * self.xx + cosine * self.yy + offset_y * pitch
+            sample_x = (field_x / extent + 0.5) * self.internal_shape[1]
+            sample_y = (field_y / extent + 0.5) * self.internal_shape[0]
+            sample_indices = (sample_y - 0.5, sample_x - 0.5)
+            pupil_on_grid = self._sample_to_lenslet_grid(
+                self.pupil, sample_indices, outside="grid-constant"
+            )
+        else:
+            field_x, field_y = self.xx, self.yy
+            pupil_on_grid = self.pupil
+        lenslet_mask = self._make_lenslet_mask(pupil_on_grid)
+        n = self.n_lenslets
+        s = self.samples_per_lenslet
+        illumination = self.backend.mean(lenslet_mask.reshape(n, s, n, s), axis=(1, 3))
+        local_x, local_y = self._local_centers
+        centers_x = cosine * local_x - sine * local_y + offset_x * pitch
+        centers_y = sine * local_x + cosine * local_y + offset_y * pitch
+        total_field_flux = self.backend.asarray(
+            self.backend.sum(self.backend.abs(lenslet_mask) ** 2),
+            dtype=self._rate_dtype,
+        )
+        if self.backend.scalar(total_field_flux) <= 0.0:
+            raise ValueError(
+                "pupil has no illuminated pixels"
+                + ("" if sample_indices is None else f" for lenslet-grid offset {list(offset)}")
+            )
+        piston_score = lenslet_mask / (1.0 + self.xx**2 + self.yy**2)
+        flat_piston_index = int(self.backend.scalar(self.backend.argmax(piston_score)))
+        subap_x = self._repeat_to_lenslet_samples(centers_x)
+        subap_y = self._repeat_to_lenslet_samples(centers_y)
+        return _LensletGeometry(
+            offset_fraction=(float(offset_x), float(offset_y)),
+            sample_indices=sample_indices,
+            lenslet_mask=lenslet_mask,
+            lenslet_illumination=illumination,
+            lenslet_valid=illumination >= self.settings.minimum_illuminated_fraction,
+            centers_x=centers_x.reshape(n * n),
+            centers_y=centers_y.reshape(n * n),
+            total_field_flux=total_field_flux,
+            piston_index=divmod(flat_piston_index, self.internal_shape[1]),
+            field_angle_opd=tuple(
+                self._field_angle_for_state(state, field_x, field_y, subap_x, subap_y)
+                for state in self.source_states
+            ),
+        )
+
+    def _repeat_to_lenslet_samples(self, per_lenslet: Any) -> Any:
+        """Hold one value per lenslet constant over that lenslet's samples."""
+        s = self.samples_per_lenslet
+        return self.backend.repeat(self.backend.repeat(per_lenslet, s, axis=0), s, axis=1)
+
+    def _attach_lgs_kernels(self) -> int:
+        """Build the fixed LGS kernel of every offset state; return the margin.
+
+        The margin is the number of oversampled focal-plane samples propagated
+        beyond each side of the detector window: the kernel half-width, capped
+        at one alias-free period of the sampled lenslet field (the shortest
+        wavelength's ``samples_per_lenslet * sampling * oversampling``).
+        """
+        oversampling = self.config.numerics.fft_oversampling
+        morphology = lgs_kernel_morphology(self.config)
+        reference_sampling = self._spot_sampling(self.config.sensor.wavelength_m)
+        pitch = self.config.input.grid_extent_m / self.n_lenslets
+        sample_angle_rad = (
+            self.config.sensor.wavelength_m / pitch / reference_sampling / oversampling
+        )
+        sigma_samples = morphology.sigma_rad / sample_angle_rad
+        offsets: list[_KernelOffsets] = [
+            kernel_offsets(
+                geometry.centers_x,
+                geometry.centers_y,
+                launch_m=self.config.source.lgs_launch_position_m,
+                mean_range_m=self._lgs_mean_range_m,
+                morphology=morphology,
+                rotation_rad=self._rotation_rad,
+                sample_angle_rad=sample_angle_rad,
+                backend=self.backend,
+            )
+            for geometry in self._geometries
+        ]
+        radius = max(
+            kernel_radius_samples(item, sigma_samples, backend=self.backend) for item in offsets
+        )
+        window = self.settings.pixels_per_subaperture * oversampling
+        period = min(
+            self.samples_per_lenslet * sampling * oversampling
+            for sampling in self._state_spot_sampling
+        )
+        margin = max(0, min(radius, math.floor((period - window) / 2 + 1e-9)))
+        self.lgs_kernel_radius_samples = radius
+        for index, item in enumerate(offsets):
+            self._geometries[index].lgs_kernel = _LGSKernelPlan.build(
+                item,
+                sigma_samples=sigma_samples,
+                radius=radius,
+                window=window,
+                margin=margin,
+                workers=self.config.numerics.fft_workers,
+                complex_dtype=self._complex_dtype,
+                backend=self.backend,
+            )
+        return margin
 
     def _build_state_groups(self) -> tuple[tuple[int, ...], ...]:
         """Group GPU states that share one exact focal-plane FFT geometry."""
@@ -274,6 +422,7 @@ class ShackHartmannEngine(SensorEngine):
                     optical_blur_kernel=self._optical_blur_kernel,
                     charge_diffusion_kernel=self._charge_diffusion_kernel,
                     backend=self.backend,
+                    window_margin=self.lgs_kernel_margin_samples,
                 )
         return tuple(plans[key] for key in keys)
 
@@ -300,11 +449,11 @@ class ShackHartmannEngine(SensorEngine):
         )
         return cast(NDArray[np.float64], self.backend.asarray(kernel, dtype=self._rate_dtype))
 
-    def _make_lenslet_mask(self) -> NDArray[np.float64]:
+    def _make_lenslet_mask(self, pupil_on_grid: NDArray[np.float64]) -> NDArray[np.float64]:
         """Apply optional square lenslet fill factor to the entrance pupil."""
         fill = self.settings.lenslet_fill_factor
         if fill >= 1.0:
-            return self._pupil_on_lenslet_grid
+            return pupil_on_grid
         s = self.samples_per_lenslet
         coords = (self.backend.arange(s, dtype=self._real_dtype) + 0.5) / s - 0.5
         yy, xx = self.backend.meshgrid(coords, coords)
@@ -312,17 +461,34 @@ class ShackHartmannEngine(SensorEngine):
             self._real_dtype
         )
         tiled = self.backend.tile(local, (self.n_lenslets, self.n_lenslets))
-        return cast(NDArray[np.float64], self._pupil_on_lenslet_grid * tiled)
+        return cast(NDArray[np.float64], pupil_on_grid * tiled)
 
-    def _sample_to_lenslet_grid(self, array: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Sample a physical-grid array on the configured lenslet grid."""
-        if self._sample_indices is None:
+    def _sample_to_lenslet_grid(
+        self,
+        array: NDArray[np.float64],
+        sample_indices: tuple[Any, Any] | None,
+        *,
+        outside: str,
+    ) -> NDArray[np.float64]:
+        """Sample a physical-grid array on a transformed lenslet grid.
+
+        Linear interpolation of the area-weighted pupil is its exact
+        area-weighted translation on the sampled grid, so the illumination of a
+        lenslet changes continuously with sub-sample offsets. ``outside``
+        extends the array beyond its outermost sample centres: the pupil uses
+        ``"grid-constant"`` (zero transmission beyond the grid, interpolated
+        across the last half sample) and the OPD ``"nearest"`` (the edge value,
+        so a pupil sample there sees a continuous wavefront). Plain
+        ``"constant"`` would drop each edge column to zero as soon as a sample
+        passed the last centre, turning a smooth translation into a staircase.
+        """
+        if sample_indices is None:
             return array
         sampled = self.backend.map_coordinates(
             array,
-            self._sample_indices,
+            sample_indices,
             order=1,
-            mode="constant",
+            mode=outside,
         )
         return cast(NDArray[np.float64], self.backend.asarray(sampled, dtype=self._real_dtype))
 
@@ -357,26 +523,37 @@ class ShackHartmannEngine(SensorEngine):
             )
         return configured * wavelength_m / self.config.sensor.wavelength_m
 
-    def _field_angle_for_state(self, state: SourceState) -> NDArray[np.float64]:
+    def _field_angle_for_state(
+        self,
+        state: SourceState,
+        field_x: Any,
+        field_y: Any,
+        subap_x: Any,
+        subap_y: Any,
+    ) -> NDArray[np.float64]:
         """Build immutable source/range geometry once for a persistent sensor."""
         if state.range_m is None:
-            return self._field_x * state.angle_x_rad + self._field_y * state.angle_y_rad
+            return cast(
+                NDArray[np.float64], field_x * state.angle_x_rad + field_y * state.angle_y_rad
+            )
         if self._lgs_mean_range_m is None:
             raise ValueError("LGS range state is missing its weighted mean range")
         launch_x, launch_y = self.config.source.lgs_launch_position_m
         range_delta = 1.0 / state.range_m - 1.0 / self._lgs_mean_range_m
-        angle_x = state.angle_x_rad + (launch_x - self._subap_x) * range_delta
-        angle_y = state.angle_y_rad + (launch_y - self._subap_y) * range_delta
-        return cast(NDArray[np.float64], self._field_x * angle_x + self._field_y * angle_y)
+        angle_x = state.angle_x_rad + (launch_x - subap_x) * range_delta
+        angle_y = state.angle_y_rad + (launch_y - subap_y) * range_delta
+        return cast(NDArray[np.float64], field_x * angle_x + field_y * angle_y)
 
     def _field(
         self,
         internal: NDArray[np.float64],
         state: SourceState,
         state_index: int,
+        geometry: _LensletGeometry | None = None,
     ) -> NDArray[Any]:
-        total_opd = internal + self._field_angle_opd[state_index]
-        piston = total_opd[self._piston_index]
+        geometry = self._geometries[0] if geometry is None else geometry
+        total_opd = internal + geometry.field_angle_opd[state_index]
+        piston = total_opd[geometry.piston_index]
         # Removing only a fixed global piston is a numerical stabilization:
         # it makes the exact physical piston invariance survive finite precision
         # in exp(i*phase) and has no effect on the intensity.
@@ -385,7 +562,7 @@ class ShackHartmannEngine(SensorEngine):
         return cast(
             NDArray[Any],
             self.backend.asarray(
-                self.lenslet_mask * self.backend.exp(1j * phase),
+                geometry.lenslet_mask * self.backend.exp(1j * phase),
                 dtype=self._complex_dtype,
             ),
         )
@@ -396,13 +573,15 @@ class ShackHartmannEngine(SensorEngine):
         state_group: tuple[int, ...],
         *,
         samples: int = 1,
+        geometry: _LensletGeometry | None = None,
     ) -> NDArray[Any]:
         """Build one device batch for source states sharing FFT geometry.
 
         With ``samples`` greater than one, ``internal`` carries a leading
         temporal axis and the returned batch is ordered ``(sample, state)``.
         """
-        angles = self.backend.stack([self._field_angle_opd[index] for index in state_group])
+        geometry = self._geometries[0] if geometry is None else geometry
+        angles = self.backend.stack([geometry.field_angle_opd[index] for index in state_group])
         if samples > 1:
             total_opd = (internal[:, None, ...] + angles[None, ...]).reshape(
                 samples * len(state_group), *internal.shape[1:]
@@ -411,8 +590,8 @@ class ShackHartmannEngine(SensorEngine):
             total_opd = internal[None, ...] + angles
         piston = total_opd[
             :,
-            self._piston_index[0],
-            self._piston_index[1],
+            geometry.piston_index[0],
+            geometry.piston_index[1],
         ][:, None, None]
         wavelengths = self.backend.asarray(
             [self.source_states[index].wavelength_m for index in state_group] * samples,
@@ -422,15 +601,18 @@ class ShackHartmannEngine(SensorEngine):
         return cast(
             NDArray[Any],
             self.backend.asarray(
-                self.lenslet_mask[None, ...] * self.backend.exp(1j * phase),
+                geometry.lenslet_mask[None, ...] * self.backend.exp(1j * phase),
                 dtype=self._complex_dtype,
             ),
         )
 
-    def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
-        return self._render_samples([wavefront])
+    def render(self, wavefront: NDArray[np.float64], *, offset_state: int = 0) -> OpticalResult:
+        """Render one OPD sample with the lenslet grid of ``offset_state``."""
+        return self._render_samples([wavefront], self.geometry(offset_state))
 
-    def render_integrated(self, wavefronts: Sequence[NDArray[np.float64]]) -> OpticalResult:
+    def render_integrated(
+        self, wavefronts: Sequence[NDArray[np.float64]], *, offset_state: int = 0
+    ) -> OpticalResult:
         """Render several temporal OPD samples as one uniformly weighted average.
 
         Identical in result to rendering each sample and averaging the photon
@@ -448,12 +630,18 @@ class ShackHartmannEngine(SensorEngine):
         """
         if not wavefronts:
             raise ValueError("render_integrated requires at least one sample")
-        return self._render_samples(wavefronts)
+        return self._render_samples(wavefronts, self.geometry(offset_state))
 
-    def _render_samples(self, wavefronts: Sequence[NDArray[np.float64]]) -> OpticalResult:
+    def _render_samples(
+        self,
+        wavefronts: Sequence[NDArray[np.float64]],
+        geometry: _LensletGeometry,
+    ) -> OpticalResult:
         internal_samples = [
             self._sample_to_lenslet_grid(
-                self.wavefront.opd(wavefront, target_shape=self.internal_shape)
+                self.wavefront.opd(wavefront, target_shape=self.internal_shape),
+                geometry.sample_indices,
+                outside="nearest",
             )
             for wavefront in wavefronts
         ]
@@ -469,7 +657,7 @@ class ShackHartmannEngine(SensorEngine):
                 axis=0,
             )
         )
-        compiled = self._render_compiled(internal, sample_count)
+        compiled = self._render_compiled(internal, sample_count, geometry)
         if compiled is not None:
             return OpticalResult(
                 compiled.photon_rate,
@@ -499,6 +687,7 @@ class ShackHartmannEngine(SensorEngine):
                         internal,
                         states[state_group[0]],
                         state_group[0],
+                        geometry,
                     )
                     .reshape(n, s, n, s)
                     .transpose(0, 2, 1, 3)
@@ -508,7 +697,7 @@ class ShackHartmannEngine(SensorEngine):
                 # Leading axis is (sample, state), flattened into the batch the
                 # transform already accepts.
                 subapertures = (
-                    self._fields(internal, state_group, samples=sample_count)
+                    self._fields(internal, state_group, samples=sample_count, geometry=geometry)
                     .reshape(sample_count * len(state_group), n, s, n, s)
                     .transpose(0, 1, 3, 2, 4)
                     .reshape(sample_count * len(state_group) * n * n, s, s)
@@ -524,6 +713,7 @@ class ShackHartmannEngine(SensorEngine):
                 optical_blur_fwhm_pixels=self.settings.optical_blur_fwhm_pixels,
                 optical_blur_kernel=self._optical_blur_kernel,
                 charge_diffusion_kernel=self._charge_diffusion_kernel,
+                source_kernel=geometry.lgs_kernel,
                 _plan=self._spot_plans[state_group[0]],
                 backend=self.backend,
             )
@@ -559,13 +749,17 @@ class ShackHartmannEngine(SensorEngine):
                 else:
                     mosaic = base_mosaic
                 cropped_flux = self.backend.sum(mosaic)
-                contribution = mosaic * (self.source_rate * state.weight / self._total_field_flux)
+                contribution = mosaic * (
+                    self.source_rate * state.weight / geometry.total_field_flux
+                )
                 photon_rate += contribution
                 if spectral_photon_rate is not None:
                     spectral_photon_rate[self._state_wavelength_indices[state_index]] += (
                         contribution
                     )
-                captured += self.source_rate * state.weight * cropped_flux / self._total_field_flux
+                captured += (
+                    self.source_rate * state.weight * cropped_flux / geometry.total_field_flux
+                )
         if spectral_photon_rate is None:
             spectral_photon_rate = photon_rate[None, ...]
         return OpticalResult(
@@ -577,11 +771,13 @@ class ShackHartmannEngine(SensorEngine):
             self._wavelengths,
         )
 
-    def _render_compiled(self, internal: Any, sample_count: int) -> Any | None:
+    def _render_compiled(
+        self, internal: Any, sample_count: int, geometry: _LensletGeometry
+    ) -> Any | None:
         """Use a first-call-JIT CUDA plan when this exact geometry supports it."""
         if not self._compiled_executor_enabled:
             return None
-        executor = self._compiled_executors.get(sample_count)
+        executor = geometry.compiled_executors.get(sample_count)
         if executor is not None:
             batched_internal = internal[None, ...] if sample_count == 1 else internal
             return executor.render(batched_internal)
@@ -592,11 +788,11 @@ class ShackHartmannEngine(SensorEngine):
             self._compiled_executor_rejections[sample_count] = rejection
             return None
         try:
-            executor = _CompiledShackHartmannExecutor(self, sample_count)
+            executor = _CompiledShackHartmannExecutor(self, sample_count, geometry)
         except _CompiledExecutorUnavailable as exc:
             self._compiled_executor_rejections[sample_count] = str(exc)
             return None
-        self._compiled_executors[sample_count] = executor
+        geometry.compiled_executors[sample_count] = executor
         batched_internal = internal[None, ...] if sample_count == 1 else internal
         return executor.render(batched_internal)
 

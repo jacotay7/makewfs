@@ -114,10 +114,15 @@ for the methodology.
   quadrature, measured source curves, and user-supplied angular kernels, so
   extended and polychromatic beacons are integrated as intensities, not fields.
 - **Laser guide stars** — sodium-range sampling with launch-position geometry
-  and the resulting spot elongation; see
+  and the resulting spot elongation, with a fast kernel mode
+  (`source.lgs_model = "kernel"`) that applies the elongation as one fixed
+  per-subaperture convolution for long closed loops; see
   **[Guide stars](https://jacotay7.github.io/makewfs/guide-stars/)**. The
   mean-altitude LGS OPD approximation is documented and deliberately distinct
   from range-resolved turbulence.
+- **Lenslet-grid offset states** — pre-declared lenslet-grid positions for
+  dithered or time-varying Shack–Hartmann schemes, cached once and selected per
+  frame with `offset_state=`, each with its own valid-subaperture map.
 - **Analytic pupils** — central obscuration, segmented and rotated apertures,
   static OPD maps and user masks, hashed for provenance.
 - **Configuration as the contract** — immutable TOML with units in every key

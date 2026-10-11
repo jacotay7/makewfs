@@ -87,6 +87,8 @@ def metadata(
             for state in states
         ],
     }
+    if config.source.kind == "lgs":
+        result["wfs_lgs_model"] = config.source.lgs_model
     result.update(referenced_file_digests(config) if file_digests is None else file_digests)
     for package in ("makewfs", "getframes"):
         try:
