@@ -68,6 +68,12 @@ boundary assigns to downstream AO software; they are tracked in
 - Both new keys are omitted from the normalized configuration at their
   defaults, so the digest of every existing configuration is unchanged.
 
+### Dependencies
+
+- Allow aocore 0.2 (`aocore>=0.1.3,<0.3`). aocore 0.2.0 is additive and the
+  suite passes against it; the `<0.2` cap made makewfs uninstallable next to
+  shmpipeline-ao 0.2.
+
 ## [2.1.1] - 2026-10-07
 
 ### Fixed
