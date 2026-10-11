@@ -157,6 +157,12 @@ must not be implemented until its acceptance test demonstrates the need.
   bright-guide-star photon rates), and all worked examples were reworked for
   legibility: colorbars with units, real named getframes presets, a GIF for the
   moving-atmosphere example, and a verified LGS-elongation figure.
+- [x] 2.2 ([#19](https://github.com/jacotay7/makewfs/issues/19)): pre-declared
+  SH lenslet-grid offset states selected per frame (ADR 0005), continuous
+  sub-pixel pupil translation, and a fast fixed-kernel sodium-LGS mode validated
+  against a dense range/angle quadrature. The issue's centroiders, geometric
+  slope engine, and interaction-matrix helper are downstream (slopes and
+  calibration) and tracked in shmpipeline-ao#5.
 - [ ] The final GitHub tag, documentation publication, and PyPI release remain.
   Targeted independent validation, the wavelength-resolved detector-QE gate,
   public CuPy parity evidence, the versioned documentation gallery, and relative

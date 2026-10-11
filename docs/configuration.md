@@ -74,6 +74,7 @@ configuration digest.
 | `lgs_ranges_m` | Optional positive sodium range nodes; only valid for LGS. Empty means a thin layer at the configured mean. |
 | `lgs_range_weights` | Optional non-negative weights matching `lgs_ranges_m`; normalized internally. |
 | `lgs_launch_position_m` | LGS launch `[x, y]` in the entrance-pupil plane (default `[0, 0]`); only valid for LGS. |
+| `lgs_model` | `"quadrature"` (default) or `"kernel"`; case-insensitive. `"kernel"` requires `kind = "lgs"` and a Shack–Hartmann sensor. It propagates only the wavelength states and applies the source extent (`angular_fwhm_arcsec` or `angular_kernel_path`) and the sodium range profile as one fixed convolution per subaperture; `angular_quadrature_order` is then unused. See [Fast LGS kernel mode](guide-stars.md#fast-lgs-kernel-mode). |
 | `sed_path` | Optional two-column `wavelength_nm value` source spectrum, non-negative and increasing. |
 | `transmission_path` | Optional two-column `wavelength_nm value` transmission curve in `[0, 1]`. |
 
@@ -150,6 +151,7 @@ fft_workers = 1  # CPU-only FFT control; accepted but ignored by CuPy FFTs
 | `detector_margin_pixels` | Non-negative zero-rate mosaic margin. |
 | `lenslet_grid_rotation_deg` | Lenslet-frame rotation in degrees (default 0). |
 | `lenslet_grid_offset_fraction` | `[x, y]` offset in lenslet-pitch fractions (default `[0, 0]`). |
+| `lenslet_grid_offset_states_fraction` | Optional list of `[x, y]` offsets in lenslet pitches (default `[]`), each added to `lenslet_grid_offset_fraction`; finite values, any number of states. Selected per call with `offset_state` (index into this list). Empty means one state, the static offset. See [Lenslet-grid offset states](shack-hartmann.md#lenslet-grid-offset-states). |
 
 `[shack_hartmann]` requires positive `lenslets_across_pupil`, at least two
 `pixels_per_subaperture`, and `minimum_illuminated_fraction` in `[0, 1]`.
@@ -166,6 +168,20 @@ is a non-negative integer. The optional
 `lenslet_grid_offset_fraction = [x, y]` shifts its origin by fractions of one
 subaperture pitch. These two controls use an explicit physical-coordinate
 resampling path; the default zero values retain the fast axis-aligned path.
+`lenslet_grid_offset_states_fraction` pre-declares several such offsets, for a
+dithered or time-varying lenslet grid; every state's geometry is built once and
+`WavefrontSensor.photon_rate(opd, offset_state=k)` (and `expose`,
+`expose_integrated`, `reference`, `valid_subapertures`) selects one:
+
+```toml
+[shack_hartmann]
+lenslets_across_pupil = 8
+pixels_per_subaperture = 8
+spot_sampling_pixels_per_lambda_over_d = 2.0
+minimum_illuminated_fraction = 0.5
+lenslet_grid_offset_states_fraction = [[0.0, 0.0], [0.5, 0.0], [0.0, 0.5], [0.5, 0.5]]
+```
+
 Integer-compatible focal grids use the batched FFT path. Arbitrary sampling,
 including undersampled quadcell modes, uses an exact sampled DFT at detector
 quadrature points so the configured plate scale is not rounded to an FFT bin.
@@ -272,7 +288,23 @@ lgs_launch_position_m = [0.0, 0.0]
 
 The supplied OPD is interpreted at the weighted mean range. Each range slice
 gets the geometric perspective offset for each lenslet; this captures image
-elongation but does not create range-resolved turbulent OPD. See the
+elongation but does not create range-resolved turbulent OPD.
+
+For long closed loops, `lgs_model = "kernel"` evaluates the same geometry as a
+fixed per-subaperture convolution, one propagation per wavelength instead of
+one per source angle and range:
+
+```toml
+[source]
+kind = "lgs"
+normalization = "detector_photon_rate"
+detector_photon_rate_per_s = 2.0e8
+lgs_model = "kernel"
+angular_fwhm_arcsec = 0.5
+lgs_ranges_m = [85753.0, 87877.0, 90000.0, 92123.0, 94247.0]
+lgs_range_weights = [0.6065, 0.8825, 1.0, 0.8825, 0.6065]
+lgs_launch_position_m = [4.5, 0.0]
+``` See the
 [guide-star guide](guide-stars.md) for the approximation and `pyturb` handoff.
 
 ## Detector choices

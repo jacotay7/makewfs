@@ -15,6 +15,37 @@ oversampling case with direct strided sums. Temporally integrated exposures
 batch their fields and avoid a caller-side optical render for every sample.
 These are mathematically equivalent allocation/reduction optimizations.
 
+## Fast LGS kernel mode and offset states (2.2)
+
+A sodium LGS rendered with `source.lgs_model = "quadrature"` costs one
+propagation per wavelength, source-angle sample, and sodium range.
+`lgs_model = "kernel"` propagates each wavelength once over the detector window
+plus a margin and applies a cached per-subaperture convolution with pruned real
+FFTs (see [Guide stars](guide-stars.md#fast-lgs-kernel-mode)). For the 20 x 20
+benchmark pair `benchmarks/configs/shack_hartmann_20x20_lgs_{quadrature,kernel}.toml`
+(float32, 16 pixels per subaperture, 45 quadrature states, a 24-pixel kernel
+margin), `python benchmarks/run.py --frames 5` on an Intel i7-10700 measured:
+
+| Model | Propagated states | Construction | Warm optical frame | Warm `expose` |
+| --- | --- | --- | --- | --- |
+| quadrature | 45 | 1.13 s | 1240 ms | 1256 ms |
+| kernel | 1 | 0.27 s | 144 ms | 142 ms |
+
+That is about 8.6x per frame. The host was shared and heavily loaded (load
+average about 15 on 16 threads), so treat the absolute times as indicative;
+a second measurement (`validation/lgs_kernel.py --dtype float32 --skip-dense
+--frames 5`) gave 1913 ms against 213 ms, 9.0x. The gain scales with the number of quadrature states
+the kernel replaces; the kernel's own cost grows with the window, margin, and
+kernel width, because the convolution runs on that extended oversampled grid.
+The kernel spectra are cached per lenslet-grid offset state and take
+`n_subapertures * Q * (Q/2 + 1)` complex values each, where `Q` is the
+convolution length (180 for this benchmark, 52 MB in float32). The convolution
+has no compiled CUDA variant: on a GPU it runs on the CuPy array path.
+
+Lenslet-grid offset states build all their geometry at construction, so
+`offset_state` selection adds no per-frame cost; construction time and memory
+grow linearly with the number of states.
+
 ## Pruned transforms and launch-overhead removal (2.1)
 
 Both sensors zero-pad a small field onto a large FFT grid and then keep only a

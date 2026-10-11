@@ -23,7 +23,10 @@ regression test, and recorded in the changelog before it is considered stable.
 
 The physical per-frame contract is a wavefront array plus configuration (and an
 optional detector seed). `out` controls storage lifetime only and cannot change
-the simulated result. Atmosphere, reconstruction, controllers, and detector
+the simulated result. A Shack–Hartmann `offset_state` index selects one of the
+lenslet-grid positions declared in the configuration
+([ADR 0005](adr/0005-lenslet-offset-states.md)); it adds no instrument
+parameter outside the configuration. Atmosphere, reconstruction, controllers, and detector
 physics remain outside the package boundary.
 
 ## Migrating to 2.0

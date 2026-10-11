@@ -398,6 +398,52 @@ class ArrayBackend:
         parts = [array[index] for index in indices]
         return parts[0] if len(parts) == 1 else self.xp.concatenate(parts, axis=axis)
 
+    def padded_convolution_spectrum(self, array: Any, *, size: int, workers: int = 1) -> Any:
+        """Real-input 2-D FFT of the last two axes, zero-padded to ``(size, size)``.
+
+        Unnormalized (``norm="backward"``), as a convolution needs: the product
+        of two such spectra transformed back by :meth:`cropped_convolution` is
+        their circular convolution. Padding is appended after the data. Only
+        the input rows that hold data are transformed along the last axis; the
+        zero rows are added for the second pass. The values equal
+        ``numpy.fft.rfft2(array, s=(size, size))``.
+        """
+        if self.is_cpu:
+            from scipy import fft
+
+            rows = fft.rfft(array, n=size, axis=-1, workers=workers)
+            return fft.fft(rows, n=size, axis=-2, workers=workers, overwrite_x=True)
+        rows = self.xp.fft.rfft(array, n=size, axis=-1)  # pragma: no cover - GPU optional
+        return self.xp.fft.fft(rows, n=size, axis=-2)  # pragma: no cover - GPU optional
+
+    def cropped_convolution(
+        self, spectrum: Any, *, size: int, start: int, length: int, workers: int = 1
+    ) -> Any:
+        """Inverse of :meth:`padded_convolution_spectrum`, keeping one square crop.
+
+        Returns rows and columns ``start, ..., start + length - 1`` of the real
+        ``(size, size)`` inverse transform. The last (real) pass runs only over
+        the kept rows.
+        """
+        stop = start + length
+        if self.is_cpu:
+            from scipy import fft
+
+            rows = fft.ifft(spectrum, axis=-2, workers=workers, overwrite_x=True)
+            real = fft.irfft(rows[..., start:stop, :], n=size, axis=-1, workers=workers)
+        else:  # pragma: no cover - GPU optional
+            rows = self.xp.fft.ifft(spectrum, axis=-2)
+            real = self.xp.fft.irfft(rows[..., start:stop, :], n=size, axis=-1)
+        return real[..., start:stop]
+
+    def floor(self, value: Any) -> Any:
+        """Largest integer not greater than each element, in the input dtype."""
+        return self.xp.floor(value)
+
+    def maximum(self, left: Any, right: Any) -> Any:
+        """Element-wise maximum."""
+        return self.xp.maximum(left, right)
+
     def centered_ifft2(self, array: Any, *, workers: int = 1) -> Any:
         """Perform a centered, unitary two-dimensional inverse FFT."""
         axes = (-2, -1)

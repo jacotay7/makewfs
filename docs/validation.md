@@ -75,6 +75,49 @@ and focus normalized response and push/pull antisymmetry. Ordinary tests require
 the shipped SH tilt scale error to stay below 5%, its cross-axis leakage below
 0.01 pixel, and each pyramid antisymmetry residual below 3%.
 
+## Fast LGS kernel mode
+
+`validation/lgs_kernel.py` renders one instrument with
+`source.lgs_model = "quadrature"` and `"kernel"` and reports image, centroid
+(a validation-only observable), and captured-flux differences plus warm frame
+times. The default instrument is
+`benchmarks/configs/shack_hartmann_20x20_lgs_quadrature.toml`: a 20 x 20
+sensor at 589 nm, 16 pixels of 0.15 arcsec per subaperture, a 1 arcsec FWHM
+source, a 10 km FWHM sodium layer sampled at five ranges about 90 km, a launch
+4.5 m off axis, and 30 nm RMS of random OPD. Results in float64
+(`python validation/lgs_kernel.py`):
+
+| Reference | Propagated states | Image L1 difference | Peak difference | Max / RMS centroid difference | Captured fraction (reference / kernel) |
+| --- | --- | --- | --- | --- | --- |
+| Dense quadrature (Gaussian source sampled every 0.5 sigma to 4 sigma) | 1445 | 0.14% | 0.34% | 0.0017 / 0.0007 px | 0.8418 / 0.8416 |
+| Configured quadrature (3 x 3 Gauss-Hermite source) | 45 | 70% | 75% | 0.21 / 0.08 px | 0.8407 / 0.8416 |
+
+The kernel matches the dense reference, which isolates the kernel
+approximation. The large difference from the configured quadrature is that
+quadrature's own error: a 1 arcsec source spans about seven pixels, and nine
+Gauss-Hermite points render it as a 3 x 3 grid of spots. The kernel is kept
+non-negative and conserves weight and first moment by construction.
+
+`tests/test_lgs_kernel.py` asserts, against the quadrature on an 8 x 8 sensor:
+
+- without source extent (both models translate the same spot), for centre,
+  side, and opposite-side launches and a 10-degree rotated lenslet grid: image
+  L1 difference below 4%, centroids within 0.01 pixel, and per-subaperture flux
+  within 0.2% of the brightest subaperture. The remaining difference is the
+  linear deposition, and it converges at second order in the focal sampling:
+  3.2%, 0.73%, and 0.19% at `fft_oversampling` 2, 4, and 8 for a side launch
+  (the test asserts the factor-of-four drop from 2 to 4);
+- a thin beacon with a 0.25 arcsec source against a dense Gaussian quadrature:
+  L1 difference below `1e-4`;
+- a unit-impulse kernel (thin beacon, no extent) reproduces the point-source
+  image to `1e-12`;
+- truncation: with streaks longer than the window, the captured rate matches
+  the quadrature to 0.2%, equals the sum of the photon-rate map, and is below a
+  thin beacon's; each kernel holds unit weight before truncation;
+- centre-launch mirror and transpose symmetry, radial elongation within 3
+  degrees, float32 versus float64, two wavelengths with a field offset, offset
+  states, and temporal integration; CPU/GPU parity is a `gpu` test.
+
 The remaining independent-reference gap is broader chromatic, partial-pupil,
 finite-source, and sodium-LGS coverage. Those models retain analytic and
 convergence tests, but the current external-package comparisons intentionally use

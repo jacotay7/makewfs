@@ -140,14 +140,78 @@ def _spectral_samples(config: WFSConfig) -> tuple[tuple[float, ...], tuple[float
     return tuple((wavelengths * 1e-9).tolist()), tuple(weights.tolist())
 
 
+@dataclass(frozen=True)
+class LGSKernelMorphology:
+    """Source morphology that the LGS kernel mode folds into one convolution.
+
+    ``points`` are ``(x_rad, y_rad, weight)`` angular offsets relative to the
+    configured ``field_angle_arcsec`` (a single ``(0, 0, 1)`` point unless an
+    ``angular_kernel_path`` table is configured). ``sigma_rad`` is the
+    standard deviation of the continuous Gaussian source extent set by
+    ``angular_fwhm_arcsec`` (zero for none). ``ranges_m`` and
+    ``range_weights`` are the normalized sodium range quadrature (both empty
+    for a thin beacon).
+    """
+
+    points: tuple[tuple[float, float, float], ...]
+    sigma_rad: float
+    ranges_m: tuple[float, ...]
+    range_weights: tuple[float, ...]
+
+
+def lgs_kernel_morphology(config: WFSConfig) -> LGSKernelMorphology:
+    """Return the angular and sodium-range morphology of the LGS kernel mode.
+
+    The quadrature model propagates one state per angular sample and sodium
+    range. The kernel mode propagates the configured wavelengths only, at
+    ``field_angle_arcsec``, and applies this morphology as a fixed
+    per-subaperture convolution (see :mod:`makewfs.sensors.lgs`).
+    """
+    source = config.source
+    base_x = source.field_angle_arcsec[0] * ARCSEC_TO_RAD
+    base_y = source.field_angle_arcsec[1] * ARCSEC_TO_RAD
+    sigma = 0.0
+    if source.angular_kernel_path is not None:
+        points = tuple(
+            (angle_x - base_x, angle_y - base_y, weight)
+            for angle_x, angle_y, weight in _angular_states(config)
+        )
+    else:
+        points = ((0.0, 0.0, 1.0),)
+        sigma = source.angular_fwhm_arcsec * ARCSEC_TO_RAD / 2.3548200450309493
+    ranges = source.lgs_ranges_m
+    weights = (
+        tuple(float(value) for value in _normalised(source.lgs_range_weights, len(ranges)))
+        if ranges
+        else ()
+    )
+    return LGSKernelMorphology(points, sigma, tuple(ranges), weights)
+
+
 def iter_source_states(config: WFSConfig) -> tuple[SourceState, ...]:
-    """Build normalized wavelength, angular, and LGS-range source states."""
+    """Build normalized wavelength, angular, and LGS-range source states.
+
+    With ``source.lgs_model = "kernel"`` only the wavelength states are
+    propagated, at the configured field angle; the angular extent and sodium
+    range profile are applied as a convolution (:func:`lgs_kernel_morphology`).
+    """
     source = config.source
     wavelengths, spectral_weights = _spectral_samples(config)
     wavelength_weights = _normalised(spectral_weights, len(wavelengths))
-    angular = _angular_states(config)
-    ranges = source.lgs_ranges_m or (None,)
-    range_weights = _normalised(source.lgs_range_weights, len(ranges))
+    if source.lgs_model == "kernel":
+        angular = [
+            (
+                source.field_angle_arcsec[0] * ARCSEC_TO_RAD,
+                source.field_angle_arcsec[1] * ARCSEC_TO_RAD,
+                1.0,
+            )
+        ]
+        ranges: tuple[float | None, ...] = (None,)
+        range_weights = _normalised((), 1)
+    else:
+        angular = _angular_states(config)
+        ranges = source.lgs_ranges_m or (None,)
+        range_weights = _normalised(source.lgs_range_weights, len(ranges))
     states: list[SourceState] = []
     for wavelength, wavelength_weight in zip(wavelengths, wavelength_weights):
         for angle_x, angle_y, angular_weight in angular:
@@ -167,4 +231,4 @@ def iter_source_states(config: WFSConfig) -> tuple[SourceState, ...]:
     return tuple(states)
 
 
-__all__ = ["SourceState", "iter_source_states"]
+__all__ = ["LGSKernelMorphology", "SourceState", "iter_source_states", "lgs_kernel_morphology"]

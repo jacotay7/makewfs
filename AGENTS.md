@@ -23,9 +23,11 @@ Before changing anything:
 The repository is currently in the Shack-Hartmann and fixed-mask four-face
 pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
-analytic segmented/rotated pupils, and a documented SH sodium-range geometry
-model. It also includes a versioned labelled documentation gallery, benchmark
-reference snapshot, non-editable-wheel clean-room smoke evidence, released
+analytic segmented/rotated pupils, a documented SH sodium-range geometry
+model with a fast fixed-kernel evaluation (`source.lgs_model = "kernel"`), and
+pre-declared SH lenslet-grid offset states. It also includes a versioned
+labelled documentation gallery, benchmark reference snapshot,
+non-editable-wheel clean-room smoke evidence, released
 wavelength-resolved detector QE through `getframes>=2.2.0`, and public
 end-to-end CuPy execution with CPU parity tests. The GPU path uses
 `numerics.device = "gpu"` and the sibling `getframes` CuPy detector. Do not
@@ -77,7 +79,10 @@ write a failing integration test/design note, use the conditional gates in
 
 - The physical per-frame runtime inputs are the wavefront and an optional noise
   seed. An optional caller-owned `out` array controls storage lifetime only. All
-  instrument/source/detector choices live in versioned config.
+  instrument/source/detector choices live in versioned config. The SH
+  `offset_state` index only selects a lenslet-grid position declared in
+  `shack_hartmann.lenslet_grid_offset_states_fraction` (ADR 0005); never add a
+  per-call geometry value that the config and digest do not record.
 - OPD metres are the canonical internal wavefront quantity. Phase-radian input
   must declare its reference wavelength; units are never inferred.
 - Arrays use `(y, x)` order and documented centered pixel coordinates. Never fix
@@ -171,6 +176,11 @@ Follow the target layout in `ROADMAP.md`:
   same extent and any shape ratio, which `aocore.block_sum` (integer factors
   only) does not cover.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
+  `shack_hartmann.py` keeps per-offset-state geometry in `_LensletGeometry`
+  (state 0 backs the legacy `lenslet_mask`/`lenslet_valid`/... attributes).
+  `lgs.py` builds the cached per-subaperture LGS kernels of
+  `lgs_model = "kernel"`, which `sampling.spot_intensity` applies through its
+  `source_kernel` hook on the oversampled focal grid.
   `_shack_hartmann_cuda.py` is a private first-use-JIT execution plan for exact
   compatible CUDA geometries (sampled-DFT and integer-FFT spot grids alike);
   `shack_hartmann.py` remains the readable physics reference and must stay as
@@ -267,6 +277,17 @@ MPLBACKEND=Agg python examples/gallery.py
   CuPy's `next_fast_len`); do not call `scipy.fft.next_fast_len` or
   `cupyx.scipy.fft.next_fast_len` for a size. SciPy's admits 11, which made the
   pyramid pad differently on the two devices before 2.1.1.
+- LGS kernel mode propagates a margin around each detector window, capped at
+  one alias-free lenslet-field period (`samples_per_lenslet * sampling *
+  fft_oversampling` samples). Kernel spectra are cached per offset state and
+  cost `n_subapertures * Q * (Q/2 + 1)` complex values; build them with
+  `padded_convolution_spectrum` from the uncentred kernel (the crop then starts
+  at `margin + radius`), never through a full wrapped `(n, Q, Q)` array, which
+  exhausted a 2 GB GPU. The kernel path has no compiled CUDA variant.
+- Transformed lenslet grids sample the pupil with `map_coordinates`
+  `mode="grid-constant"` and the OPD with `mode="nearest"`. Plain `"constant"`
+  zeroes everything beyond the outermost sample centres, which made sub-pixel
+  pupil translation a staircase before 2.2.
 
 ## Documentation and examples
 

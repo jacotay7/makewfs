@@ -60,6 +60,18 @@ class WavefrontSensor:
             file_digests=self.engine.file_digests,
             pyramid_fft_size=getattr(self.engine, "nfft", None),
         )
+        if isinstance(self.engine, ShackHartmannEngine):
+            self._metadata_base["wfs_lenslet_offset_state_count"] = len(self.engine.offset_states)
+            if config.source.lgs_model == "kernel":
+                # Native pixels: the kernel half-width, and how far beyond the
+                # window light is propagated so it can be convolved inward.
+                oversampling = config.numerics.fft_oversampling
+                self._metadata_base["wfs_lgs_kernel_radius_px"] = (
+                    self.engine.lgs_kernel_radius_samples / oversampling
+                )
+                self._metadata_base["wfs_lgs_kernel_margin_px"] = (
+                    self.engine.lgs_kernel_margin_samples / oversampling
+                )
         self._rms_weights = pupil_weights(self._input_pupil_intensity(), backend=self.backend)
 
     @classmethod
@@ -67,8 +79,33 @@ class WavefrontSensor:
         """Build a sensor from a validated TOML file."""
         return cls(load_config(path))
 
-    def _render(self, wavefront: ArrayLike) -> OpticalResult:
-        return self.engine.render(cast(NDArray[np.float64], wavefront))
+    def _render(self, wavefront: ArrayLike, offset_state: int = 0) -> OpticalResult:
+        opd = cast(NDArray[np.float64], wavefront)
+        if isinstance(self.engine, ShackHartmannEngine):
+            return self.engine.render(opd, offset_state=offset_state)
+        self._check_offset_state(offset_state)
+        return self.engine.render(opd)
+
+    def _check_offset_state(self, offset_state: int) -> None:
+        """Validate an offset-state index; only the SH engine has more than one."""
+        if isinstance(self.engine, ShackHartmannEngine):
+            self.engine.geometry(offset_state)
+        elif isinstance(offset_state, bool) or offset_state != 0:
+            raise ValueError("offset_state is defined only for Shack--Hartmann sensors; use 0")
+
+    def lenslet_grid_offsets_fraction(self) -> tuple[tuple[float, float], ...]:
+        """Return the effective ``[x, y]`` lenslet-grid offset of each offset state.
+
+        Shack--Hartmann only. Offsets are in lenslet pitches: each entry of
+        ``shack_hartmann.lenslet_grid_offset_states_fraction`` added to the
+        static ``lenslet_grid_offset_fraction``, or the static offset alone
+        when no states are declared. The position in this tuple is the
+        ``offset_state`` index that :meth:`photon_rate`, :meth:`expose` and the
+        other render methods accept.
+        """
+        if not isinstance(self.engine, ShackHartmannEngine):
+            raise ValueError("lenslet-grid offsets are defined only for Shack--Hartmann")
+        return self.engine.offset_states
 
     def _input_pupil_intensity(self) -> Any:
         """Return the pupil intensity the optics use, on the input grid.
@@ -115,9 +152,15 @@ class WavefrontSensor:
         opd_rms_m: float,
         opd_rms_unweighted_m: float,
         seed: int | None,
+        offset_state: int = 0,
     ) -> dict[str, Any]:
         """Copy cached static provenance and fill the per-frame values."""
         result = dict(self._metadata_base)
+        if isinstance(self.engine, ShackHartmannEngine):
+            result["wfs_lenslet_offset_state"] = int(offset_state)
+            result["wfs_lenslet_grid_offset_fraction"] = list(
+                self.engine.offset_states[int(offset_state)]
+            )
         result.update(
             {
                 "wfs_launched_photons_s": float(launched_rate),
@@ -129,26 +172,34 @@ class WavefrontSensor:
         )
         return result
 
-    def photon_rate(self, wavefront: ArrayLike) -> Any:
-        """Return the ideal native-pixel photon rate before detector noise."""
-        return self._render(wavefront).photon_rate
+    def photon_rate(self, wavefront: ArrayLike, *, offset_state: int = 0) -> Any:
+        """Return the ideal native-pixel photon rate before detector noise.
 
-    def reference(self) -> Any:
-        """Return the ideal image for a zero dynamic OPD."""
+        ``offset_state`` selects one of the configured Shack--Hartmann
+        lenslet-grid offset states (see :meth:`lenslet_grid_offsets_fraction`);
+        it must be ``0`` for a sensor with one state and for a pyramid.
+        """
+        return self._render(wavefront, offset_state).photon_rate
+
+    def reference(self, *, offset_state: int = 0) -> Any:
+        """Return the ideal image for a zero dynamic OPD in one offset state."""
         dtype = np.dtype(self.config.numerics.dtype)
-        return self.photon_rate(self.backend.zeros(self.config.input.shape, dtype=dtype))
+        return self.photon_rate(
+            self.backend.zeros(self.config.input.shape, dtype=dtype), offset_state=offset_state
+        )
 
-    def valid_subapertures(self) -> Any:
+    def valid_subapertures(self, *, offset_state: int = 0) -> Any:
         """Return the configured static Shack--Hartmann lenslet-valid mask.
 
         The mask is derived from pupil illumination and the configured minimum
         illuminated fraction, not from a detector frame.  It is therefore safe
         to freeze into a calibration artifact and use for active-slope vector
-        ordering.  Pyramid sensors do not have lenslet subapertures.
+        ordering. Each lenslet-grid offset state has its own map, selected by
+        ``offset_state``. Pyramid sensors do not have lenslet subapertures.
         """
-        if self.config.sensor.kind != "shack_hartmann":
+        if not isinstance(self.engine, ShackHartmannEngine):
             raise ValueError("valid_subapertures is defined only for Shack--Hartmann")
-        return cast(ShackHartmannEngine, self.engine).lenslet_valid.copy()
+        return self.engine.geometry(offset_state).lenslet_valid.copy()
 
     def subaperture_plate_scale_arcsec(self) -> float:
         """Return the on-sky angle one detector pixel subtends per subaperture.
@@ -220,6 +271,7 @@ class WavefrontSensor:
         *,
         seed: int | None = None,
         out: Any | None = None,
+        offset_state: int = 0,
     ) -> Any:
         """Render one wavefront into optional caller-owned detector storage.
 
@@ -228,10 +280,15 @@ class WavefrontSensor:
         the pupil intensity with piston removed (aocore CONVENTIONS 4.1), and
         ``wfs_input_opd_rms_unweighted_m``, its RMS over the whole input grid
         with piston kept.
+
+        ``offset_state`` selects a configured Shack--Hartmann lenslet-grid
+        offset state (``shack_hartmann.lenslet_grid_offset_states_fraction``);
+        a Shack--Hartmann frame records it as ``wfs_lenslet_offset_state`` and
+        the effective offset as ``wfs_lenslet_grid_offset_fraction``.
         """
         total_start = perf_counter()
         optical_start = total_start
-        result = self._render(wavefront)
+        result = self._render(wavefront, offset_state)
         captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
             result.captured_rate_per_s, *self._opd_rms(result.opd_m)
         )
@@ -242,6 +299,7 @@ class WavefrontSensor:
             opd_rms_m=opd_rms,
             opd_rms_unweighted_m=opd_rms_unweighted,
             seed=seed,
+            offset_state=offset_state,
         )
         detector_start = perf_counter()
         frame = self.detector.expose(
@@ -261,13 +319,24 @@ class WavefrontSensor:
         return frame
 
     def expose_many(
-        self, phases: Iterable[ArrayLike], seeds: Iterable[int | None] | None = None
+        self,
+        phases: Iterable[ArrayLike],
+        seeds: Iterable[int | None] | None = None,
+        *,
+        offset_states: Iterable[int] | None = None,
     ) -> Iterator[Any]:
-        """Yield one detector frame per phase sample without stacking the stream."""
+        """Yield one detector frame per phase sample without stacking the stream.
+
+        ``offset_states`` optionally gives the lenslet-grid offset state of each
+        frame, for example ``itertools.cycle(range(n))`` for a dithered
+        Shack--Hartmann; the default renders every frame in state ``0``.
+        """
         seed_iter = iter(seeds) if seeds is not None else None
+        state_iter = iter(offset_states) if offset_states is not None else None
         for phase in phases:
             seed = next(seed_iter) if seed_iter is not None else None
-            yield self.expose(phase, seed=seed)
+            offset_state = next(state_iter) if state_iter is not None else 0
+            yield self.expose(phase, seed=seed, offset_state=offset_state)
 
     def expose_integrated(
         self,
@@ -275,10 +344,16 @@ class WavefrontSensor:
         *,
         seed: int | None = None,
         out: Any | None = None,
+        offset_state: int = 0,
     ) -> Any:
-        """Expose temporally averaged OPD into optional caller-owned detector storage."""
+        """Expose temporally averaged OPD into optional caller-owned detector storage.
+
+        Every sample uses the same lenslet-grid ``offset_state`` (see
+        :meth:`expose`).
+        """
         total_start = perf_counter()
         optical_start = total_start
+        self._check_offset_state(offset_state)
         batched = getattr(self.engine, "render_integrated", None)
         if callable(batched):
             # An engine that can render the whole exposure at once does so far
@@ -290,7 +365,7 @@ class WavefrontSensor:
             )
             if not samples:
                 raise ValueError("phase_samples must contain at least one sample")
-            result = batched(samples)
+            result = batched(samples, offset_state=offset_state)
             captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
                 result.captured_rate_per_s, *self._opd_rms(result.opd_m)
             )
@@ -300,6 +375,7 @@ class WavefrontSensor:
                 opd_rms_m=opd_rms,
                 opd_rms_unweighted_m=opd_rms_unweighted,
                 seed=seed,
+                offset_state=offset_state,
             )
             frame_metadata["wfs_temporal_samples"] = len(samples)
             optical_elapsed = perf_counter() - optical_start
@@ -328,7 +404,7 @@ class WavefrontSensor:
             self.config.input.shape,
             backend=self.backend,
         ):
-            result = self._render(sample)
+            result = self._render(sample, offset_state)
             if rate_sum is None:
                 rate_sum = self.backend.zeros_like(result.photon_rate)
                 opd_sum = self.backend.zeros_like(result.opd_m)
@@ -362,6 +438,7 @@ class WavefrontSensor:
             opd_rms_m=opd_rms,
             opd_rms_unweighted_m=opd_rms_unweighted,
             seed=seed,
+            offset_state=offset_state,
         )
         frame_metadata["wfs_temporal_samples"] = sample_count
         optical_elapsed = perf_counter() - optical_start
