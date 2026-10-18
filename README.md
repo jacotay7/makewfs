@@ -47,7 +47,8 @@ frame = wfs.expose_integrated(samples)  # several temporal OPD samples, one expo
 ```
 
 Construct the sensor once and call `expose()` with each new residual wavefront:
-the only per-frame inputs are the wavefront and an optional noise seed, because
+the only per-frame inputs are the wavefront (OPD, plus an optional pupil
+amplitude for scintillation) and an optional noise seed, because
 telescope, source, sensor, sampling and camera choices all live in versioned
 configuration. Set `device = "gpu"` under `[numerics]` and pass a CuPy OPD array
 for the fully device-resident path; `frame.data` is then a CuPy ADU array, and
@@ -123,6 +124,12 @@ for the methodology.
 - **Lenslet-grid offset states** — pre-declared lenslet-grid positions for
   dithered or time-varying Shack–Hartmann schemes, cached once and selected per
   frame with `offset_state=`, each with its own valid-subaperture map.
+- **Scintillation and subaperture flux** — an optional per-frame pupil
+  `amplitude` next to the OPD (per wavelength if needed) for both sensors,
+  ideal per-subaperture photon rates from `subaperture_flux()`, and, for
+  extreme-AO Shack–Hartmann designs, a square focal-plane spatial filter in
+  front of the lenslets and inter-lenslet cross-talk; see
+  **[Scintillation](https://jacotay7.github.io/makewfs/scintillation/)**.
 - **Analytic pupils** — central obscuration, segmented and rotated apertures,
   static OPD maps and user masks, hashed for provenance.
 - **Configuration as the contract** — immutable TOML with units in every key

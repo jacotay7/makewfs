@@ -19,6 +19,10 @@ The most complete current workflows are:
   quadrature, with timings;
 - `lenslet_offset_states.py`: one wavefront through four pre-declared
   lenslet-grid offset states and their valid-subaperture maps;
+- `scintillation.py`: a Fresnel-propagated high layer (`pyturb` screen,
+  `aocore` propagator) as pupil amplitude plus OPD through a 16 x 16
+  Shack-Hartmann, with subaperture fluxes against the pupil intensity, a
+  `lambda/d` spatial filter, and illustrative slopes;
 - `closed_loop_injection.py`: external residual update at the closed-loop API
   boundary;
 - `detector_choices.py`: identical ideal maps through several getframes presets.

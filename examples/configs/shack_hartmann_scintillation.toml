@@ -1,0 +1,49 @@
+schema_version = 1
+
+# A 16 x 16 Shack-Hartmann on an 8 m pupil, sampled finely enough (1.6 cm per
+# pixel) to resolve the ~9 cm Fresnel scale of a high turbulent layer. The
+# input grid equals the lenslet propagation grid (16 lenslets x 32 samples), so
+# neither the OPD nor the per-frame amplitude is resampled.
+
+[input]
+quantity = "opd"
+unit = "m"
+shape = [512, 512]
+grid_extent_m = 8.0
+
+[telescope]
+pupil_diameter_m = 8.0
+central_obscuration_ratio = 0.14
+
+[source]
+kind = "ngs"
+normalization = "detector_photon_rate"
+detector_photon_rate_per_s = 2.0e9
+
+[sensor]
+kind = "shack_hartmann"
+wavelength_m = 7.0e-7
+
+[shack_hartmann]
+lenslets_across_pupil = 16
+pixels_per_subaperture = 8
+spot_sampling_pixels_per_lambda_over_d = 2.0
+minimum_illuminated_fraction = 0.5
+# Optional extreme-AO controls (see docs/scintillation.md); the example script
+# sets them on copies of this configuration:
+# spatial_filter_width_lambda_over_d = 1.0   # square stop, lambda/d wide
+# crosstalk_reach_subapertures = 1           # spots may spill into neighbours
+
+[detector]
+preset = "generic_cmos"
+exposure_s = 0.001
+temperature_c = 20.0
+binning = 1
+binning_mode = "digital"
+precision = "float32"
+
+[numerics]
+dtype = "float32"
+fft_oversampling = 2
+fft_workers = 1
+pupil_samples_per_lenslet = 32

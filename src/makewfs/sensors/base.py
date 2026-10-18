@@ -23,6 +23,9 @@ class OpticalResult:
     """Input wavefront in OPD metres (phase input converted), without static OPD."""
     spectral_photon_rate: NDArray[np.float64] | None = None
     spectral_wavelengths_m: tuple[float, ...] | None = None
+    lenslet_rate_per_s: Any | None = None
+    """Shack-Hartmann only, when requested: the ``(lenslet_y, lenslet_x)``
+    photon rate entering each lenslet's clear aperture, in photons/s."""
 
 
 class SensorEngine:
@@ -33,6 +36,8 @@ class SensorEngine:
     source_states: tuple[SourceState, ...]
     file_digests: dict[str, str]
     backend: ArrayBackend
+    _wavelengths: tuple[float, ...]
+    """Distinct source wavelengths in metres, in spectral-cube order."""
     configured_pupil: Any
     """Pupil amplitude on the engine's configured pupil grid.
 

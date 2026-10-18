@@ -4,6 +4,70 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-18
+
+Scintillation and extreme-AO Shack-Hartmann options
+([ADR 0006](docs/adr/0006-pupil-amplitude-input.md),
+[guide](docs/scintillation.md)).
+
+### Added
+
+- **Per-frame pupil amplitude.** `photon_rate`, `expose`, `expose_integrated`,
+  `subaperture_flux` and `simulate` take an optional `amplitude` (and
+  `expose_many` an iterable `amplitudes`): the dimensionless field modulus
+  `|U| / |U_0|` relative to the unscintillated field, multiplying the
+  configured pupil amplitude of both the Shack-Hartmann and the pyramid
+  sensor. The OPD still carries the phase. One `input.shape` map serves every
+  wavelength, or a `(len(wavelengths_m), *input.shape)` stack gives one per
+  wavelength node (`WavefrontSensor.wavelengths_m`, new). On another
+  propagation grid the intensity is area-averaged with exact overlaps, so each
+  cell receives the integral of the input intensity. An amplitude of exactly
+  one reproduces the OPD-only result bit for bit on the CPU. The configured
+  source rate describes amplitude one; a frame's flux scales with the
+  pupil-weighted mean of the squared amplitude. Frames record
+  `wfs_input_amplitude`.
+- **Per-subaperture flux.** `WavefrontSensor.subaperture_flux()` returns a
+  `makewfs.api.SubapertureFlux` with the ideal photon rate collected by each
+  subaperture's pixel block (`detector_photons_s`), the photon rate entering
+  each lenslet's aperture in the pupil plane (`pupil_photons_s`), the valid
+  map, and the image, from one render.
+- **Focal-plane spatial filter.** `shack_hartmann.spatial_filter_width_lambda_over_d`
+  puts a square stop of full width `c lambda / d` (at `sensor.wavelength_m`)
+  in front of the lenslets (Poyneer & Macintosh 2004): the whole entrance
+  field is zero-padded twice, low-passed to `|f_x|, |f_y| < c / (2 d) *
+  lambda_ref / lambda`, and cropped before the lenslet fill factor and the
+  lenslets. Removed light is lost and reported. Not available with
+  range-resolved LGS states.
+- **Inter-lenslet cross-talk.** `shack_hartmann.crosstalk_reach_subapertures = k`
+  propagates each lenslet over `2k + 1` subaperture windows per axis and adds
+  the light into the neighbours' pixels, instead of the default field stop at
+  each window. Light beyond the reach or off the detector is lost and reported.
+  The lenslet sampling is raised to keep the wider window free of aliasing.
+  Not available with `source.lgs_model = "kernel"`.
+- `sampling.square_spatial_filter`, `sampling.spatial_filter_half_width` and
+  `sampling.area_rebin_operators` helpers; `spot_intensity(crosstalk_reach=)`.
+- Example `examples/scintillation.py` with
+  `examples/configs/shack_hartmann_scintillation.toml` (a `pyturb` layer at
+  12 km, Fresnel-propagated with `aocore`, through a 16 x 16 Shack-Hartmann),
+  docs page "Scintillation and subaperture flux", and ADR 0006.
+
+### Changed
+
+- The private `_CudaGraphReplay` takes several input arrays; a GPU pyramid
+  replays a second graph for frames with an amplitude.
+- On a GPU, Shack-Hartmann frames with an amplitude, a spatial filter, or
+  cross-talk use the array-operation reference path; the compiled kernel
+  records `"focal-plane spatial filter"` or `"inter-lenslet cross-talk"` as
+  its fallback reason.
+
+### Compatibility
+
+- Without an amplitude and with both new keys at their defaults, every image
+  is bit-identical to 2.2.0 (a 147-array CPU render matrix of the shipped
+  example and benchmark configurations and variants). The new keys are
+  omitted from the normalized configuration at their defaults, so existing
+  digests are unchanged. Frame metadata gains `wfs_input_amplitude`.
+
 ## [2.2.0] - 2026-10-10
 
 Closed-loop conveniences from

@@ -215,6 +215,10 @@ def _compiled_executor_rejection(  # pragma: no cover - optional CUDA execution
         return "measured native-pixel optical blur"
     if engine.config.source.lgs_model == "kernel":
         return "LGS kernel convolution"
+    if engine.settings.spatial_filter_width_lambda_over_d is not None:
+        return "focal-plane spatial filter"
+    if engine.settings.crosstalk_reach_subapertures:
+        return "inter-lenslet cross-talk"
     if any(plan.dft_kernel is None for plan in engine._spot_plans):
         return "no sampled-DFT kernel"
     charge_kernel = engine._charge_diffusion_kernel

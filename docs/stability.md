@@ -5,7 +5,7 @@ The stable top-level names are:
 | Name | Contract |
 | --- | --- |
 | `load_config(path)` | Load and validate schema-version-1 TOML, resolving referenced files relative to the TOML. |
-| `WavefrontSensor(config)` | Construct one cached optical/detector pipeline; call `photon_rate`, `expose`, `expose_many`, or `expose_integrated` with phase/OPD arrays. `expose` and `expose_integrated` optionally accept caller-owned `out` storage with an explicit alias lifetime. |
+| `WavefrontSensor(config)` | Construct one cached optical/detector pipeline; call `photon_rate`, `expose`, `expose_many`, or `expose_integrated` with phase/OPD arrays and an optional pupil `amplitude`, and `subaperture_flux` for ideal Shack-Hartmann subaperture photon rates. `expose` and `expose_integrated` optionally accept caller-owned `out` storage with an explicit alias lifetime. |
 | `simulate(config, wavefront, ...)` | One-shot convenience wrapper around the same pipeline. |
 | `WFSConfig` / `Config` | Frozen normalized configuration value; `Config` is a compatibility alias of `WFSConfig`. |
 | `ConfigError` | Validation exception for actionable configuration failures. |
@@ -22,11 +22,14 @@ Every new physical field must be documented there, validated, covered by a
 regression test, and recorded in the changelog before it is considered stable.
 
 The physical per-frame contract is a wavefront array plus configuration (and an
-optional detector seed). `out` controls storage lifetime only and cannot change
-the simulated result. A Shack–Hartmann `offset_state` index selects one of the
-lenslet-grid positions declared in the configuration
-([ADR 0005](adr/0005-lenslet-offset-states.md)); it adds no instrument
-parameter outside the configuration. Atmosphere, reconstruction, controllers, and detector
+optional detector seed). Since 2.3 the wavefront may include a pupil-plane
+`amplitude` next to the OPD, for scintillation
+([ADR 0006](adr/0006-pupil-amplitude-input.md)); without it, or with an
+amplitude of exactly one, results are those of the OPD alone. `out` controls
+storage lifetime only and cannot change the simulated result. A
+Shack–Hartmann `offset_state` index selects one of the lenslet-grid positions
+declared in the configuration ([ADR 0005](adr/0005-lenslet-offset-states.md));
+it adds no instrument parameter outside the configuration. Atmosphere, reconstruction, controllers, and detector
 physics remain outside the package boundary.
 
 ## Migrating to 2.0

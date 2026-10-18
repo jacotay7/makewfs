@@ -19,42 +19,46 @@ from typing import Any
 
 
 class _CudaGraphReplay:  # pragma: no cover - optional CUDA execution
-    """Replay ``function(value)`` from a captured graph.
+    """Replay ``function(*values)`` from a captured graph.
 
-    ``function`` must take one device array of a fixed shape and dtype, return
-    a tuple of device arrays, and never synchronize with the host. It is run
-    eagerly once on the private stream (warming FFT plans, compiled kernels
-    and the pool) and then captured. A device or driver that cannot capture
-    falls back to eager calls for the rest of the sensor's life, recording the
-    reason in ``failure``.
+    ``function`` must take one or more device arrays, each of a fixed shape and
+    dtype, return a tuple of device arrays, and never synchronize with the
+    host. It is run eagerly once on the private stream (warming FFT plans,
+    compiled kernels and the pool) and then captured. A device or driver that
+    cannot capture falls back to eager calls for the rest of the sensor's
+    life, recording the reason in ``failure``.
     """
 
-    def __init__(self, xp: Any, function: Callable[[Any], tuple[Any, ...]]) -> None:
+    def __init__(self, xp: Any, function: Callable[..., tuple[Any, ...]]) -> None:
         self._xp = xp
         self._function = function
         self._graph: Any | None = None
-        self._input: Any | None = None
+        self._inputs: tuple[Any, ...] = ()
         self._outputs: tuple[Any, ...] = ()
         self.failure: str | None = None
 
-    def __call__(self, value: Any) -> tuple[Any, ...]:
+    def __call__(self, *values: Any) -> tuple[Any, ...]:
         if self.failure is None and self._graph is None:
-            self._capture(value)
-        if self._graph is None or self._input is None:
-            return self._function(value)
-        if value.shape != self._input.shape or value.dtype != self._input.dtype:
+            self._capture(values)
+        if self._graph is None or not self._inputs:
+            return self._function(*values)
+        if len(values) != len(self._inputs) or any(
+            value.shape != staged.shape or value.dtype != staged.dtype
+            for value, staged in zip(values, self._inputs)
+        ):
             raise ValueError("captured graph input changed shape or dtype")
         current = self._xp.cuda.get_current_stream()
-        # Order the replay after the caller's producer of ``value`` and after
+        # Order the replay after the caller's producer of ``values`` and after
         # the copies that read the previous replay's outputs.
         self._stream.wait_event(current.record())
         with self._stream:
-            self._input[...] = value
+            for staged, value in zip(self._inputs, values):
+                staged[...] = value
             self._graph.launch()
         current.wait_event(self._stream.record())
         return tuple(output.copy() for output in self._outputs)
 
-    def _capture(self, value: Any) -> None:
+    def _capture(self, values: tuple[Any, ...]) -> None:
         xp = self._xp
         try:
             self._stream = xp.cuda.Stream(non_blocking=True)
@@ -62,21 +66,24 @@ class _CudaGraphReplay:  # pragma: no cover - optional CUDA execution
             current = xp.cuda.get_current_stream()
             with xp.cuda.using_allocator(self._pool.malloc), self._stream:
                 self._stream.wait_event(current.record())
-                staged = xp.empty_like(value)
-                staged[...] = value
-                self._function(staged)
+                staged = []
+                for value in values:
+                    copy = xp.empty(value.shape, dtype=value.dtype)
+                    copy[...] = value
+                    staged.append(copy)
+                self._function(*staged)
                 self._stream.synchronize()
                 self._stream.begin_capture()
                 try:
-                    outputs = self._function(staged)
+                    outputs = self._function(*staged)
                 finally:
                     graph = self._stream.end_capture()
-            self._input = staged
+            self._inputs = tuple(staged)
             self._outputs = outputs
             self._graph = graph
         except Exception as exc:  # driver/runtime without usable graph capture
             self._graph = None
-            self._input = None
+            self._inputs = ()
             self._outputs = ()
             self.failure = f"{type(exc).__name__}: {exc}"
 
