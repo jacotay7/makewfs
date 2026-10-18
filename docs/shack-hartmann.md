@@ -129,6 +129,18 @@ the test cases (`tests/test_shack_hartmann_sampling.py`).
 Raise `numerics.pupil_samples_per_lenslet` when wing flux matters, for example
 for wide-field or quad-cell geometries; the cost grows with `s^2`.
 
+## Scintillation, flux, spatial filter, and cross-talk
+
+A frame may carry a pupil amplitude next to the OPD, so the spots, the image,
+and the subaperture fluxes include scintillation, and
+`WavefrontSensor.subaperture_flux` returns the ideal photon rate of each
+subaperture's pixels and of each lenslet's aperture. Two configuration keys
+model extreme-AO designs: `spatial_filter_width_lambda_over_d`, a square
+focal-plane stop in front of the lenslets, and `crosstalk_reach_subapertures`,
+which removes the field stop at each window so light falls on the neighbouring
+subapertures' pixels. All are described in
+[Scintillation and subaperture flux](scintillation.md).
+
 ## Centroider choice for closed-loop use
 
 makewfs forms images; it has no centroider, slope, or reconstruction API.
@@ -155,7 +167,9 @@ assumes:
 - Dividing by the measured flux makes any centre of gravity non-linear, and
   window truncation (the field stop each subaperture window imposes, see
   `subaperture_field_of_view_arcsec()`) breaks the centroid theorem for spots
-  that extend past the window, such as elongated LGS spots.
+  that extend past the window, such as elongated LGS spots. With
+  `crosstalk_reach_subapertures > 0` the window also collects light from
+  neighbouring spots.
 
 ## Current limitations
 
@@ -165,5 +179,8 @@ static path OPD, measured blur kernels, and a configurable sodium-range
 elongation model for Shack–Hartmann, with an equivalent fast
 [kernel mode](guide-stars.md#fast-lgs-kernel-mode). Lenslet-grid rotation/offset,
 including pre-declared offset states, is supported through the explicit
-resampling path. LGS return flux is always supplied by the
-user; `makewfs` does not model laser propagation or sodium physics.
+resampling path. A per-frame pupil amplitude, a square focal-plane spatial
+filter, and inter-lenslet cross-talk are supported with the limitations listed
+in [Scintillation and subaperture flux](scintillation.md#limitations). LGS
+return flux is always supplied by the user; `makewfs` does not model laser
+propagation, sodium physics, or the propagation that produces scintillation.

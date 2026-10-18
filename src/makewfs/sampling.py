@@ -181,6 +181,25 @@ def _area_overlap(target: int, source: int, *, backend: ArrayBackend, dtype: Any
     return cast(NDArray[Any], backend.asarray(overlap, dtype=dtype) / source)
 
 
+def area_rebin_operators(
+    source_shape: tuple[int, int],
+    target_shape: tuple[int, int],
+    *,
+    backend: ArrayBackend | None = None,
+    dtype: Any = np.float64,
+) -> tuple[NDArray[Any], NDArray[Any]]:
+    """Return the row and column overlap matrices of :func:`area_rebin`.
+
+    ``rows @ array @ columns.T`` area-averages a ``source_shape`` map (or a
+    batch of them, on the last two axes) onto ``target_shape``. A persistent
+    caller builds the matrices once and reuses them every frame.
+    """
+    resolved = backend or cpu_backend()
+    rows = _area_overlap(target_shape[0], source_shape[0], backend=resolved, dtype=dtype)
+    columns = _area_overlap(target_shape[1], source_shape[1], backend=resolved, dtype=dtype)
+    return rows, columns
+
+
 def area_rebin(
     array: NDArray[Any],
     shape: tuple[int, int],
@@ -213,8 +232,9 @@ def area_rebin(
     height, width = array.shape
     if (height, width) == tuple(shape):
         return array
-    rows = _area_overlap(shape[0], height, backend=resolved, dtype=array.dtype)
-    columns = _area_overlap(shape[1], width, backend=resolved, dtype=array.dtype)
+    rows, columns = area_rebin_operators(
+        (height, width), shape, backend=resolved, dtype=array.dtype
+    )
     return cast(NDArray[Any], resolved.matmul(resolved.matmul(rows, array), columns.T))
 
 
@@ -240,6 +260,9 @@ class _SpotPropagationPlan:
     field_stop_radius_lambda_over_d: float | None
     window_margin: int = 0
     """Extra focal-plane samples propagated on each side of the detector window."""
+    keep_window_margin: bool = False
+    """Return the window and its margin (inter-lenslet cross-talk) instead of
+    cropping back to the window."""
     half_sample: Any | None = None
     fft_window_start: int = 0
     fft_output_start: int = 0
@@ -264,14 +287,16 @@ class _SpotPropagationPlan:
         charge_diffusion_kernel: NDArray[np.float64] | None,
         backend: ArrayBackend,
         window_margin: int = 0,
+        keep_window_margin: bool = False,
     ) -> _SpotPropagationPlan:
         """Build backend-resident geometry once for one optical state.
 
         ``window_margin`` propagates that many extra oversampled focal-plane
         samples on each side of the detector window, for a source convolution
-        that moves light into the window (see :mod:`makewfs.sensors.lgs`). It
-        must keep the extended window within one alias-free period of the
-        sampled lenslet field.
+        that moves light into the window (see :mod:`makewfs.sensors.lgs`) or,
+        with ``keep_window_margin``, for light that lands in neighbouring
+        subapertures' pixels. It must keep the extended window within one
+        alias-free period of the sampled lenslet field.
         """
         if window_margin < 0:
             raise ValueError("window_margin must be non-negative")
@@ -298,6 +323,7 @@ class _SpotPropagationPlan:
                 else float(field_stop_radius_lambda_over_d)
             ),
             window_margin=int(window_margin),
+            keep_window_margin=bool(keep_window_margin),
             optical_blur_kernel=(
                 None if optical_blur_kernel is None else backend.asarray(optical_blur_kernel)
             ),
@@ -333,7 +359,10 @@ class _SpotPropagationPlan:
             )
             plan.dft_kernel = backend.astype(kernel, plan.field_dtype)
         if field_stop_radius_lambda_over_d is not None:
-            coordinates = backend.centered_coordinates(high_resolution_pixels, dtype=np.float64)
+            stop_pixels = high_resolution_pixels + (
+                2 * plan.window_margin if plan.keep_window_margin else 0
+            )
+            coordinates = backend.centered_coordinates(stop_pixels, dtype=np.float64)
             y, x = backend.meshgrid(coordinates, coordinates, indexing="ij")
             radius_lambda_over_d = backend.hypot(x, y) / (oversampling * sampling)
             plan.field_stop_mask = radius_lambda_over_d <= field_stop_radius_lambda_over_d
@@ -398,6 +427,7 @@ class _SpotPropagationPlan:
         optical_blur_kernel: NDArray[np.float64] | None,
         charge_diffusion_kernel: NDArray[np.float64] | None,
         window_margin: int = 0,
+        keep_window_margin: bool = False,
     ) -> None:
         """Reject accidental use of a plan for a different physical geometry."""
         if (
@@ -417,6 +447,7 @@ class _SpotPropagationPlan:
             or ((self.optical_blur_kernel is None) != (optical_blur_kernel is None))
             or ((self.charge_diffusion_kernel is None) != (charge_diffusion_kernel is None))
             or self.window_margin != window_margin
+            or self.keep_window_margin != keep_window_margin
             or (
                 (self.geometry == "dft" or self.field_stop_mask is not None)
                 and self.sampling != float(sampling)
@@ -438,6 +469,7 @@ def spot_intensity(
     optical_blur_kernel: NDArray[np.float64] | None = None,
     charge_diffusion_kernel: NDArray[np.float64] | None = None,
     source_kernel: Any | None = None,
+    crosstalk_reach: int = 0,
     _plan: _SpotPropagationPlan | None = None,
     backend: ArrayBackend | None = None,
 ) -> NDArray[Any]:
@@ -463,9 +495,24 @@ def spot_intensity(
     over the detector window plus the kernel's margin, convolved, and cropped
     back to the window before the field stop, blur, and pixel integration;
     light convolved out of the window is lost.
+
+    ``crosstalk_reach`` (``k``) propagates each lenslet over a window
+    ``(2 k + 1) * pixels`` native pixels wide, centred on its own window, and
+    returns all of it: the light a spot sends towards its ``k`` nearest
+    neighbouring windows on each side, for the caller to add into their pixels.
+    The field stop, blur, and pixel integration act on the whole wider window.
     """
     resolved = backend or cpu_backend()
-    window_margin = 0 if source_kernel is None else int(source_kernel.margin)
+    if crosstalk_reach < 0:
+        raise ValueError("crosstalk_reach must be non-negative")
+    if crosstalk_reach and source_kernel is not None:
+        raise ValueError("crosstalk_reach cannot be combined with a source_kernel")
+    window_margin = (
+        crosstalk_reach * pixels * oversampling
+        if source_kernel is None
+        else int(source_kernel.margin)
+    )
+    keep_window_margin = crosstalk_reach > 0
     plan = _plan or _SpotPropagationPlan.build(
         pixels=pixels,
         samples_per_lenslet=samples_per_lenslet,
@@ -477,6 +524,7 @@ def spot_intensity(
         charge_diffusion_kernel=charge_diffusion_kernel,
         backend=resolved,
         window_margin=window_margin,
+        keep_window_margin=keep_window_margin,
     )
     plan.validate(
         field,
@@ -489,6 +537,7 @@ def spot_intensity(
         optical_blur_kernel=optical_blur_kernel,
         charge_diffusion_kernel=charge_diffusion_kernel,
         window_margin=window_margin,
+        keep_window_margin=keep_window_margin,
     )
     geometry = plan.geometry
     geometry_value = plan.geometry_value
@@ -534,7 +583,7 @@ def spot_intensity(
         cropped = resolved.abs(transformed / ideal_nfft) ** 2
     if source_kernel is not None:
         cropped = source_kernel.apply(cropped)
-    elif plan.window_margin:
+    elif plan.window_margin and not plan.keep_window_margin:
         cropped = crop_center(cropped, (high_resolution_pixels, high_resolution_pixels))
     if plan.field_stop_mask is not None:
         cropped = cropped * plan.field_stop_mask
@@ -574,13 +623,130 @@ def spot_intensity(
     return native
 
 
+def spatial_filter_half_width(
+    width_lambda_over_d: float,
+    *,
+    lenslets: int,
+    reference_wavelength_m: float,
+    wavelength_m: float,
+) -> int:
+    """Return the highest padded-grid frequency index a square spatial filter passes.
+
+    A square focal-plane stop of full width ``c lambda_ref / d`` (``c`` is
+    ``width_lambda_over_d``, ``d`` the lenslet pitch) passes the pupil-plane
+    spatial frequencies ``|f_x|, |f_y| < c / (2 d) * lambda_ref / lambda`` at
+    wavelength ``lambda``: the stop is a fixed angle, and a field component of
+    frequency ``f`` arrives at angle ``lambda f``. :func:`square_spatial_filter`
+    zero-pads a field spanning ``n`` lenslet pitches to twice its size, where
+    frequency index ``m`` is ``m / (2 n d)``, so the passband is
+    ``|m| < c n lambda_ref / lambda``. A frequency exactly on the edge is
+    blocked (to ``1e-9`` of a bin, which absorbs rounding in the product).
+
+    Parameters
+    ----------
+    width_lambda_over_d
+        Full width ``c`` of the stop in lenslet ``lambda / d`` at the reference
+        wavelength; positive.
+    lenslets
+        Lenslet pitches spanned by the filtered field.
+    reference_wavelength_m, wavelength_m
+        Wavelength at which the width is defined, and that of the field, in
+        metres.
+
+    Returns
+    -------
+    int
+        Largest index ``h >= 0`` with ``h < c n lambda_ref / lambda``.
+    """
+    if not width_lambda_over_d > 0.0 or not math.isfinite(width_lambda_over_d):
+        raise ValueError("width_lambda_over_d must be finite and positive")
+    if lenslets < 1:
+        raise ValueError("lenslets must be positive")
+    if not reference_wavelength_m > 0.0 or not wavelength_m > 0.0:
+        raise ValueError("wavelengths must be positive")
+    limit = width_lambda_over_d * lenslets * reference_wavelength_m / wavelength_m
+    return max(0, math.ceil(limit - 1e-9) - 1)
+
+
+def square_spatial_filter(
+    field: NDArray[Any],
+    *,
+    half_width: int,
+    workers: int = 1,
+    backend: ArrayBackend | None = None,
+) -> NDArray[Any]:
+    """Low-pass square pupil fields through a square focal-plane stop.
+
+    Each ``(..., N, N)`` field is zero-padded to ``2N x 2N`` (so the filtered
+    field, which spreads beyond the pupil, does not wrap onto itself), Fourier
+    transformed, restricted to the frequencies ``|m_x|, |m_y| <= half_width``
+    of that padded grid, transformed back, and cropped to its original
+    ``N x N`` window. Light the stop removes, and light diffracted beyond the
+    window, is lost; nothing is renormalized. The unitary transforms compute
+    only the passband lines: the forward transform keeps the ``2 half_width +
+    1`` passband rows and columns, which is the same as multiplying by the
+    square mask, and the inverse starts from them. With ``half_width >= N``
+    the stop passes the whole padded grid and the field is returned unchanged.
+
+    Parameters
+    ----------
+    field
+        Complex ``(..., N, N)`` field batch; it is not modified.
+    half_width
+        Highest passed frequency index of the padded grid
+        (:func:`spatial_filter_half_width`).
+    workers
+        FFT worker count on the CPU.
+    backend
+        Array backend holding ``field``.
+
+    Returns
+    -------
+    numpy.ndarray or cupy.ndarray
+        The filtered field, same shape and dtype.
+    """
+    resolved = backend or cpu_backend()
+    height, width = field.shape[-2:]
+    if height != width:
+        raise ValueError("square_spatial_filter needs square fields")
+    if half_width < 0:
+        raise ValueError("half_width must be non-negative")
+    if half_width >= width:
+        return field
+    size = 2 * width
+    start = (size - half_width) % size
+    passband = resolved.pruned_fft2(
+        field,
+        size=size,
+        input_start=0,
+        output_start=start,
+        output_length=2 * half_width + 1,
+        workers=workers,
+    )
+    return cast(
+        NDArray[Any],
+        resolved.pruned_fft2(
+            passband,
+            size=size,
+            input_start=start,
+            output_start=0,
+            output_length=width,
+            inverse=True,
+            workers=workers,
+        ),
+    )
+
+
 __all__ = [
     "area_rebin",
+    "area_rebin_operators",
     "block_sum",
     "crop_center",
     "lenslet_field_upsampling",
     "load_blur_kernel",
     "pad_center",
+    "spatial_filter_half_width",
     "spot_intensity",
     "spot_sampling_geometry",
+    "square_spatial_filter",
 ]

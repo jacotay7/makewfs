@@ -16,7 +16,7 @@ from ..pupil import make_pupil
 from ..radiometry import clear_aperture_fraction, source_rate_per_s
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states
-from ..wavefront import WavefrontInput, _coordinates, load_static_opd
+from ..wavefront import AmplitudeInput, WavefrontInput, _coordinates, load_static_opd
 from ._cuda_graph import _CudaGraphReplay
 
 
@@ -118,9 +118,20 @@ class PyramidEngine(SensorEngine):
         )
         self._base_output_shape = (pixels + separation, pixels + separation)
         self._build_unshifted_geometry()
+        self._amplitude = AmplitudeInput(
+            config.input.shape,
+            self.internal_shape,
+            self._wavelengths,
+            backend=self.backend,
+            dtype=self._real_dtype,
+        )
         # A GPU frame is launch-bound at these sizes: replay the fixed-shape
-        # propagation from a CUDA graph (see ``_cuda_graph``).
+        # propagation from a CUDA graph (see ``_cuda_graph``). A frame with a
+        # pupil amplitude has a second input, so it replays its own graph.
         self._graph = (
+            None if self.backend.is_cpu else _CudaGraphReplay(self.backend.xp, self._propagate)
+        )
+        self._amplitude_graph = (
             None if self.backend.is_cpu else _CudaGraphReplay(self.backend.xp, self._propagate)
         )
         # The graph replays cuFFT work, so its plans must outlive it rather than
@@ -192,9 +203,16 @@ class PyramidEngine(SensorEngine):
         )
 
     def _fields(
-        self, internal: NDArray[np.float64], state: SourceState, state_index: int
+        self,
+        internal: NDArray[np.float64],
+        state: SourceState,
+        state_index: int,
+        amplitude: Any | None = None,
     ) -> NDArray[Any]:
         phasor = self._base_phasor(internal, state, state_index)
+        if amplitude is not None:
+            # A real amplitude of exactly one leaves the phasor bit-identical.
+            phasor = phasor * amplitude
         if self._modulated_pupil is None:
             return cast(NDArray[Any], (self.pupil * phasor)[None, ...])
         return cast(
@@ -204,10 +222,29 @@ class PyramidEngine(SensorEngine):
             ),
         )
 
-    def render(self, wavefront: NDArray[np.float64]) -> OpticalResult:
+    def render(
+        self, wavefront: NDArray[np.float64], *, amplitude: Any | None = None
+    ) -> OpticalResult:
+        """Render one OPD sample, with an optional per-frame pupil amplitude.
+
+        ``amplitude`` multiplies the configured pupil amplitude (see
+        :class:`makewfs.wavefront.AmplitudeInput`), so each of the four pupil
+        images carries its intensity pattern.
+        """
         internal = self.wavefront.opd(wavefront, target_shape=self.internal_shape)
         # On a GPU the graph replays the same kernels as ``_propagate``.
-        outputs = self._propagate(internal) if self._graph is None else self._graph(internal)
+        if amplitude is None:
+            outputs = self._propagate(internal) if self._graph is None else self._graph(internal)
+        else:
+            maps = self._amplitude(amplitude)
+            if maps.shape[0] != len(self._wavelengths):
+                # One fixed shape, so the captured graph sees the same input.
+                maps = self.backend.repeat(maps, len(self._wavelengths), axis=0)
+            outputs = (
+                self._propagate(internal, maps)
+                if self._amplitude_graph is None
+                else self._amplitude_graph(internal, maps)
+            )
         photon_rate, captured = outputs[0], outputs[1]
         spectral_photon_rate = outputs[2] if len(outputs) > 2 else photon_rate[None, ...]
         return OpticalResult(
@@ -219,12 +256,15 @@ class PyramidEngine(SensorEngine):
             self._wavelengths,
         )
 
-    def _propagate(self, internal: NDArray[np.float64]) -> tuple[Any, ...]:
+    def _propagate(
+        self, internal: NDArray[np.float64], amplitude: Any | None = None
+    ) -> tuple[Any, ...]:
         """Return the photon rate, captured rate and, if polychromatic, the cube.
 
         Everything here has a fixed shape and stays on the device without a
         host synchronization, which is what lets a GPU sensor capture it once
-        as a CUDA graph.
+        as a CUDA graph. ``amplitude`` is ``None`` or one internal-grid map per
+        wavelength node.
         """
         photon_rate = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
         spectral_photon_rate = (
@@ -237,7 +277,14 @@ class PyramidEngine(SensorEngine):
         captured: Any = 0.0
         margin = self.settings.detector_margin_pixels
         for state_index, state in enumerate(self.source_states):
-            fields = self._fields(internal, state, state_index)
+            fields = self._fields(
+                internal,
+                state,
+                state_index,
+                None
+                if amplitude is None
+                else amplitude[self._state_wavelength_indices[state_index]],
+            )
             # Centred unitary FFT, pyramid mask, centred inverse FFT and crop,
             # evaluated on the unshifted grid (see ``_build_unshifted_geometry``).
             # The transforms skip the zero padding rows and the cropped-away

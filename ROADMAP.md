@@ -68,8 +68,9 @@ The 1.0 release is complete when all of the following are true:
 ### makewfs does not own
 
 - Atmospheric turbulence, frozen flow, Cn2 profiles, cone-effect phase, or
-  scintillation. Use `pyturb`; amplitude fluctuations remain out of scope while
-  the input contract is phase/OPD only.
+  the propagation that produces scintillation. Use `pyturb` (and `aocore`
+  propagators). Since 2.3 the resulting pupil amplitude may be passed per frame
+  next to the OPD (ADR 0006); makewfs applies it but never propagates fields.
 - Shot noise, QE, PRNU, read noise, gain, dark current, detector artifacts,
   digitization, persistence, or calibration. Use `getframes`.
 - Wavefront reconstruction, centroiding algorithms, slope extraction,
@@ -163,6 +164,10 @@ must not be implemented until its acceptance test demonstrates the need.
   against a dense range/angle quadrature. The issue's centroiders, geometric
   slope engine, and interaction-matrix helper are downstream (slopes and
   calibration) and tracked in shmpipeline-ao#5.
+- [x] 2.3: per-frame pupil amplitude (scintillation) for both sensors
+  (ADR 0006), SH per-subaperture flux, a square focal-plane spatial filter, and
+  inter-lenslet cross-talk, with analytic and independent-reference tests and
+  CPU/GPU parity.
 - [ ] The final GitHub tag, documentation publication, and PyPI release remain.
   Targeted independent validation, the wavelength-resolved detector-QE gate,
   public CuPy parity evidence, the versioned documentation gallery, and relative
@@ -314,9 +319,12 @@ The CLI does not generate an atmosphere.
   the documented physical coordinate grid. Plane and band-limited-mode tests
   guard interpolation accuracy. The original dynamic input is never silently
   cropped to make a reshape convenient.
-- The configured pupil supplies amplitude; no amplitude array is a per-frame
-  input. Non-finite values inside illuminated pupil pixels are errors. Values
-  outside the pupil are ignored and zeroed.
+- The configured pupil supplies the static amplitude. Since 2.3 an optional
+  per-frame amplitude array (scintillation, ADR 0006) multiplies it; the OPD
+  remains the phase input, and without the array (or with an amplitude of
+  exactly one) results are those of the OPD alone. Non-finite values inside
+  illuminated pupil pixels are errors. Values outside the pupil are ignored
+  and zeroed.
 - Constant piston must leave every ideal intensity image invariant to numerical
   precision. Piston is not silently removed except as an explicitly documented
   numerical stabilization before evaluating `exp(i phase)`.
@@ -782,8 +790,12 @@ cannot be represented as an existing engine variant.
   propagation, radiometry, detector, and validation contracts.
 - [ ] Add sensor registration/manufacturing defect models only from measured or
   well-sourced parameterizations, all disabled by default.
-- [ ] Consider amplitude input/scintillation only as a versioned extension to the
+- [x] Consider amplitude input/scintillation only as a versioned extension to the
   input contract and only in coordination with the atmosphere/propagation owner.
+  Done in 2.3.0 at the maintainer's request (ADR 0006): a per-frame pupil
+  amplitude next to the OPD for both sensors, SH subaperture flux, a square
+  focal-plane spatial filter, and inter-lenslet cross-talk. Field propagation
+  stays with the caller (`pyturb`, `aocore` propagators).
 
 ## 9. Verification strategy
 

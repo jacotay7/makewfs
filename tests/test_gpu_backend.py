@@ -615,3 +615,130 @@ def test_lgs_kernel_mode_matches_cpu(dtype: str) -> None:
     assert gpu.engine._compiled_executor_rejections[1] == "LGS kernel convolution"
     frame = gpu.expose(cupy.asarray(opd), seed=4)
     assert isinstance(frame.truth.photon_rate, cupy.ndarray)
+
+
+def _scintillation_config(dtype: str, **shack_hartmann: object) -> WFSConfig:
+    config = _config("shack_hartmann_minimal.toml")
+    assert config.shack_hartmann is not None
+    return replace(
+        config,
+        numerics=replace(config.numerics, dtype=dtype),
+        shack_hartmann=replace(config.shack_hartmann, **shack_hartmann),
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize(
+    "features",
+    [
+        {},
+        {"spatial_filter_width_lambda_over_d": 1.5},
+        {"crosstalk_reach_subapertures": 1, "detector_margin_pixels": 4},
+        {
+            "spatial_filter_width_lambda_over_d": 2.0,
+            "crosstalk_reach_subapertures": 1,
+            "lenslet_fill_factor": 0.9,
+            "lenslet_grid_rotation_deg": 3.0,
+        },
+    ],
+    ids=["amplitude", "spatial-filter", "crosstalk", "all"],
+)
+def test_scintillation_features_match_cpu(dtype: str, features: dict[str, object]) -> None:
+    cupy = _cupy()
+    config = _scintillation_config(dtype, **features)
+    cpu = WavefrontSensor(config)
+    gpu = WavefrontSensor(replace(config, numerics=replace(config.numerics, device="gpu")))
+    shape = config.input.shape
+    rng = np.random.default_rng(31)
+    opd = rng.normal(size=shape) * 40e-9
+    amplitude = np.sqrt(1.0 + 0.3 * rng.random(shape))
+    expected = cpu.subaperture_flux(opd, amplitude=amplitude)
+    actual = gpu.subaperture_flux(cupy.asarray(opd), amplitude=cupy.asarray(amplitude))
+    assert isinstance(actual.photon_rate, cupy.ndarray)
+    assert isinstance(actual.pupil_photons_s, cupy.ndarray)
+    rtol = 1e-4 if dtype == "float32" else 1e-10
+    for name in ("photon_rate", "detector_photons_s", "pupil_photons_s"):
+        reference = np.asarray(getattr(expected, name))
+        np.testing.assert_allclose(
+            cupy.asnumpy(getattr(actual, name)),
+            reference,
+            rtol=rtol,
+            atol=rtol * float(np.max(reference)),
+        )
+    frame = gpu.expose(cupy.asarray(opd), amplitude=cupy.asarray(amplitude), seed=5)
+    assert isinstance(frame.data, cupy.ndarray)
+    assert frame.metadata["wfs_input_amplitude"] is True
+    if features:
+        # Every new optical feature runs on the reference path, which records why.
+        gpu.engine.render(cupy.asarray(opd))
+        assert set(gpu.engine._compiled_executor_rejections.values()) <= {
+            "focal-plane spatial filter",
+            "inter-lenslet cross-talk",
+        }
+        assert gpu.engine._compiled_executor_rejections
+
+
+@pytest.mark.gpu
+def test_unit_amplitude_on_gpu_matches_the_compiled_opd_only_path() -> None:
+    cupy = _cupy()
+    config = _compiled_dft_config(dtype="float64")
+    sensor = WavefrontSensor(config)
+    opd = cupy.random.RandomState(23).normal(0.0, 8.0e-8, config.input.shape)
+    compiled = sensor.photon_rate(opd)
+    assert 1 in sensor.engine._compiled_executors
+    with_amplitude = sensor.photon_rate(opd, amplitude=cupy.ones(config.input.shape))
+    np.testing.assert_allclose(
+        cupy.asnumpy(with_amplitude), cupy.asnumpy(compiled), rtol=2e-12, atol=1e-8
+    )
+    sensor.engine._compiled_executor_enabled = False
+    reference = sensor.photon_rate(opd)
+    assert bool(cupy.array_equal(with_amplitude, reference))
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("broadband", [False, True])
+def test_pyramid_amplitude_graph_replay_equals_eager_and_cpu(broadband: bool) -> None:
+    cupy = _cupy()
+    config = _config("pyramid_minimal.toml")
+    assert config.pyramid is not None
+    config = replace(
+        config,
+        numerics=replace(config.numerics, dtype="float64"),
+        pyramid=replace(config.pyramid, modulation_radius_lambda_over_d=2.0, modulation_samples=4),
+    )
+    if broadband:
+        config = replace(
+            config,
+            source=replace(config.source, wavelengths_m=(6.5e-7, 7.5e-7)),
+        )
+    cpu = WavefrontSensor(config)
+    gpu_config = replace(config, numerics=replace(config.numerics, device="gpu"))
+    engine = WavefrontSensor(gpu_config).engine
+    rng = np.random.default_rng(14)
+    shape = config.input.shape
+    opd = rng.normal(size=shape) * 5.0e-8
+    amplitude = np.sqrt(1.0 + 0.4 * rng.random(shape))
+    first = engine.render(cupy.asarray(opd), amplitude=cupy.asarray(amplitude))
+    second = engine.render(cupy.asarray(opd), amplitude=cupy.asarray(amplitude))
+    assert engine._amplitude_graph is not None
+    assert engine._amplitude_graph.failure is None
+    assert engine._amplitude_graph._graph is not None
+    assert bool(cupy.array_equal(first.photon_rate, second.photon_rate))
+    graph = engine._amplitude_graph
+    engine._amplitude_graph = None
+    eager = engine.render(cupy.asarray(opd), amplitude=cupy.asarray(amplitude))
+    engine._amplitude_graph = graph
+    assert bool(cupy.array_equal(second.photon_rate, eager.photon_rate))
+    expected = cpu.photon_rate(opd, amplitude=amplitude)
+    np.testing.assert_allclose(
+        cupy.asnumpy(second.photon_rate), expected, rtol=1e-9, atol=1e-9 * expected.max()
+    )
+    # The OPD-only graph is unaffected.
+    plain = engine.render(cupy.asarray(opd))
+    np.testing.assert_allclose(
+        cupy.asnumpy(plain.photon_rate),
+        cpu.photon_rate(opd),
+        rtol=1e-9,
+        atol=1e-9 * expected.max(),
+    )

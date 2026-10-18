@@ -410,6 +410,16 @@ class ShackHartmannConfig:
     lenslet_grid_rotation_deg: float = 0.0
     lenslet_grid_offset_fraction: tuple[float, float] = (0.0, 0.0)
     lenslet_grid_offset_states_fraction: tuple[tuple[float, float], ...] = ()
+    spatial_filter_width_lambda_over_d: float | None = None
+    """Full width of a square focal-plane spatial filter in front of the lenslets.
+
+    In lenslet ``lambda / d`` at ``sensor.wavelength_m``; ``None`` for no filter.
+    """
+    crosstalk_reach_subapertures: int = 0
+    """Neighbouring subaperture windows a lenslet's light may reach on the detector.
+
+    ``0`` confines each spot to its own window (a field stop at the window).
+    """
 
     @property
     def lenslet_grid_offsets_fraction(self) -> tuple[tuple[float, float], ...]:
@@ -447,6 +457,8 @@ class ShackHartmannConfig:
                 "lenslet_grid_rotation_deg",
                 "lenslet_grid_offset_fraction",
                 "lenslet_grid_offset_states_fraction",
+                "spatial_filter_width_lambda_over_d",
+                "crosstalk_reach_subapertures",
             },
             "shack_hartmann",
         )
@@ -487,6 +499,22 @@ class ShackHartmannConfig:
         if len(grid_offset) != 2:
             raise ConfigError("shack_hartmann.lenslet_grid_offset_fraction: expected [x, y]")
         offset_states = _offset_states(data.get("lenslet_grid_offset_states_fraction", []))
+        raw_filter = data.get("spatial_filter_width_lambda_over_d")
+        spatial_filter = (
+            None
+            if raw_filter is None
+            else _finite(raw_filter, "shack_hartmann.spatial_filter_width_lambda_over_d")
+        )
+        if spatial_filter is not None and spatial_filter <= 0:
+            raise ConfigError(
+                "shack_hartmann.spatial_filter_width_lambda_over_d: must be > 0 "
+                "(omit the key for no spatial filter)"
+            )
+        crosstalk = _positive_int(
+            data.get("crosstalk_reach_subapertures", 0),
+            "shack_hartmann.crosstalk_reach_subapertures",
+            minimum=0,
+        )
         return cls(
             _positive_int(
                 data.get("lenslets_across_pupil"), "shack_hartmann.lenslets_across_pupil", minimum=1
@@ -549,6 +577,29 @@ class ShackHartmannConfig:
             ),
             (grid_offset[0], grid_offset[1]),
             offset_states,
+            spatial_filter,
+            crosstalk,
+        )
+
+
+def _check_shack_hartmann_source(settings: ShackHartmannConfig, source: SourceConfig) -> None:
+    """Reject Shack-Hartmann options that the configured source cannot use.
+
+    The spatial filter acts on one pupil field per source state, but a
+    range-resolved LGS state tilts every subaperture differently to model
+    elongation, which is not a field a focal-plane filter could act on. LGS
+    kernel mode convolves and crops each window on its own, so it cannot send
+    light into a neighbour's pixels.
+    """
+    if settings.spatial_filter_width_lambda_over_d is not None and source.lgs_ranges_m:
+        raise ConfigError(
+            "shack_hartmann.spatial_filter_width_lambda_over_d: not supported with "
+            "range-resolved LGS states (source.lgs_ranges_m); use an NGS or a thin beacon"
+        )
+    if source.lgs_model == "kernel" and settings.crosstalk_reach_subapertures:
+        raise ConfigError(
+            "shack_hartmann.crosstalk_reach_subapertures: not supported with "
+            "source.lgs_model = 'kernel'; use the 'quadrature' LGS model"
         )
 
 
@@ -877,6 +928,11 @@ class WFSConfig:
                 raise ConfigError("pyramid: required for pyramid sensor")
             sh_data = None
             pyramid_data = table("pyramid")
+        sh_config = (
+            None if sh_data is None else ShackHartmannConfig.from_dict(sh_data, base=base_path)
+        )
+        if sh_config is not None:
+            _check_shack_hartmann_source(sh_config, source_config)
         return cls(
             1,
             input_config,
@@ -885,7 +941,7 @@ class WFSConfig:
             sensor,
             DetectorConfig.from_dict(table("detector"), base=base_path),
             NumericsConfig.from_dict(table("numerics")),
-            None if sh_data is None else ShackHartmannConfig.from_dict(sh_data, base=base_path),
+            sh_config,
             None if pyramid_data is None else PyramidConfig.from_dict(pyramid_data),
             dict(table("metadata")),
         )
@@ -948,6 +1004,8 @@ class WFSConfig:
 _OMITTED_AT_DEFAULT: tuple[tuple[str, str, Any], ...] = (
     ("source", "lgs_model", "quadrature"),
     ("shack_hartmann", "lenslet_grid_offset_states_fraction", []),
+    ("shack_hartmann", "spatial_filter_width_lambda_over_d", None),
+    ("shack_hartmann", "crosstalk_reach_subapertures", 0),
 )
 """``(table, key, serialized default)`` of fields left out of ``to_dict`` at default."""
 

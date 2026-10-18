@@ -12,3 +12,8 @@ internal so new sensor types do not expand the top-level API.
 [ADR 0005](0005-lenslet-offset-states.md) adds an optional `offset_state` index
 that selects one of the Shack-Hartmann lenslet-grid positions declared in the
 configuration; it adds no instrument parameter outside the configuration.
+
+[ADR 0006](0006-pupil-amplitude-input.md) adds an optional per-frame pupil
+`amplitude` next to the OPD (scintillation), part of the wavefront rather than
+an instrument parameter, and `subaperture_flux` for ideal per-subaperture photon
+rates.

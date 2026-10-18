@@ -29,6 +29,12 @@ diameter is allowed and intentionally produces overlapping pupil images; the
 propagation does not assign pixels to a single pupil. Pyramid reconstruction remains
 outside this repository.
 
+A frame may also carry a pupil amplitude (`amplitude=` on `photon_rate`,
+`expose`, and the other render calls): it multiplies the configured pupil, so
+the four pupil images carry the scintillation pattern. On a GPU such frames
+replay their own CUDA graph. See
+[Scintillation and subaperture flux](scintillation.md).
+
 The propagation is verified internally against a direct-summation forward and
 inverse DFT on a random small grid. Optional HCIPy and OOPAO comparisons exercise
 the flat reference plus tip, tilt, and focus push/pull response maps. HCIPy's

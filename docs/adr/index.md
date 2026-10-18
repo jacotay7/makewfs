@@ -9,3 +9,4 @@ supersede one explicitly rather than silently changing conventions.
 - [Public API](0003-public-api.md)
 - [Backend boundary](0004-backend-boundary.md)
 - [Lenslet-grid offset states](0005-lenslet-offset-states.md)
+- [Per-frame pupil amplitude](0006-pupil-amplitude-input.md)

@@ -152,6 +152,8 @@ fft_workers = 1  # CPU-only FFT control; accepted but ignored by CuPy FFTs
 | `lenslet_grid_rotation_deg` | Lenslet-frame rotation in degrees (default 0). |
 | `lenslet_grid_offset_fraction` | `[x, y]` offset in lenslet-pitch fractions (default `[0, 0]`). |
 | `lenslet_grid_offset_states_fraction` | Optional list of `[x, y]` offsets in lenslet pitches (default `[]`), each added to `lenslet_grid_offset_fraction`; finite values, any number of states. Selected per call with `offset_state` (index into this list). Empty means one state, the static offset. See [Lenslet-grid offset states](shack-hartmann.md#lenslet-grid-offset-states). |
+| `spatial_filter_width_lambda_over_d` | Optional full width `c > 0` of a square focal-plane spatial filter in front of the lenslets, in lenslet `lambda/d` at `sensor.wavelength_m` (default: no filter). It passes the pupil-plane frequencies `|f_x|, |f_y| < c / (2 d) * lambda_ref / lambda`; `c = 1` is the anti-aliasing width. Not allowed with range-resolved LGS states (`source.lgs_ranges_m`). See [Focal-plane spatial filter](scintillation.md#focal-plane-spatial-filter). |
+| `crosstalk_reach_subapertures` | Integer `k >= 0` (default 0): how many neighbouring subaperture windows on each side a lenslet's light may reach on the detector. `0` confines each spot to its own window, which acts as a field stop; `k > 0` propagates `2k + 1` windows per axis and adds the light into the neighbours' pixels (raising `samples_per_lenslet` to avoid aliasing). Not allowed with `source.lgs_model = "kernel"`. See [Inter-lenslet cross-talk](scintillation.md#inter-lenslet-cross-talk). |
 
 `[shack_hartmann]` requires positive `lenslets_across_pupil`, at least two
 `pixels_per_subaperture`, and `minimum_illuminated_fraction` in `[0, 1]`.
@@ -248,6 +250,24 @@ stop, `optical_blur_fwhm_pixels` applies a flux-spreading optical Gaussian
 before detector sampling, and `detector_margin_pixels` pads the assembled SH
 mosaic with zero-rate margins. These are optical settings; detector binning and
 noise remain in `[detector]`/`getframes`.
+
+An extreme-AO style Shack-Hartmann adds a square spatial filter in front of the
+lenslets and lets spots spill into neighbouring subapertures:
+
+```toml
+[shack_hartmann]
+lenslets_across_pupil = 16
+pixels_per_subaperture = 8
+spot_sampling_pixels_per_lambda_over_d = 2.0
+spatial_filter_width_lambda_over_d = 1.0
+crosstalk_reach_subapertures = 1
+detector_margin_pixels = 8
+```
+
+Both keys are omitted from the normalized configuration at their defaults, so
+the digest of a configuration without them is unchanged. A per-frame pupil
+amplitude (scintillation) is not configuration: it is passed with each
+wavefront ([Scintillation and subaperture flux](scintillation.md)).
 
 Wavelength and source-size quadrature are optional. Weights are normalized, and
 intensities—not complex fields—are summed:

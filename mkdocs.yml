@@ -35,6 +35,7 @@ nav:
   - Guide stars: guide-stars.md
   - Shack-Hartmann: shack-hartmann.md
   - Pyramid: pyramid.md
+  - Scintillation and subaperture flux: scintillation.md
   - Detectors and radiometry: detectors.md
   - Interoperability: interop.md
   - Validation: validation.md
@@ -53,3 +54,4 @@ nav:
       - Public API: adr/0003-public-api.md
       - Backend boundary: adr/0004-backend-boundary.md
       - Lenslet-grid offset states: adr/0005-lenslet-offset-states.md
+      - Per-frame pupil amplitude: adr/0006-pupil-amplitude-input.md

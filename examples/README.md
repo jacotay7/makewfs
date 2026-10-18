@@ -32,6 +32,12 @@ script accepts `--help` for output and resolution controls.
   half-pitch lenslet-grid offset states
   (`configs/shack_hartmann_offset_states.toml`) and shows each state's
   valid-subaperture map.
+- `scintillation.py` propagates a `pyturb` phase screen at 12 km to the pupil
+  with `aocore`'s angular-spectrum propagator and passes the field to a 16 x 16
+  Shack-Hartmann (`configs/shack_hartmann_scintillation.toml`) as an amplitude
+  plus OPD. It compares the subaperture fluxes with the pupil intensity, with
+  and without a `lambda/d` focal-plane spatial filter, and shows how much the
+  amplitude moves illustrative centre-of-gravity slopes.
 - `closed_loop_injection.py` drives a low-order residual toward zero via a toy
   external loop and tracks the residual RMS and the frame's departure from the
   flat reference; the controller is explicitly outside makewfs.

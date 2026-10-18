@@ -15,6 +15,32 @@ oversampling case with direct strided sums. Temporally integrated exposures
 batch their fields and avoid a caller-side optical render for every sample.
 These are mathematically equivalent allocation/reduction optimizations.
 
+## Pupil amplitude, spatial filter, and cross-talk (2.3)
+
+Frames without an amplitude, and configurations without a spatial filter or
+cross-talk, run the 2.2 code unchanged: a before/after render matrix of 147
+photon-rate arrays (every shipped example and benchmark configuration, plus
+rotated/offset, field-stop/fill-factor and float64 variants, single and
+integrated frames) is bit-identical. For the 20 x 20 float32 benchmark
+(`benchmarks/configs/shack_hartmann_20x20_float32.toml`, 16 samples per
+lenslet), warm `photon_rate` frames measured (best of 80, interleaved, on a
+shared Intel i7-10700 at load average about 11, and a Quadro P620):
+
+| Frame | CPU | GPU |
+| --- | --- | --- |
+| OPD only | 5.5 ms | 0.74 ms (compiled kernel) |
+| with an amplitude | 6.0 ms | 3.0 ms |
+| `spatial_filter_width_lambda_over_d = 1` | 7.6 ms | 3.7 ms |
+| `crosstalk_reach_subapertures = 1` | 11.7 ms | 3.0 ms |
+| `subaperture_flux` with an amplitude | 6.2 ms | 4.4 ms |
+
+The GPU times are the array-operation reference path, which these features
+use because the compiled Shack--Hartmann kernel takes the OPD only. The spatial
+filter transforms only the passband lines of the twice-padded pupil field.
+Cross-talk propagates and integrates a `(2k + 1)^2` times larger focal window
+per lenslet, and may raise `samples_per_lenslet` to keep the wider window free
+of aliasing.
+
 ## Fast LGS kernel mode and offset states (2.2)
 
 A sodium LGS rendered with `source.lgs_model = "quadrature"` costs one

@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: Taylor
     given-names: Jacob
-version: 2.2.0
-date-released: 2026-10-10
+version: 2.3.0
+date-released: 2026-10-18
 license: MIT
 repository-code: "https://github.com/jacotay7/makewfs"
 url: "https://jacotay7.github.io/makewfs/"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from typing import Any, cast
@@ -20,7 +21,50 @@ from .sampling import area_rebin
 from .sensors.base import OpticalResult, SensorEngine
 from .sensors.pyramid import PyramidEngine
 from .sensors.shack_hartmann import ShackHartmannEngine
-from .wavefront import grid_rms, iter_phase_samples, pupil_rms, pupil_weights
+from .wavefront import (
+    amplitude_samples,
+    grid_rms,
+    iter_phase_samples,
+    pupil_rms,
+    pupil_weights,
+)
+
+
+@dataclass(frozen=True)
+class SubapertureFlux:
+    """Ideal (noise-free) per-subaperture photon rates of one Shack--Hartmann frame.
+
+    Every array is indexed ``(lenslet_y, lenslet_x)`` like
+    :meth:`WavefrontSensor.valid_subapertures` and stays on the sensor's
+    device (a CuPy array on a GPU sensor).
+
+    Attributes
+    ----------
+    detector_photons_s
+        Photon rate collected by each subaperture's own
+        ``pixels_per_subaperture x pixels_per_subaperture`` pixel block, in
+        photons/s: the block sum of :attr:`photon_rate` without the detector
+        margin. It excludes light its spot sends beyond the block and, with
+        ``crosstalk_reach_subapertures > 0``, includes light neighbouring spots
+        send into it. This is the flux a detector reading those pixels
+        measures, before QE and noise.
+    pupil_photons_s
+        Photon rate entering each lenslet's clear aperture in the pupil plane,
+        in photons/s: the source rate times the integral of the entrance-field
+        intensity (pupil times amplitude squared, after the spatial filter and
+        the lenslet fill factor) over the lenslet, divided by the unscintillated
+        pupil's integral. It does not depend on the detector window.
+    valid
+        Static valid-subaperture map of the offset state used.
+    photon_rate
+        The ideal photon-rate image the detector fluxes were summed from, in
+        photons/s per native detector pixel.
+    """
+
+    detector_photons_s: Any
+    pupil_photons_s: Any
+    valid: Any
+    photon_rate: Any
 
 
 class WavefrontSensor:
@@ -79,12 +123,34 @@ class WavefrontSensor:
         """Build a sensor from a validated TOML file."""
         return cls(load_config(path))
 
-    def _render(self, wavefront: ArrayLike, offset_state: int = 0) -> OpticalResult:
+    def _render(
+        self,
+        wavefront: ArrayLike,
+        offset_state: int = 0,
+        amplitude: ArrayLike | None = None,
+        *,
+        lenslet_flux: bool = False,
+    ) -> OpticalResult:
         opd = cast(NDArray[np.float64], wavefront)
         if isinstance(self.engine, ShackHartmannEngine):
-            return self.engine.render(opd, offset_state=offset_state)
+            return self.engine.render(
+                opd, offset_state=offset_state, amplitude=amplitude, lenslet_flux=lenslet_flux
+            )
         self._check_offset_state(offset_state)
-        return self.engine.render(opd)
+        if amplitude is None:
+            return self.engine.render(opd)
+        return cast(PyramidEngine, self.engine).render(opd, amplitude=amplitude)
+
+    @property
+    def wavelengths_m(self) -> tuple[float, ...]:
+        """Wavelength nodes of the source quadrature, in metres.
+
+        The order is that of the spectral photon-rate cube and of a
+        per-wavelength ``amplitude`` stack: an amplitude of shape
+        ``(len(wavelengths_m), *input.shape)`` gives map ``k`` to
+        ``wavelengths_m[k]``.
+        """
+        return tuple(self.engine._wavelengths)
 
     def _check_offset_state(self, offset_state: int) -> None:
         """Validate an offset-state index; only the SH engine has more than one."""
@@ -153,9 +219,11 @@ class WavefrontSensor:
         opd_rms_unweighted_m: float,
         seed: int | None,
         offset_state: int = 0,
+        amplitude: bool = False,
     ) -> dict[str, Any]:
         """Copy cached static provenance and fill the per-frame values."""
         result = dict(self._metadata_base)
+        result["wfs_input_amplitude"] = bool(amplitude)
         if isinstance(self.engine, ShackHartmannEngine):
             result["wfs_lenslet_offset_state"] = int(offset_state)
             result["wfs_lenslet_grid_offset_fraction"] = list(
@@ -172,14 +240,67 @@ class WavefrontSensor:
         )
         return result
 
-    def photon_rate(self, wavefront: ArrayLike, *, offset_state: int = 0) -> Any:
+    def photon_rate(
+        self,
+        wavefront: ArrayLike,
+        *,
+        amplitude: ArrayLike | None = None,
+        offset_state: int = 0,
+    ) -> Any:
         """Return the ideal native-pixel photon rate before detector noise.
 
         ``offset_state`` selects one of the configured Shack--Hartmann
         lenslet-grid offset states (see :meth:`lenslet_grid_offsets_fraction`);
         it must be ``0`` for a sensor with one state and for a pyramid.
+
+        ``amplitude`` is an optional per-frame pupil-plane field amplitude
+        ``|U| / |U_0|`` (dimensionless, non-negative), relative to the
+        unscintillated field the source normalization describes. It multiplies
+        the configured pupil amplitude, so the pupil intensity, and with it the
+        photon rate, scales with its square; the wavefront still carries the
+        phase. Pass an ``input.shape`` map for every wavelength, or a
+        ``(len(wavelengths_m), *input.shape)`` stack with one map per
+        wavelength node. ``None`` (the default) and an amplitude of exactly one
+        give the OPD-only result. See ``docs/scintillation.md``.
         """
-        return self._render(wavefront, offset_state).photon_rate
+        return self._render(wavefront, offset_state, amplitude).photon_rate
+
+    def subaperture_flux(
+        self,
+        wavefront: ArrayLike,
+        *,
+        amplitude: ArrayLike | None = None,
+        offset_state: int = 0,
+    ) -> SubapertureFlux:
+        """Return the ideal per-subaperture photon rates of one wavefront.
+
+        Shack--Hartmann only. One render gives the ideal image and, for each
+        lenslet, the photon rate its pixel block collects and the photon rate
+        entering its aperture in the pupil plane (see :class:`SubapertureFlux`).
+        Under scintillation (``amplitude``, as in :meth:`photon_rate`) these
+        fluxes measure the pupil intensity. They are noise-free; a measured
+        flux comes from summing the same pixel blocks of an exposed frame.
+        """
+        if not isinstance(self.engine, ShackHartmannEngine):
+            raise ValueError("subaperture_flux is defined only for Shack--Hartmann")
+        engine = self.engine
+        result = engine.render(
+            cast(NDArray[np.float64], wavefront),
+            offset_state=offset_state,
+            amplitude=amplitude,
+            lenslet_flux=True,
+        )
+        n = engine.n_lenslets
+        pixels = engine.settings.pixels_per_subaperture
+        margin = engine.settings.detector_margin_pixels
+        base = result.photon_rate[margin : margin + n * pixels, margin : margin + n * pixels]
+        detector = self.backend.sum(base.reshape(n, pixels, n, pixels), axis=(1, 3))
+        return SubapertureFlux(
+            detector_photons_s=detector,
+            pupil_photons_s=result.lenslet_rate_per_s,
+            valid=engine.geometry(offset_state).lenslet_valid.copy(),
+            photon_rate=result.photon_rate,
+        )
 
     def reference(self, *, offset_state: int = 0) -> Any:
         """Return the ideal image for a zero dynamic OPD in one offset state."""
@@ -219,15 +340,16 @@ class WavefrontSensor:
     def subaperture_field_of_view_arcsec(self) -> float:
         """Return the on-sky field of view one subaperture's window spans.
 
-        A Shack--Hartmann's detector window is itself a field stop. Each
-        subaperture's spot is formed and integrated only over its own
+        By default a Shack--Hartmann's detector window is itself a field stop.
+        Each subaperture's spot is formed and integrated only over its own
         ``pixels_per_subaperture`` block, and the blocks are tiled without
         overlap, so light beyond this field is neither recorded nor allowed to
         contaminate a neighbour. An instrument whose physical field stop matches
-        its pixel field is therefore already represented; one whose stop is
-        larger would spill light between subapertures, which this does not
-        model. Reporting the value makes that assumption checkable instead of
-        leaving it implied by the pixel count.
+        its pixel field is therefore already represented. One without such a
+        stop spills light between subapertures: set
+        ``shack_hartmann.crosstalk_reach_subapertures`` to model that. Reporting
+        the value makes the assumption checkable instead of leaving it implied
+        by the pixel count.
         """
         settings = self.config.shack_hartmann
         if settings is None:
@@ -269,6 +391,7 @@ class WavefrontSensor:
         self,
         wavefront: ArrayLike,
         *,
+        amplitude: ArrayLike | None = None,
         seed: int | None = None,
         out: Any | None = None,
         offset_state: int = 0,
@@ -279,7 +402,12 @@ class WavefrontSensor:
         wavefront's ``wfs_input_opd_rms_m``, its RMS in OPD metres weighted by
         the pupil intensity with piston removed (aocore CONVENTIONS 4.1), and
         ``wfs_input_opd_rms_unweighted_m``, its RMS over the whole input grid
-        with piston kept.
+        with piston kept. Both use the configured pupil, not the per-frame
+        amplitude.
+
+        ``amplitude`` is the optional per-frame pupil amplitude of
+        :meth:`photon_rate`; frames record whether one was given as
+        ``wfs_input_amplitude``.
 
         ``offset_state`` selects a configured Shack--Hartmann lenslet-grid
         offset state (``shack_hartmann.lenslet_grid_offset_states_fraction``);
@@ -288,7 +416,7 @@ class WavefrontSensor:
         """
         total_start = perf_counter()
         optical_start = total_start
-        result = self._render(wavefront, offset_state)
+        result = self._render(wavefront, offset_state, amplitude)
         captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
             result.captured_rate_per_s, *self._opd_rms(result.opd_m)
         )
@@ -300,6 +428,7 @@ class WavefrontSensor:
             opd_rms_unweighted_m=opd_rms_unweighted,
             seed=seed,
             offset_state=offset_state,
+            amplitude=amplitude is not None,
         )
         detector_start = perf_counter()
         frame = self.detector.expose(
@@ -324,24 +453,30 @@ class WavefrontSensor:
         seeds: Iterable[int | None] | None = None,
         *,
         offset_states: Iterable[int] | None = None,
+        amplitudes: Iterable[ArrayLike | None] | None = None,
     ) -> Iterator[Any]:
         """Yield one detector frame per phase sample without stacking the stream.
 
         ``offset_states`` optionally gives the lenslet-grid offset state of each
         frame, for example ``itertools.cycle(range(n))`` for a dithered
         Shack--Hartmann; the default renders every frame in state ``0``.
+        ``amplitudes`` optionally gives each frame's pupil amplitude (see
+        :meth:`photon_rate`), consumed in step with ``phases``.
         """
         seed_iter = iter(seeds) if seeds is not None else None
         state_iter = iter(offset_states) if offset_states is not None else None
+        amplitude_iter = iter(amplitudes) if amplitudes is not None else None
         for phase in phases:
             seed = next(seed_iter) if seed_iter is not None else None
             offset_state = next(state_iter) if state_iter is not None else 0
-            yield self.expose(phase, seed=seed, offset_state=offset_state)
+            amplitude = next(amplitude_iter) if amplitude_iter is not None else None
+            yield self.expose(phase, amplitude=amplitude, seed=seed, offset_state=offset_state)
 
     def expose_integrated(
         self,
         phase_samples: ArrayLike | Iterable[ArrayLike],
         *,
+        amplitude: ArrayLike | Iterable[ArrayLike] | None = None,
         seed: int | None = None,
         out: Any | None = None,
         offset_state: int = 0,
@@ -349,7 +484,10 @@ class WavefrontSensor:
         """Expose temporally averaged OPD into optional caller-owned detector storage.
 
         Every sample uses the same lenslet-grid ``offset_state`` (see
-        :meth:`expose`).
+        :meth:`expose`). ``amplitude`` optionally gives one pupil amplitude per
+        temporal sample: a sequence, or an array whose leading axis is the
+        sample axis, each entry an ``input.shape`` map or a per-wavelength stack
+        (see :meth:`photon_rate`).
         """
         total_start = perf_counter()
         optical_start = total_start
@@ -365,7 +503,15 @@ class WavefrontSensor:
             )
             if not samples:
                 raise ValueError("phase_samples must contain at least one sample")
-            result = batched(samples, offset_state=offset_state)
+            result = (
+                batched(samples, offset_state=offset_state)
+                if amplitude is None
+                else batched(
+                    samples,
+                    offset_state=offset_state,
+                    amplitudes=amplitude_samples(amplitude, len(samples)),
+                )
+            )
             captured_rate, opd_rms, opd_rms_unweighted = self.backend.scalars(
                 result.captured_rate_per_s, *self._opd_rms(result.opd_m)
             )
@@ -376,6 +522,7 @@ class WavefrontSensor:
                 opd_rms_unweighted_m=opd_rms_unweighted,
                 seed=seed,
                 offset_state=offset_state,
+                amplitude=amplitude is not None,
             )
             frame_metadata["wfs_temporal_samples"] = len(samples)
             optical_elapsed = perf_counter() - optical_start
@@ -399,12 +546,15 @@ class WavefrontSensor:
         sample_count = 0
         launched = 0.0
         captured: Any = 0.0
-        for sample in iter_phase_samples(
-            phase_samples,
-            self.config.input.shape,
-            backend=self.backend,
-        ):
-            result = self._render(sample, offset_state)
+        samples = list(
+            iter_phase_samples(
+                phase_samples,
+                self.config.input.shape,
+                backend=self.backend,
+            )
+        )
+        for sample, sample_amplitude in zip(samples, amplitude_samples(amplitude, len(samples))):
+            result = self._render(sample, offset_state, sample_amplitude)
             if rate_sum is None:
                 rate_sum = self.backend.zeros_like(result.photon_rate)
                 opd_sum = self.backend.zeros_like(result.opd_m)
@@ -439,6 +589,7 @@ class WavefrontSensor:
             opd_rms_unweighted_m=opd_rms_unweighted,
             seed=seed,
             offset_state=offset_state,
+            amplitude=amplitude is not None,
         )
         frame_metadata["wfs_temporal_samples"] = sample_count
         optical_elapsed = perf_counter() - optical_start
@@ -458,11 +609,19 @@ class WavefrontSensor:
 
 
 def simulate(
-    wavefront: ArrayLike, config: WFSConfig | str | Path, *, seed: int | None = None
+    wavefront: ArrayLike,
+    config: WFSConfig | str | Path,
+    *,
+    seed: int | None = None,
+    amplitude: ArrayLike | None = None,
 ) -> Any:
-    """One-shot convenience wrapper around :class:`WavefrontSensor`."""
+    """One-shot convenience wrapper around :class:`WavefrontSensor`.
+
+    ``amplitude`` is the optional per-frame pupil amplitude of
+    :meth:`WavefrontSensor.photon_rate`.
+    """
     resolved = load_config(config) if isinstance(config, (str, Path)) else config
-    return WavefrontSensor(resolved).expose(wavefront, seed=seed)
+    return WavefrontSensor(resolved).expose(wavefront, amplitude=amplitude, seed=seed)
 
 
-__all__ = ["WavefrontSensor", "simulate"]
+__all__ = ["SubapertureFlux", "WavefrontSensor", "simulate"]

@@ -12,6 +12,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from .backend import ArrayBackend, cpu_backend
 from .config import WFSConfig
+from .sampling import area_rebin_operators
 
 
 def _coordinates(
@@ -142,6 +143,117 @@ class WavefrontInput:
         """Reject non-finite OPD only where the configured pupil is illuminated."""
         if not self.backend.scalar(self.backend.all(self.backend.isfinite(opd[pupil > 0]))):
             raise ValueError("wavefront contains non-finite OPD inside the illuminated pupil")
+
+
+class AmplitudeInput:
+    """Validated per-frame pupil amplitude, carried to an engine's propagation grid.
+
+    The amplitude is the dimensionless modulus ``|U| / |U_0|`` of the incoming
+    field relative to the unscintillated field the source normalization
+    describes; it multiplies the configured pupil amplitude, and its square
+    scales the pupil intensity. One map applies to every wavelength; a stack
+    gives one map per wavelength node, in the order of ``wavelengths_m``.
+
+    The map is defined on the input grid (``input.shape`` spanning
+    ``input.grid_extent_m``). On another propagation grid its intensity is
+    area-averaged onto the new cells (exact overlaps, ``sampling.area_rebin_operators``)
+    and the square root taken, so the light each cell receives is the integral of
+    the input intensity over that cell; an intensity of exactly one stays exactly
+    one. Equal grids use the map as given.
+    """
+
+    def __init__(
+        self,
+        input_shape: tuple[int, int],
+        target_shape: tuple[int, int],
+        wavelengths_m: tuple[float, ...],
+        *,
+        backend: ArrayBackend | None = None,
+        dtype: Any = np.float64,
+    ) -> None:
+        self.backend = backend or cpu_backend()
+        self.input_shape = tuple(input_shape)
+        self.target_shape = tuple(target_shape)
+        self.wavelengths_m = tuple(wavelengths_m)
+        self.dtype = np.dtype(dtype)
+        self._operators = (
+            None
+            if self.input_shape == self.target_shape
+            else area_rebin_operators(
+                cast(tuple[int, int], self.input_shape),
+                cast(tuple[int, int], self.target_shape),
+                backend=self.backend,
+                dtype=np.float64,
+            )
+        )
+
+    def __call__(self, value: ArrayLike) -> Any:
+        """Return the amplitude as a ``(k, *target_shape)`` array, ``k`` 1 or per wavelength.
+
+        Raises
+        ------
+        TypeError
+            If the amplitude is complex or not numeric.
+        ValueError
+            If its shape is not ``input.shape`` or ``(n_wavelengths, *input.shape)``,
+            or a value is negative or non-finite.
+        """
+        array = self.backend.asarray(value)
+        if np.issubdtype(array.dtype, np.complexfloating):
+            raise TypeError(
+                "amplitude must be real: pass |U| as the amplitude and carry the "
+                "field's phase in the wavefront (OPD)"
+            )
+        if not np.issubdtype(array.dtype, np.number):
+            raise TypeError("amplitude must be numeric")
+        count = len(self.wavelengths_m)
+        if array.ndim == 2 and tuple(array.shape) == self.input_shape:
+            array = array[None, ...]
+        elif not (
+            array.ndim == 3
+            and tuple(array.shape[1:]) == self.input_shape
+            and array.shape[0] in {1, count}
+        ):
+            raise ValueError(
+                f"amplitude must have shape {self.input_shape} or "
+                f"({count}, {self.input_shape[0]}, {self.input_shape[1]}) for the "
+                f"wavelength nodes {list(self.wavelengths_m)}, got {tuple(array.shape)}"
+            )
+        converted = self.backend.asarray(array, dtype=np.float64)
+        valid = self.backend.isfinite(converted) & (converted >= 0.0)
+        if not self.backend.scalar(self.backend.all(valid)):
+            raise ValueError("amplitude must be finite and non-negative")
+        if self._operators is not None:
+            # Average the departure of the intensity from one and add one back:
+            # the same linear operation (each row of overlaps sums to one), but
+            # an intensity of exactly one stays exactly one, which the sums of
+            # overlap fractions need not reproduce in floating point.
+            rows, columns = self._operators
+            departure = converted * converted - 1.0
+            averaged = self.backend.matmul(self.backend.matmul(rows, departure), columns.T)
+            converted = self.backend.sqrt(self.backend.maximum(averaged + 1.0, 0.0))
+        return self.backend.asarray(converted, dtype=self.dtype)
+
+
+def amplitude_samples(value: Any, count: int) -> list[Any]:
+    """Split a per-temporal-sample amplitude into one entry per sample.
+
+    ``None`` gives ``count`` ``None`` entries. Otherwise ``value`` is a
+    sequence, or an array whose leading axis is the sample axis, with exactly
+    ``count`` entries; each is one sample's amplitude. A single two-dimensional
+    map is accepted for a single sample.
+    """
+    if value is None:
+        return [None] * count
+    if count == 1 and getattr(value, "ndim", None) == 2:
+        return [value]
+    entries = list(value)
+    if len(entries) != count:
+        raise ValueError(
+            f"amplitude needs one entry per temporal sample: got {len(entries)} for "
+            f"{count} sample(s)"
+        )
+    return entries
 
 
 def resample_opd(
@@ -295,8 +407,10 @@ def iter_phase_samples(
 
 
 __all__ = [
+    "AmplitudeInput",
     "WavefrontInput",
     "_coordinates",
+    "amplitude_samples",
     "grid_rms",
     "iter_phase_samples",
     "load_static_opd",

@@ -1,7 +1,9 @@
 # Guide stars and source morphology
 
 `makewfs` consumes a source photon budget; it does not predict laser return
-power, sodium excitation, sky background, or atmospheric scintillation. This
+power, sodium excitation, sky background, or atmospheric scintillation (a
+caller-computed scintillation pattern can be passed per frame as an
+[amplitude](scintillation.md)). This
 keeps source/radiometry assumptions visible to an AO designer and leaves
 detector effects to `getframes`.
 

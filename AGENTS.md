@@ -24,9 +24,11 @@ The repository is currently in the Shack-Hartmann and fixed-mask four-face
 pyramid stage, with deterministic source spectral/angular quadrature, measured
 source curves and user-supplied angular kernels, physical SH sampling controls,
 analytic segmented/rotated pupils, a documented SH sodium-range geometry
-model with a fast fixed-kernel evaluation (`source.lgs_model = "kernel"`), and
-pre-declared SH lenslet-grid offset states. It also includes a versioned
-labelled documentation gallery, benchmark reference snapshot,
+model with a fast fixed-kernel evaluation (`source.lgs_model = "kernel"`),
+pre-declared SH lenslet-grid offset states, an optional per-frame pupil
+amplitude for scintillation (ADR 0006), SH per-subaperture flux, a square
+focal-plane spatial filter, and inter-lenslet cross-talk. It also includes a
+versioned labelled documentation gallery, benchmark reference snapshot,
 non-editable-wheel clean-room smoke evidence, released
 wavelength-resolved detector QE through `getframes>=2.2.0`, and public
 end-to-end CuPy execution with CPU parity tests. The GPU path uses
@@ -78,8 +80,11 @@ write a failing integration test/design note, use the conditional gates in
 ## Stable contracts to protect
 
 - The physical per-frame runtime inputs are the wavefront and an optional noise
-  seed. An optional caller-owned `out` array controls storage lifetime only. All
-  instrument/source/detector choices live in versioned config. The SH
+  seed. The wavefront is the OPD plus, optionally, a pupil `amplitude`
+  (ADR 0006); the OPD stays the only phase input, and `amplitude=None` or an
+  amplitude of exactly one must reproduce the OPD-only result bit for bit on
+  the CPU. An optional caller-owned `out` array controls storage lifetime
+  only. All instrument/source/detector choices live in versioned config. The SH
   `offset_state` index only selects a lenslet-grid position declared in
   `shack_hartmann.lenslet_grid_offset_states_fraction` (ADR 0005); never add a
   per-call geometry value that the config and digest do not record.
@@ -90,7 +95,8 @@ write a failing integration test/design note, use the conditional gates in
 - Ideal output is a non-negative photon-rate map in photons/s/native detector
   pixel. Only `getframes` turns it into electrons or ADU.
 - Intensities, not fields, are summed over incoherent wavelengths, modulation
-  points, finite-source samples, and sodium slices.
+  points, finite-source samples, and sodium slices, and over the overlapping
+  windows of neighbouring lenslets with cross-talk (a documented approximation).
 - Cropping reports lost flux; it does not renormalize it away.
 - Wavefront metrics follow aocore CONVENTIONS 4.1. Frame metadata
   `wfs_input_opd_rms_m` is the pupil-intensity-weighted, piston-removed RMS of
@@ -177,7 +183,14 @@ Follow the target layout in `ROADMAP.md`:
   only) does not cover.
 - `sensors/` contains deterministic ideal optical engines and no camera noise.
   `shack_hartmann.py` keeps per-offset-state geometry in `_LensletGeometry`
-  (state 0 backs the legacy `lenslet_mask`/`lenslet_valid`/... attributes).
+  (state 0 backs the legacy `lenslet_mask`/`lenslet_valid`/... attributes;
+  `entrance_pupil` and `fill_mask` keep the pupil and the fill factor apart
+  because the spatial filter acts between them). `_lenslet_fields` builds the
+  amplitude-weighted and spatially filtered entrance fields, and `_mosaic`
+  overlap-adds widened spot windows for cross-talk.
+  `wavefront.AmplitudeInput` validates the per-frame amplitude and area-averages
+  its intensity onto a propagation grid; `sampling.square_spatial_filter` is
+  the focal-plane stop.
   `lgs.py` builds the cached per-subaperture LGS kernels of
   `lgs_model = "kernel"`, which `sampling.spot_intensity` applies through its
   `source_kernel` hook on the oversampled focal grid.
@@ -288,6 +301,31 @@ MPLBACKEND=Agg python examples/gallery.py
   `mode="grid-constant"` and the OPD with `mode="nearest"`. Plain `"constant"`
   zeroes everything beyond the outermost sample centres, which made sub-pixel
   pupil translation a staircase before 2.2.
+- An amplitude of exactly one must stay exactly one through resampling, but
+  linear-interpolation weights and sums of area-overlap fractions need not add
+  to one in floating point (a rotated grid moved values by an ulp). Resample the
+  departure from one and add one back (`lenslet_amplitudes`,
+  `AmplitudeInput`), clamping the intensity at zero before the square root.
+- The spatial filter blocks a frequency exactly on its edge, with a `1e-9`-bin
+  tolerance on `c n lambda_ref / lambda`. An independent mask in a test must use
+  the same rule: `3.0 * 1.25` is `3.7500000000000004`, which a plain `<`
+  comparison admits as one more bin.
+- Cross-talk widens the propagated window by `window_margin` and keeps it
+  (`keep_window_margin`). `spot_sampling_geometry` is still called without the
+  margin; field upsampling already makes `samples_per_lenslet` hold the widened
+  window, and `_SpotPropagationPlan.build` must keep raising when a margin
+  exceeds one FFT period (passing the margin to the geometry silently switched
+  such a plan to an aliasing DFT).
+- The compiled SH kernel takes the OPD only, so frames with an amplitude, a
+  spatial filter, or cross-talk use the array reference path on a GPU. A GPU
+  pyramid replays a second CUDA graph (`_amplitude_graph`) for amplitude
+  frames; `_CudaGraphReplay` takes several fixed-shape inputs, so the
+  amplitude is always passed as one map per wavelength node.
+- `tests/test_oopao_validation.py` fails at import, not with a skip, when
+  OOPAO's own `__init__` finds no `sys.path` entry containing "OOPAO" (it
+  calls `argmin` on an empty list), which happens with OOPAO installed as an
+  ordinary site package. It is an environment issue, unrelated to makewfs
+  code.
 
 ## Documentation and examples
 

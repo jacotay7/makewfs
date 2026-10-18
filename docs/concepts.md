@@ -9,7 +9,10 @@ never inferred from array magnitude.
 
 The input array uses `(y, x)` order. Its physical extent and shape come from the
 `[input]` table. The pupil amplitude is configured separately, so a per-frame
-input contains only the phase/OPD map.
+input is normally only the phase/OPD map. An optional per-frame `amplitude`
+array of the same shape multiplies the configured pupil to represent
+scintillation ([Scintillation and subaperture flux](scintillation.md)); the
+OPD still carries the phase.
 
 ## Image domains
 

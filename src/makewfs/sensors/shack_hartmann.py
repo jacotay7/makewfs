@@ -1,4 +1,9 @@
-"""Batched Fourier-optics Shack-Hartmann wavefront sensor."""
+"""Batched Fourier-optics Shack-Hartmann wavefront sensor.
+
+Optional per-frame amplitude (scintillation), a square focal-plane spatial
+filter in front of the lenslets (Poyneer & Macintosh 2004, JOSA A 21, 810) and
+inter-lenslet cross-talk are documented in ``docs/scintillation.md`` and ADR 0006.
+"""
 
 from __future__ import annotations
 
@@ -21,12 +26,14 @@ from ..sampling import (
     _SpotPropagationPlan,
     lenslet_field_upsampling,
     load_blur_kernel,
+    spatial_filter_half_width,
     spot_intensity,
     spot_sampling_geometry,
+    square_spatial_filter,
 )
 from ..sensors.base import OpticalResult, SensorEngine
 from ..source import SourceState, iter_source_states, lgs_kernel_morphology
-from ..wavefront import WavefrontInput, _coordinates, load_static_opd
+from ..wavefront import AmplitudeInput, WavefrontInput, _coordinates, load_static_opd
 from ._shack_hartmann_cuda import (
     _compiled_executor_rejection,
     _CompiledExecutorUnavailable,
@@ -49,6 +56,12 @@ class _LensletGeometry:
     """Physical-grid sample coordinates of each lenslet-grid sample, or ``None``
     for the aligned grid, which needs no resampling."""
     lenslet_mask: Any
+    """Entrance pupil times the lenslet fill-factor mask, on the lenslet grid."""
+    entrance_pupil: Any
+    """Entrance pupil on the lenslet grid, before the fill-factor mask (the field
+    the spatial filter acts on)."""
+    fill_mask: Any | None
+    """Lenslet fill-factor mask, or ``None`` for a fill factor of one."""
     lenslet_illumination: Any
     lenslet_valid: Any
     centers_x: Any
@@ -90,6 +103,23 @@ class ShackHartmannEngine(SensorEngine):
         # custom mask, which must match it) and defines lenslet illumination.
         self.pupil_samples_per_lenslet = requested or max(8, math.ceil(input_samples))
         self.pupil_shape = (self.n_lenslets * self.pupil_samples_per_lenslet,) * 2
+        # Without cross-talk each spot is confined to its own window; with a
+        # reach of k it is propagated over (2k + 1) windows on each axis and
+        # added into the neighbours' pixels.
+        self.crosstalk_reach = self.settings.crosstalk_reach_subapertures
+        self._window_pixels = self.settings.pixels_per_subaperture * (2 * self.crosstalk_reach + 1)
+        if self.crosstalk_reach and config.source.lgs_model == "kernel":
+            raise ValueError(
+                "shack_hartmann.crosstalk_reach_subapertures is not supported with "
+                "source.lgs_model = 'kernel'"
+            )
+        if self.settings.spatial_filter_width_lambda_over_d is not None and (
+            config.source.lgs_ranges_m
+        ):
+            raise ValueError(
+                "shack_hartmann.spatial_filter_width_lambda_over_d is not supported with "
+                "range-resolved LGS states"
+            )
         # Each lenslet is propagated on an integer refinement of that grid,
         # fine enough that the sampled field's periodic far field does not
         # repeat inside the detector window at the shortest wavelength. See
@@ -186,6 +216,22 @@ class ShackHartmannEngine(SensorEngine):
         self.lgs_kernel_radius_samples = 0
         if config.source.lgs_model == "kernel":
             self.lgs_kernel_margin_samples = self._attach_lgs_kernels()
+        # Oversampled focal-plane samples propagated beyond each side of a
+        # detector window: the LGS kernel margin, or the cross-talk reach.
+        self._spot_window_margin = (
+            self.lgs_kernel_margin_samples
+            + self.crosstalk_reach
+            * self.settings.pixels_per_subaperture
+            * config.numerics.fft_oversampling
+        )
+        self._spatial_filter_half_widths = self._build_spatial_filter()
+        self._amplitude = AmplitudeInput(
+            config.input.shape,
+            self.internal_shape,
+            self._wavelengths,
+            backend=self.backend,
+            dtype=self._real_dtype,
+        )
         self._state_groups = self._build_state_groups()
         self._spot_plans = self._build_spot_plans()
         self._compiled_executor_enabled = True
@@ -284,7 +330,8 @@ class ShackHartmannEngine(SensorEngine):
         else:
             field_x, field_y = self.xx, self.yy
             pupil_on_grid = self.pupil
-        lenslet_mask = self._make_lenslet_mask(pupil_on_grid)
+        fill_mask = self._fill_factor_mask()
+        lenslet_mask = pupil_on_grid if fill_mask is None else pupil_on_grid * fill_mask
         n = self.n_lenslets
         s = self.samples_per_lenslet
         illumination = self.backend.mean(lenslet_mask.reshape(n, s, n, s), axis=(1, 3))
@@ -308,6 +355,8 @@ class ShackHartmannEngine(SensorEngine):
             offset_fraction=(float(offset_x), float(offset_y)),
             sample_indices=sample_indices,
             lenslet_mask=lenslet_mask,
+            entrance_pupil=pupil_on_grid,
+            fill_mask=fill_mask,
             lenslet_illumination=illumination,
             lenslet_valid=illumination >= self.settings.minimum_illuminated_fraction,
             centers_x=centers_x.reshape(n * n),
@@ -422,7 +471,8 @@ class ShackHartmannEngine(SensorEngine):
                     optical_blur_kernel=self._optical_blur_kernel,
                     charge_diffusion_kernel=self._charge_diffusion_kernel,
                     backend=self.backend,
-                    window_margin=self.lgs_kernel_margin_samples,
+                    window_margin=self._spot_window_margin,
+                    keep_window_margin=self.crosstalk_reach > 0,
                 )
         return tuple(plans[key] for key in keys)
 
@@ -449,19 +499,40 @@ class ShackHartmannEngine(SensorEngine):
         )
         return cast(NDArray[np.float64], self.backend.asarray(kernel, dtype=self._rate_dtype))
 
-    def _make_lenslet_mask(self, pupil_on_grid: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Apply optional square lenslet fill factor to the entrance pupil."""
+    def _fill_factor_mask(self) -> NDArray[np.float64] | None:
+        """Return the square lenslet fill-factor mask, or ``None`` for full fill."""
         fill = self.settings.lenslet_fill_factor
         if fill >= 1.0:
-            return pupil_on_grid
+            return None
         s = self.samples_per_lenslet
         coords = (self.backend.arange(s, dtype=self._real_dtype) + 0.5) / s - 0.5
         yy, xx = self.backend.meshgrid(coords, coords)
         local = ((self.backend.abs(xx) <= fill / 2) & (self.backend.abs(yy) <= fill / 2)).astype(
             self._real_dtype
         )
-        tiled = self.backend.tile(local, (self.n_lenslets, self.n_lenslets))
-        return cast(NDArray[np.float64], pupil_on_grid * tiled)
+        return cast(
+            NDArray[np.float64], self.backend.tile(local, (self.n_lenslets, self.n_lenslets))
+        )
+
+    def _build_spatial_filter(self) -> dict[float, int] | None:
+        """Return the passband half-width of each wavelength, or ``None`` for no filter.
+
+        The square stop of ``spatial_filter_width_lambda_over_d`` is defined at
+        ``sensor.wavelength_m``; at another wavelength the same physical stop
+        passes spatial frequencies scaled by ``lambda_ref / lambda``.
+        """
+        width = self.settings.spatial_filter_width_lambda_over_d
+        if width is None:
+            return None
+        return {
+            wavelength: spatial_filter_half_width(
+                width,
+                lenslets=self.n_lenslets,
+                reference_wavelength_m=self.config.sensor.wavelength_m,
+                wavelength_m=wavelength,
+            )
+            for wavelength in self._wavelengths
+        }
 
     def _sample_to_lenslet_grid(
         self,
@@ -498,12 +569,15 @@ class ShackHartmannEngine(SensorEngine):
         Spot sampling in pixels per ``lambda / d`` scales with wavelength, so the
         shortest propagated wavelength sees the widest window. A configured
         circular field stop of radius ``r`` admits nothing beyond a ``2 r`` wide
-        region, so it bounds the window too.
+        region, so it bounds the window too. With cross-talk the window is the
+        ``(2 k + 1)`` subaperture windows each spot is propagated over.
         """
-        pixels = self.settings.pixels_per_subaperture
+        pixels = self._window_pixels
         window = max(pixels / sampling for sampling in self._state_spot_sampling)
         field_stop = self.settings.field_stop_radius_lambda_over_d
-        if field_stop is not None:
+        if field_stop is not None and not self.crosstalk_reach:
+            # With cross-talk the propagated grid must still hold the whole
+            # extended window, so the stop does not shrink it.
             window = min(window, 2.0 * field_stop)
         return window
 
@@ -550,6 +624,7 @@ class ShackHartmannEngine(SensorEngine):
         state: SourceState,
         state_index: int,
         geometry: _LensletGeometry | None = None,
+        amplitude: Any | None = None,
     ) -> NDArray[Any]:
         geometry = self._geometries[0] if geometry is None else geometry
         total_opd = internal + geometry.field_angle_opd[state_index]
@@ -559,13 +634,21 @@ class ShackHartmannEngine(SensorEngine):
         # in exp(i*phase) and has no effect on the intensity.
         relative_opd = total_opd - piston
         phase = opd_to_phase(relative_opd, state.wavelength_m)
-        return cast(
-            NDArray[Any],
-            self.backend.asarray(
-                geometry.lenslet_mask * self.backend.exp(1j * phase),
-                dtype=self._complex_dtype,
-            ),
+        if amplitude is None and self._spatial_filter_half_widths is None:
+            return cast(
+                NDArray[Any],
+                self.backend.asarray(
+                    geometry.lenslet_mask * self.backend.exp(1j * phase),
+                    dtype=self._complex_dtype,
+                ),
+            )
+        fields = self._lenslet_fields(
+            self.backend.exp(1j * phase)[None, ...],
+            geometry,
+            None if amplitude is None else amplitude[None, ...],
+            (state.wavelength_m,),
         )
+        return cast(NDArray[Any], fields[0])
 
     def _fields(
         self,
@@ -574,11 +657,14 @@ class ShackHartmannEngine(SensorEngine):
         *,
         samples: int = 1,
         geometry: _LensletGeometry | None = None,
+        amplitudes: Any | None = None,
     ) -> NDArray[Any]:
         """Build one device batch for source states sharing FFT geometry.
 
         With ``samples`` greater than one, ``internal`` carries a leading
         temporal axis and the returned batch is ordered ``(sample, state)``.
+        ``amplitudes`` is ``None`` or the ``(samples, k, *internal_shape)``
+        lenslet-grid amplitude, ``k`` one or one per wavelength node.
         """
         geometry = self._geometries[0] if geometry is None else geometry
         angles = self.backend.stack([geometry.field_angle_opd[index] for index in state_group])
@@ -598,20 +684,146 @@ class ShackHartmannEngine(SensorEngine):
             dtype=self._real_dtype,
         )[:, None, None]
         phase = opd_to_phase(total_opd - piston, wavelengths)
-        return cast(
-            NDArray[Any],
-            self.backend.asarray(
-                geometry.lenslet_mask[None, ...] * self.backend.exp(1j * phase),
-                dtype=self._complex_dtype,
-            ),
+        if amplitudes is None and self._spatial_filter_half_widths is None:
+            return cast(
+                NDArray[Any],
+                self.backend.asarray(
+                    geometry.lenslet_mask[None, ...] * self.backend.exp(1j * phase),
+                    dtype=self._complex_dtype,
+                ),
+            )
+        batch_amplitude = None
+        if amplitudes is not None:
+            if amplitudes.shape[1] == 1:
+                batch_amplitude = self.backend.repeat(amplitudes, len(state_group), axis=1)
+            else:
+                batch_amplitude = amplitudes[
+                    :, [self._state_wavelength_indices[index] for index in state_group]
+                ]
+            batch_amplitude = batch_amplitude.reshape(
+                samples * len(state_group), *batch_amplitude.shape[2:]
+            )
+        return self._lenslet_fields(
+            self.backend.exp(1j * phase),
+            geometry,
+            batch_amplitude,
+            tuple(self.source_states[index].wavelength_m for index in state_group) * samples,
         )
 
-    def render(self, wavefront: NDArray[np.float64], *, offset_state: int = 0) -> OpticalResult:
-        """Render one OPD sample with the lenslet grid of ``offset_state``."""
-        return self._render_samples([wavefront], self.geometry(offset_state))
+    def _lenslet_fields(
+        self,
+        phasor: Any,
+        geometry: _LensletGeometry,
+        amplitude: Any | None,
+        wavelengths: tuple[float, ...],
+    ) -> NDArray[Any]:
+        """Return the fields entering the lenslets for a batch of phasors.
+
+        The entrance field is the pupil times the per-frame amplitude times the
+        phasor. Without a spatial filter the fill-factor mask is folded into
+        the pupil (``lenslet_mask``), as on the OPD-only path; an amplitude of
+        exactly one therefore leaves every value unchanged. With a filter, the
+        whole entrance field is low-passed by the square focal-plane stop first
+        and the lenslet fill-factor mask applies after it.
+        """
+        if self._spatial_filter_half_widths is None:
+            pupil = geometry.lenslet_mask[None, ...]
+            if amplitude is not None:
+                pupil = pupil * amplitude
+            return cast(
+                NDArray[Any],
+                self.backend.asarray(pupil * phasor, dtype=self._complex_dtype),
+            )
+        pupil = geometry.entrance_pupil[None, ...]
+        if amplitude is not None:
+            pupil = pupil * amplitude
+        fields = self.backend.asarray(pupil * phasor, dtype=self._complex_dtype)
+        half_widths = [self._spatial_filter_half_widths[value] for value in wavelengths]
+        if len(set(half_widths)) == 1:
+            fields = square_spatial_filter(
+                fields,
+                half_width=half_widths[0],
+                workers=self.config.numerics.fft_workers,
+                backend=self.backend,
+            )
+        else:
+            fields = self.backend.stack(
+                [
+                    square_spatial_filter(
+                        fields[index],
+                        half_width=half_width,
+                        workers=self.config.numerics.fft_workers,
+                        backend=self.backend,
+                    )
+                    for index, half_width in enumerate(half_widths)
+                ]
+            )
+        if geometry.fill_mask is not None:
+            fields = fields * geometry.fill_mask[None, ...]
+        return cast(NDArray[Any], fields)
+
+    def lenslet_amplitudes(self, amplitudes: Sequence[Any], geometry: _LensletGeometry) -> Any:
+        """Carry per-sample amplitudes to the lenslet grid of ``geometry``.
+
+        Returns a ``(samples, k, *internal_shape)`` array in the working
+        precision, ``k`` one or one per wavelength node. A rotated or offset
+        lenslet grid samples each map at its transformed coordinates by linear
+        interpolation, as it does the OPD. It interpolates the departure from
+        one and adds one back, which is the same linear operation but keeps an
+        amplitude of exactly one exact (interpolation weights need not sum to
+        one in floating point).
+        """
+        maps = []
+        for value in amplitudes:
+            resampled = self._amplitude(value)
+            if geometry.sample_indices is not None:
+                resampled = self.backend.stack(
+                    [
+                        self._sample_to_lenslet_grid(
+                            resampled[index] - 1.0, geometry.sample_indices, outside="nearest"
+                        )
+                        + 1.0
+                        for index in range(resampled.shape[0])
+                    ]
+                )
+            maps.append(resampled)
+        counts = {int(item.shape[0]) for item in maps}
+        if len(counts) > 1:
+            # Mixed achromatic and per-wavelength samples: repeat the single maps.
+            width = max(counts)
+            maps = [
+                item if item.shape[0] == width else self.backend.repeat(item, width, axis=0)
+                for item in maps
+            ]
+        return self.backend.stack(maps)
+
+    def render(
+        self,
+        wavefront: NDArray[np.float64],
+        *,
+        offset_state: int = 0,
+        amplitude: Any | None = None,
+        lenslet_flux: bool = False,
+    ) -> OpticalResult:
+        """Render one OPD sample with the lenslet grid of ``offset_state``.
+
+        ``amplitude`` is an optional per-frame pupil amplitude (see
+        :class:`makewfs.wavefront.AmplitudeInput`). ``lenslet_flux`` also
+        returns the photon rate entering each lenslet.
+        """
+        return self._render_samples(
+            [wavefront],
+            self.geometry(offset_state),
+            amplitudes=None if amplitude is None else [amplitude],
+            lenslet_flux=lenslet_flux,
+        )
 
     def render_integrated(
-        self, wavefronts: Sequence[NDArray[np.float64]], *, offset_state: int = 0
+        self,
+        wavefronts: Sequence[NDArray[np.float64]],
+        *,
+        offset_state: int = 0,
+        amplitudes: Sequence[Any] | None = None,
     ) -> OpticalResult:
         """Render several temporal OPD samples as one uniformly weighted average.
 
@@ -627,15 +839,22 @@ class ShackHartmannEngine(SensorEngine):
         scaling by source flux, and summing. Averaging the spots and then
         scaling is therefore the same arithmetic as scaling and then averaging,
         which is what the caller-side loop used to do.
+
+        ``amplitudes`` optionally gives one pupil amplitude per sample.
         """
         if not wavefronts:
             raise ValueError("render_integrated requires at least one sample")
-        return self._render_samples(wavefronts, self.geometry(offset_state))
+        if amplitudes is not None and len(amplitudes) != len(wavefronts):
+            raise ValueError("render_integrated needs one amplitude per wavefront sample")
+        return self._render_samples(wavefronts, self.geometry(offset_state), amplitudes=amplitudes)
 
     def _render_samples(
         self,
         wavefronts: Sequence[NDArray[np.float64]],
         geometry: _LensletGeometry,
+        *,
+        amplitudes: Sequence[Any] | None = None,
+        lenslet_flux: bool = False,
     ) -> OpticalResult:
         internal_samples = [
             self._sample_to_lenslet_grid(
@@ -649,6 +868,9 @@ class ShackHartmannEngine(SensorEngine):
         internal = (
             internal_samples[0] if sample_count == 1 else self.backend.stack(internal_samples)
         )
+        amplitude_maps = (
+            None if amplitudes is None else self.lenslet_amplitudes(amplitudes, geometry)
+        )
         opd = self.wavefront.input_opd(
             wavefronts[0]
             if sample_count == 1
@@ -657,7 +879,11 @@ class ShackHartmannEngine(SensorEngine):
                 axis=0,
             )
         )
-        compiled = self._render_compiled(internal, sample_count, geometry)
+        compiled = (
+            None
+            if amplitude_maps is not None or lenslet_flux
+            else self._render_compiled(internal, sample_count, geometry)
+        )
         if compiled is not None:
             return OpticalResult(
                 compiled.photon_rate,
@@ -676,10 +902,15 @@ class ShackHartmannEngine(SensorEngine):
                 (len(self._wavelengths), *self.output_shape), dtype=self._rate_dtype
             )
         )
+        lenslet_rate = (
+            self.backend.zeros((self.n_lenslets, self.n_lenslets), dtype=self._rate_dtype)
+            if lenslet_flux
+            else None
+        )
         captured: Any = 0.0
         s = self.samples_per_lenslet
         n = self.n_lenslets
-        margin = self.settings.detector_margin_pixels
+        window = self._window_pixels
         for state_group in self._state_groups:
             if sample_count == 1 and len(state_group) == 1:
                 subapertures = (
@@ -688,6 +919,16 @@ class ShackHartmannEngine(SensorEngine):
                         states[state_group[0]],
                         state_group[0],
                         geometry,
+                        amplitude=(
+                            None
+                            if amplitude_maps is None
+                            else amplitude_maps[
+                                0,
+                                0
+                                if amplitude_maps.shape[1] == 1
+                                else self._state_wavelength_indices[state_group[0]],
+                            ]
+                        ),
                     )
                     .reshape(n, s, n, s)
                     .transpose(0, 2, 1, 3)
@@ -697,11 +938,26 @@ class ShackHartmannEngine(SensorEngine):
                 # Leading axis is (sample, state), flattened into the batch the
                 # transform already accepts.
                 subapertures = (
-                    self._fields(internal, state_group, samples=sample_count, geometry=geometry)
+                    self._fields(
+                        internal,
+                        state_group,
+                        samples=sample_count,
+                        geometry=geometry,
+                        amplitudes=amplitude_maps,
+                    )
                     .reshape(sample_count * len(state_group), n, s, n, s)
                     .transpose(0, 1, 3, 2, 4)
                     .reshape(sample_count * len(state_group) * n * n, s, s)
                 )
+            if lenslet_rate is not None:
+                power = self.backend.sum(
+                    self.backend.abs(subapertures) ** 2, axis=(-2, -1)
+                ).reshape(sample_count, len(state_group), n, n)
+                power = power.mean(axis=0) if sample_count > 1 else power[0]
+                for group_index, state_index in enumerate(state_group):
+                    lenslet_rate += power[group_index] * (
+                        self.source_rate * states[state_index].weight / geometry.total_field_flux
+                    )
             spots = spot_intensity(
                 subapertures,
                 pixels=self.settings.pixels_per_subaperture,
@@ -714,6 +970,7 @@ class ShackHartmannEngine(SensorEngine):
                 optical_blur_kernel=self._optical_blur_kernel,
                 charge_diffusion_kernel=self._charge_diffusion_kernel,
                 source_kernel=geometry.lgs_kernel,
+                crosstalk_reach=self.crosstalk_reach,
                 _plan=self._spot_plans[state_group[0]],
                 backend=self.backend,
             )
@@ -721,33 +978,15 @@ class ShackHartmannEngine(SensorEngine):
                 sample_count,
                 len(state_group),
                 n * n,
-                self.settings.pixels_per_subaperture,
-                self.settings.pixels_per_subaperture,
+                window,
+                window,
             )
             # The uniform temporal average, taken here rather than by the
             # caller because everything below is linear in these spots.
             grouped_spots = grouped_spots.mean(axis=0) if sample_count > 1 else grouped_spots[0]
             for group_index, state_index in enumerate(state_group):
                 state = states[state_index]
-                base_mosaic = (
-                    grouped_spots[group_index]
-                    .reshape(
-                        n,
-                        n,
-                        self.settings.pixels_per_subaperture,
-                        self.settings.pixels_per_subaperture,
-                    )
-                    .transpose(0, 2, 1, 3)
-                    .reshape((self._base_shape, self._base_shape))
-                )
-                if margin:
-                    mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
-                    mosaic[
-                        margin : margin + self._base_shape,
-                        margin : margin + self._base_shape,
-                    ] = base_mosaic
-                else:
-                    mosaic = base_mosaic
+                mosaic = self._mosaic(grouped_spots[group_index])
                 cropped_flux = self.backend.sum(mosaic)
                 contribution = mosaic * (
                     self.source_rate * state.weight / geometry.total_field_flux
@@ -769,7 +1008,66 @@ class ShackHartmannEngine(SensorEngine):
             opd,
             spectral_photon_rate,
             self._wavelengths,
+            lenslet_rate,
         )
+
+    def _mosaic(self, windows: Any) -> Any:
+        """Assemble one state's ``(n * n, W, W)`` spot windows into the detector image.
+
+        Without cross-talk each window is its own subaperture's block of the
+        ``(lenslet_y, lenslet_x)`` mosaic. With a reach of ``k`` each window
+        spans ``2 k + 1`` blocks per axis, centred on its own; every block is
+        added onto the block of the neighbour it falls on, so light leaving a
+        spot's window lands in the neighbours' pixels. The sum runs on a canvas
+        ``k`` blocks wider on each side, of which the detector (including its
+        margin) keeps its own extent; light beyond the detector is lost.
+        """
+        n = self.n_lenslets
+        pixels = self.settings.pixels_per_subaperture
+        margin = self.settings.detector_margin_pixels
+        reach = self.crosstalk_reach
+        if not reach:
+            base_mosaic = (
+                windows.reshape(n, n, pixels, pixels)
+                .transpose(0, 2, 1, 3)
+                .reshape((self._base_shape, self._base_shape))
+            )
+            if not margin:
+                return base_mosaic
+            mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
+            mosaic[
+                margin : margin + self._base_shape,
+                margin : margin + self._base_shape,
+            ] = base_mosaic
+            return mosaic
+        span = 2 * reach + 1
+        blocks = windows.reshape(n, n, span, pixels, span, pixels)
+        canvas = self.backend.zeros(
+            (n + 2 * reach, pixels, n + 2 * reach, pixels), dtype=windows.dtype
+        )
+        for row in range(span):
+            for column in range(span):
+                canvas[row : row + n, :, column : column + n, :] += blocks[
+                    :, :, row, :, column, :
+                ].transpose(0, 2, 1, 3)
+        canvas_width = (n + 2 * reach) * pixels
+        canvas = canvas.reshape(canvas_width, canvas_width)
+        # Detector pixel o is canvas pixel o - margin + reach * pixels.
+        offset = reach * pixels - margin
+        output_start = max(0, -offset)
+        canvas_start = output_start + offset
+        # Both the detector and the canvas contain the n x n subaperture blocks,
+        # so the overlap is never empty.
+        length = min(self.output_shape[0] - output_start, canvas_width - canvas_start)
+        mosaic = self.backend.zeros(self.output_shape, dtype=self._rate_dtype)
+        mosaic[
+            output_start : output_start + length,
+            output_start : output_start + length,
+        ] = canvas[
+            canvas_start : canvas_start + length,
+            canvas_start : canvas_start + length,
+        ]
+        return mosaic
 
     def _render_compiled(
         self, internal: Any, sample_count: int, geometry: _LensletGeometry
