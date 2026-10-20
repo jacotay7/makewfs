@@ -4,6 +4,11 @@ All notable changes to `makewfs` are documented here.
 
 ## [Unreleased]
 
+- The OOPAO cross-checks target OOPAO 1.0, now on PyPI: the Shack-Hartmann
+  comparison uses 1.0's `wfs_measure(src, sh_data, phase_in=...)` call, both
+  tests skip on older OOPAO, and the `validation` extra installs `OOPAO>=1.0`
+  on Python 3.11 and later.
+
 ## [2.3.0] - 2026-10-18
 
 Scintillation and extreme-AO Shack-Hartmann options

@@ -1,4 +1,4 @@
-"""Supplementary independent optical cross-checks using a local OOPAO checkout."""
+"""Supplementary independent optical cross-checks against OOPAO (>= 1.0, on PyPI)."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def _config(kind: str, wavelength_m: float) -> WFSConfig:
 @pytest.mark.validation
 def test_shack_hartmann_tilt_response_tracks_oopao() -> None:
     """Compare SH response gain and axis isolation with OOPAO's diffractive path."""
-    pytest.importorskip("OOPAO")
+    pytest.importorskip("OOPAO", minversion="1.0")
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         from OOPAO.ShackHartmann import ShackHartmann
         from OOPAO.Source import Source
@@ -102,7 +102,9 @@ def test_shack_hartmann_tilt_response_tracks_oopao() -> None:
     }
     ours_zero = _centroids(sensor.reference(), 2, 8)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        oopao.wfs_measure(phase_in=np.zeros(config.input.shape))
+        # OOPAO 1.0 keeps per-source detector data in ``sh_data`` and measures
+        # the source passed in, not the telescope's.
+        oopao.wfs_measure(source, oopao.sh_data["src_0"], phase_in=np.zeros(config.input.shape))
     oopao_zero = _centroids(np.asarray(oopao.raw_data), 2, 8)
     cycles = np.asarray([-0.2, -0.1, 0.1, 0.2])
     gains: list[float] = []
@@ -119,7 +121,7 @@ def test_shack_hartmann_tilt_response_tracks_oopao() -> None:
                 contextlib.redirect_stdout(io.StringIO()),
                 contextlib.redirect_stderr(io.StringIO()),
             ):
-                oopao.wfs_measure(phase_in=2 * np.pi * cycle * mode)
+                oopao.wfs_measure(source, oopao.sh_data["src_0"], phase_in=2 * np.pi * cycle * mode)
             oopao_delta = _centroids(np.asarray(oopao.raw_data), 2, 8) - oopao_zero
             assert np.max(np.abs(ours_delta[:, 1 - our_component])) < 0.01
             assert np.max(np.abs(oopao_delta[:, 1 - oopao_component])) < 0.01
@@ -140,7 +142,7 @@ def test_shack_hartmann_tilt_response_tracks_oopao() -> None:
 @pytest.mark.validation
 def test_pyramid_low_order_response_maps_track_oopao() -> None:
     """Compare unmodulated pyramid push/pull maps with OOPAO's Fourier model."""
-    pytest.importorskip("OOPAO")
+    pytest.importorskip("OOPAO", minversion="1.0")
     try:
         import cupy
 

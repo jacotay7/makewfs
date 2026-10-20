@@ -33,14 +33,14 @@ propagation on a finer grid that is subsequently pixel-area integrated. The
 separate analytic slope test fixes makewfs's absolute pixel scale to 5%, so an
 independent-package gain difference cannot redefine the physical sampling.
 
-[OOPAO](https://github.com/cheritier/OOPAO) is supplementary rather than a pinned
-CI dependency. Its diffractive SH raw frame stores detector axes transposed
+[OOPAO](https://github.com/cheritier/OOPAO) (1.0 or later, from PyPI) is
+supplementary rather than a CI dependency. Its diffractive SH raw frame stores detector axes transposed
 relative to makewfs; after that explicit mapping, both axis curves must correlate
 above 0.999 and their gains must agree within 1%. Its unmodulated pyramid
 tip/tilt/focus maps must correlate above 0.9 with response norms within 25%.
 OOPAO exercises a different end-to-end object model and is valuable corroboration,
-but its development checkout/API and optional CuPy behavior are not stable enough
-to make it a package dependency.
+but its API and optional CuPy behavior are not stable enough to make it a core
+dependency (1.0 changed the Shack-Hartmann measurement call, for example).
 
 Run the optional reference test with:
 
@@ -49,11 +49,13 @@ python -m pip install -e ".[dev,validation]"
 python -m pytest -q -m validation
 ```
 
-To include a local OOPAO checkout, install it or put its repository root on
-`PYTHONPATH`; otherwise its two tests skip cleanly:
+On Python 3.11 and later the `validation` extra also installs OOPAO (its pyFFTW
+dependency has no Python 3.10 wheels). Without OOPAO 1.0 or later, its two tests
+skip cleanly:
 
 ```bash
-PYTHONPATH=/path/to/OOPAO python -m pytest -q tests/test_oopao_validation.py
+python -m pip install "OOPAO>=1.0"
+python -m pytest -q tests/test_oopao_validation.py
 ```
 
 Some OOPAO revisions select CuPy whenever it is importable. The pyramid
