@@ -43,7 +43,7 @@ dev = [
 docs = ["mkdocs>=1.5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.24"]
 examples = ["matplotlib>=3.7"]
 interop = ["pyturb>=1.0"]
-validation = ["hcipy>=0.6"]
+validation = ["hcipy>=0.6", "OOPAO>=1.0; python_version >= '3.11'"]
 gpu = ["cupy-cuda12x>=13.0"]
 
 [project.scripts]

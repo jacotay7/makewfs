@@ -321,11 +321,12 @@ MPLBACKEND=Agg python examples/gallery.py
   pyramid replays a second CUDA graph (`_amplitude_graph`) for amplitude
   frames; `_CudaGraphReplay` takes several fixed-shape inputs, so the
   amplitude is always passed as one map per wavelength node.
-- `tests/test_oopao_validation.py` fails at import, not with a skip, when
-  OOPAO's own `__init__` finds no `sys.path` entry containing "OOPAO" (it
-  calls `argmin` on an empty list), which happens with OOPAO installed as an
-  ordinary site package. It is an environment issue, unrelated to makewfs
-  code.
+- `tests/test_oopao_validation.py` needs OOPAO 1.0 or later (on PyPI; it
+  skips otherwise). Older git checkouts fail at import when installed as a
+  site package, and 1.0 changed `ShackHartmann.wfs_measure` to take the source
+  and its `sh_data` entry explicitly. Setting `tel.OPD` and propagating
+  `src ** tel * wfs` does not apply the OPD in 1.0 (the source carries the
+  field), so pass `phase_in` to `wfs_measure`.
 
 ## Documentation and examples
 
